@@ -1,0 +1,35 @@
+# Ignore build artifacts
+/build/
+/build/*
+
+# Ignore object files
+*.o
+*.obj
+
+# Ignore executable files
+umdf
+*.exe
+*.out
+*.app
+
+# Ignore temporary files
+*.log
+*.tmp
+*.swp
+*~
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore editor/IDE folders
+.vscode/
+
+# Ignore cmake files if you use CMake
+Makefile
+
+# Ignore any compiled static or shared libraries
+*.a
+*.so
+*.dll
+*.dylib
