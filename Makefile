@@ -19,7 +19,7 @@
 
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Iinclude -Wall -Wextra -MMD -MP
+CXXFLAGS = -std=c++20 -Iinclude -Wall -Wextra -MMD -MP
 
 SRC_DIR = src
 BUILD_DIR = build
@@ -28,7 +28,7 @@ SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
-TARGET = umdf
+TARGET = umdf_tool
 
 # Default target
 all: release

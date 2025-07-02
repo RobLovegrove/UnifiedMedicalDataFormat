@@ -25,7 +25,7 @@ Thumbs.db
 # Ignore editor/IDE folders
 .vscode/
 
-# Ignore cmake files if you use CMake
+# Ignore Makefile
 Makefile
 
 # Ignore any compiled static or shared libraries

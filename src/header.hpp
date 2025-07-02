@@ -1,0 +1,24 @@
+#ifndef HEADER_HPP
+#define HEADER_HPP
+
+#include <cstdint>
+#include <array>
+#include <string>
+#include <string_view>
+
+#include "utils.hpp"
+#include "xref.hpp"
+
+class Header {
+
+private:
+    // Define a magic number and version
+    inline static constexpr Version UMDF_VERSION = Version{1, 0, 0};
+    inline static constexpr std::string_view MAGIC_NUMBER = "#UMDFv1.0\n";
+
+public:
+    bool writeHeader(std::ofstream& outfile, XRefTable& xref);
+    bool readHeader(std::ifstream& inFile);
+};
+
+#endif
