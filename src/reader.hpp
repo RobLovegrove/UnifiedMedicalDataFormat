@@ -3,8 +3,8 @@
 
 #include <string>
 
-#include "header.hpp"
-#include "xref.hpp"
+#include "Header/header.hpp"
+#include "Xref/xref.hpp"
 
 class Reader {
 private: 

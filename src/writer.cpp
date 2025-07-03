@@ -1,6 +1,7 @@
 #include "writer.hpp"
-#include "header.hpp"
-#include "utils.hpp"
+#include "Header/header.hpp"
+#include "Utility/utils.hpp"
+#include "Patient/patient.hpp"
 
 #include <nlohmann/json.hpp> 
 
@@ -10,7 +11,7 @@
 
 using namespace std;
 
-bool Writer::writeNewFile(const string& filename, const string& patientData) {
+bool Writer::writeNewFile(const string& filename, const Patient patient, const string& patientData) {
 
     // OPEN FILE
     ofstream outfile(filename, ios::binary);
@@ -18,6 +19,9 @@ bool Writer::writeNewFile(const string& filename, const string& patientData) {
 
     // CREATE HEADER
     if (!writeHeader(outfile)) return false;
+
+    // CREATE PATIENT DATA
+    if (!writePatientData(outfile)) return false;
 
     // Write data
     uint64_t offset = 0;
@@ -43,7 +47,11 @@ void Writer::setFileAccessMode(FileAccessMode mode) {
 }
 
 bool Writer::writeHeader(ofstream& outfile) {
-    return header.writeHeader(outfile, xref);
+    return header.writePrimaryHeader(outfile, xref);
+}
+
+bool Writer::writePatientData(ofstream& outfile) {
+    return patient.writeToFile(outfile, xref);
 }
 
 bool Writer::writeXref(std::ofstream& outfile) { 

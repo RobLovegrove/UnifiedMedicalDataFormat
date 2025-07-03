@@ -1,6 +1,6 @@
 #include "header.hpp"
 #include "nlohmann/json.hpp"
-#include "utils.hpp"
+#include "Utility/utils.hpp"
 
 #include <sstream>
 #include <fstream>
@@ -12,7 +12,7 @@
 
 using namespace std;
 
-bool Header::writeHeader(ofstream& outfile, XRefTable& xref) {
+bool Header::writePrimaryHeader(ofstream& outfile, XRefTable& xref) {
 
     uint64_t offset = 0;
     if (!getCurrentFilePosition(outfile, offset)) { return false; };
@@ -30,7 +30,7 @@ bool Header::writeHeader(ofstream& outfile, XRefTable& xref) {
     return outfile.good();
 }
 
-bool Header::readHeader(std::ifstream& inFile) {
+bool Header::readPrimaryHeader(std::ifstream& inFile) {
 
     // Confirm correct magic number and version
     string magicLine;

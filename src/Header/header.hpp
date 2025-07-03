@@ -6,8 +6,8 @@
 #include <string>
 #include <string_view>
 
-#include "utils.hpp"
-#include "xref.hpp"
+#include "Utility/utils.hpp"
+#include "Xref/xref.hpp"
 
 class Header {
 
@@ -17,8 +17,11 @@ private:
     inline static constexpr std::string_view MAGIC_NUMBER = "#UMDFv1.0\n";
 
 public:
-    bool writeHeader(std::ofstream& outfile, XRefTable& xref);
-    bool readHeader(std::ifstream& inFile);
+    bool writePrimaryHeader(std::ofstream& outfile, XRefTable& xref);
+    bool readPrimaryHeader(std::ifstream& inFile);
+
+    static bool writeDataHeader(std::ofstream& outfile, ModuleType module, XRefTable& xref);
+    static bool readDataHeader(std::ofstream& outfile);
 };
 
 #endif

@@ -1,7 +1,7 @@
 #include "reader.hpp"
-#include "header.hpp"
-#include "utils.hpp"
-#include "xref.hpp"
+#include "Header/header.hpp"
+#include "Utility/utils.hpp"
+#include "Xref/xref.hpp"
 
 #include <fstream>
 #include <cstdint>
@@ -16,7 +16,7 @@ bool Reader::readFile(const string& filename) {
     if (!inFile) return false;
     
     // Read header and confirm UMDF
-    if (!header.readHeader(inFile)) { return false; } 
+    if (!header.readPrimaryHeader(inFile)) { return false; } 
 
     // load Xref Table
     xrefTable = XRefTable::loadXrefTable(inFile);

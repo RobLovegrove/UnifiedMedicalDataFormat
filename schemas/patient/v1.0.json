@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://localhost:8080/schemas/patient/v1.0.json",
+  "title": "Patient",
+  "description": "Minimal schema for a patient module in UMDF.",
+  "type": "object",
+  "required": ["patient_id", "name", "sex", "birth_date"],
+  "properties": {
+    "patient_id": {
+      "type": "string",
+      "description": "Unique patient identifier within the UMDF file."
+    },
+    "name": {
+      "type": "object",
+      "required": ["family", "given"],
+      "properties": {
+        "family": {
+          "type": "string",
+          "description": "Family or last name."
+        },
+        "given": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Given names (e.g., first and middle names)."
+        }
+      },
+      "description": "The full name of the patient."
+    },
+    "sex": {
+      "type": "string",
+      "enum": ["male", "female", "other", "unknown"],
+      "description": "Administrative gender or sex at birth."
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of birth in YYYY-MM-DD format."
+    }
+  }
+}
