@@ -21,14 +21,12 @@ private:
     Patient patient;
     XRefTable xref;
 
-    bool writeHeader(std::ofstream& outfile);
-    bool writePatientData(std::ofstream& outfile);
     bool writeXref(std::ofstream& outfile);
 
 public:
 
     // Returns true on success, false on failure.
-    bool writeNewFile(const std::string& filename, const Patient patient, const std::string& patientData);
+    bool writeNewFile(const std::string& filename, const Patient& patient);
     void setFileAccessMode(FileAccessMode);
     FileAccessMode getFileAccessMode() const { return accessMode; }
 

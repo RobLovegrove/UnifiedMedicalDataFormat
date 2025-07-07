@@ -19,9 +19,6 @@ private:
 public:
     bool writePrimaryHeader(std::ofstream& outfile, XRefTable& xref);
     bool readPrimaryHeader(std::ifstream& inFile);
-
-    static bool writeDataHeader(std::ofstream& outfile, ModuleType module, XRefTable& xref);
-    static bool readDataHeader(std::ofstream& outfile);
 };
 
 #endif

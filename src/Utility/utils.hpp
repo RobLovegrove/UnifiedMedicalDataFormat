@@ -23,10 +23,6 @@ enum class ModuleType : uint8_t {
     Imaging
 };
 
-struct DataHeader {
-    
-}
-
 bool getCurrentFilePosition(std::ofstream& outfile, uint64_t& offset);
 
 #endif

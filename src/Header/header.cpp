@@ -1,6 +1,7 @@
 #include "header.hpp"
 #include "nlohmann/json.hpp"
 #include "Utility/utils.hpp"
+#include "Utility/uuid.hpp"
 
 #include <sstream>
 #include <fstream>
@@ -25,7 +26,7 @@ bool Header::writePrimaryHeader(ofstream& outfile, XRefTable& xref) {
     outfile.write(MAGIC_NUMBER.data(), size);
 
     // ADD HEADER TO XREFTABLE 
-    xref.addEntry(ModuleType::FileHeader, offset, size);
+    xref.addEntry(ModuleType::FileHeader, UUID(), offset, size);
 
     return outfile.good();
 }

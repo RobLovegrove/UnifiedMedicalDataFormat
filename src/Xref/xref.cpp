@@ -1,5 +1,6 @@
 #include "xref.hpp"
 #include "Utility/utils.hpp"
+#include "Utility/uuid.hpp"
 
 #include <string>
 #include <algorithm> 
@@ -11,18 +12,17 @@ using namespace std;
 char XRefTable::xrefMarker[12] = "xrefoffset\n";
 char XRefTable::EOFmarker[8] = "#EOUMDF";
 
-uint32_t XRefTable::addEntry(ModuleType type, uint64_t offset, uint32_t size) {
+void XRefTable::addEntry(ModuleType type, UUID uuid, uint64_t offset, uint32_t size) {
     XrefEntry newEntry;
-    newEntry.id = nextId++;
+    newEntry.id = uuid;
     newEntry.type = static_cast<uint8_t>(type);
     newEntry.offset = offset;
     newEntry.size = size;
     
     entries.push_back(newEntry);
-    return newEntry.id;
 }
 
-bool XRefTable::deleteEntry(uint32_t entryId) {
+bool XRefTable::deleteEntry(UUID entryId) {
 
     if (erase_if(entries, [entryId](const XrefEntry& entry) {
         return entry.id == entryId;
@@ -46,8 +46,8 @@ bool XRefTable::writeXref(std::ostream& out) const{
     uint32_t count = static_cast<uint32_t>(entries.size());
     out.write(reinterpret_cast<const char*>(&count), sizeof(count));
 
-    // 3. Write field widths: [id=4, type=1, size=4, offset=8]
-    uint8_t widths[4] = {4, 1, 4, 8};
+    // 3. Write field widths: [id=16, type=1, size=4, offset=8]
+    uint8_t widths[4] = {16, 1, 4, 8};
     out.write(reinterpret_cast<const char*>(widths), sizeof(widths));
 
     // 4. Write Reserved (zeroed)
@@ -88,7 +88,7 @@ XRefTable XRefTable::loadXrefTable(std::ifstream& in) {
     in.seekg(fileSize - FOOTER_SIZE);
 
     // 2. Read footer marker and xref offset
-    char inXrefMarker[8];
+    char inXrefMarker[12];
     uint64_t inXrefOffset = 0;
     char inEOFmarker[8];
 
@@ -96,7 +96,7 @@ XRefTable XRefTable::loadXrefTable(std::ifstream& in) {
     in.read(reinterpret_cast<char*>(&inXrefOffset), sizeof(xrefOffset));
     in.read(inEOFmarker, sizeof(EOFmarker));
 
-    if (std::memcmp(inXrefMarker, xrefMarker, 8) != 0) {
+    if (std::memcmp(inXrefMarker, xrefMarker, 12) != 0) {
         throw std::runtime_error("Invalid Xref offset marker.");
     }
     if (std::memcmp(inEOFmarker, EOFmarker, 8) != 0) {
@@ -120,6 +120,10 @@ XRefTable XRefTable::loadXrefTable(std::ifstream& in) {
     // 6. Read widths
     uint8_t widths[4];
     in.read(reinterpret_cast<char*>(widths), sizeof(widths));
+
+    if (widths[0] != 16 || widths[1] != 1 || widths[2] != 4 || widths[3] != 8) {
+        throw std::runtime_error("Unexpected field widths.");
+    }
 
     // 7. Skip reserved
     uint8_t reserved[32];

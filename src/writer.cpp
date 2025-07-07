@@ -1,6 +1,7 @@
 #include "writer.hpp"
 #include "Header/header.hpp"
 #include "Utility/utils.hpp"
+#include "Utility/uuid.hpp"
 #include "Patient/patient.hpp"
 
 #include <nlohmann/json.hpp> 
@@ -11,28 +12,17 @@
 
 using namespace std;
 
-bool Writer::writeNewFile(const string& filename, const Patient patient, const string& patientData) {
+bool Writer::writeNewFile(const string& filename, const Patient& patient) {
 
     // OPEN FILE
     ofstream outfile(filename, ios::binary);
     if (!outfile) return false;
 
     // CREATE HEADER
-    if (!writeHeader(outfile)) return false;
+    if (!header.writePrimaryHeader(outfile, xref)) return false;
 
     // CREATE PATIENT DATA
-    if (!writePatientData(outfile)) return false;
-
-    // Write data
-    uint64_t offset = 0;
-    if (!getCurrentFilePosition(outfile, offset)) { return false; };
-    
-    uint32_t dataLength = static_cast<uint32_t>(patientData.size());
-
-    xref.addEntry(ModuleType::Patient, offset, dataLength);
-
-    cout << "Data length: " << dataLength << endl;
-    outfile.write(patientData.data(), dataLength);
+    if (!patient.writeToFile(outfile, xref)) return false;
 
     // APPEND XREF
     if (!writeXref(outfile)) return false;
@@ -44,14 +34,6 @@ bool Writer::writeNewFile(const string& filename, const Patient patient, const s
 
 void Writer::setFileAccessMode(FileAccessMode mode) {
     accessMode = mode;
-}
-
-bool Writer::writeHeader(ofstream& outfile) {
-    return header.writePrimaryHeader(outfile, xref);
-}
-
-bool Writer::writePatientData(ofstream& outfile) {
-    return patient.writeToFile(outfile, xref);
 }
 
 bool Writer::writeXref(std::ofstream& outfile) { 

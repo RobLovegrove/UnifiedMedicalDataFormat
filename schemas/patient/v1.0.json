@@ -4,7 +4,7 @@
   "title": "Patient",
   "description": "Minimal schema for a patient module in UMDF.",
   "type": "object",
-  "required": ["patient_id", "name", "sex", "birth_date"],
+  "required": ["patient_id", "name", "gender", "birth_date"],
   "properties": {
     "patient_id": {
       "type": "string",
@@ -28,10 +28,15 @@
       },
       "description": "The full name of the patient."
     },
-    "sex": {
+    "gender": {
       "type": "string",
       "enum": ["male", "female", "other", "unknown"],
-      "description": "Administrative gender or sex at birth."
+      "description": "Administrative gender patient currently identifies by."
+    },
+    "birth_sex": {
+      "type": "string",
+      "enum": ["male", "female", "other", "unknown"],
+      "description": "Administrative sex at birth."
     },
     "birth_date": {
       "type": "string",
