@@ -3,6 +3,7 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
+#include <string>
 
 using namespace std;
 
@@ -36,4 +37,8 @@ string UUID::toString() {
     }
 
     return oss.str();
+}
+
+const array<uint8_t, 16>& UUID::data() const {
+    return uuid;
 }

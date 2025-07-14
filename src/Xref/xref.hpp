@@ -3,6 +3,7 @@
 
 #include "Utility/utils.hpp"
 #include "Utility/uuid.hpp"
+#include "DataModule/moduleType.hpp"
 
 #include <fstream>
 #include <iostream>

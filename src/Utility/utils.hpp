@@ -15,14 +15,6 @@ struct Version {
     bool is_compatible_with(const Version& reader_version) const;
 };
 
-enum class ModuleType : uint8_t {
-    FileHeader = 0,
-    Patient,   
-    XrefTable,   
-    Encounter,
-    Imaging
-};
-
 bool getCurrentFilePosition(std::ofstream& outfile, uint64_t& offset);
 
 #endif

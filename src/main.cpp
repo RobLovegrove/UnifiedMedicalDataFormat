@@ -1,11 +1,11 @@
 #include <iostream>
+#include <string>
 
 #include "writer.hpp"
 #include "reader.hpp"
 #include "CLI11/CLI11.hpp"
 #include "Utility/utils.hpp"
 #include "Utility/uuid.hpp"
-#include "Patient/patient.hpp"
 
 using namespace std;
  
@@ -21,29 +21,14 @@ void addWriteOptions(
     bool& update, 
     Writer& writer);
 
-
-
 /* -------------------------- MOCK DATA -------------------------- */
 
-// Example pateint data in JSON format
-const string patientData = R"({
-    "patient_id": "12345",
-    "name": "Nicola Lovegrove",
-    "dob": "21-06-1999"
-})";
-
-Patient p;
 
 /* -------------------------- MAIN FUNCTION -------------------------- */
 
 int main(int argc, char** argv) {
 
     UUID uuid;
-    p.setID(uuid.toString());
-    p.addGivenName("Nicola");
-    p.setLastName("Lovegrove");
-    p.setBirthDate("21-06-1999");
-    p.setGender("Female");
 
     CLI::App app{"UMDF - Unified Medical Data Format Tool"};
     
@@ -72,10 +57,7 @@ int main(int argc, char** argv) {
     if (*writeCmd) {
 
         cout << "Writing to file: " << outputFile << "\n";
-        // Write patient data
-
-        
-        if (!writer.writeNewFile(outputFile, p)) {
+        if (!writer.writeNewFile(outputFile)) {
             cerr << "Failed to write data\n";
             return 1;
         }

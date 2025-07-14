@@ -2,7 +2,6 @@
 #define WRITER_HPP
 
 #include "Header/header.hpp"
-#include "Patient/patient.hpp"
 #include "Xref/xref.hpp"
 
 #include <string>
@@ -18,7 +17,6 @@ class Writer {
 private:
     FileAccessMode accessMode = FileAccessMode::FailIfExists;
     Header header = Header();
-    Patient patient;
     XRefTable xref;
 
     bool writeXref(std::ofstream& outfile);
@@ -26,7 +24,7 @@ private:
 public:
 
     // Returns true on success, false on failure.
-    bool writeNewFile(const std::string& filename, const Patient& patient);
+    bool writeNewFile(const std::string& filename);
     void setFileAccessMode(FileAccessMode);
     FileAccessMode getFileAccessMode() const { return accessMode; }
 
