@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <memory>
+#include <map>
+#include <nlohmann/json.hpp> 
 
 using namespace std;
 
@@ -17,44 +19,146 @@ ostream& operator<<(ostream& os, const unique_ptr<DataField>& field) {
 
 /* ================== StringField ================== */
 
-void StringField::encodeToBuffer(const std::string& value, std::vector<uint8_t>& buffer, size_t offset) const {
-    memcpy(&buffer[offset], value.c_str(), std::min(length, value.size()));
+void StringField::encodeToBuffer(
+    const nlohmann::json& value, vector<uint8_t>& buffer, size_t offset) {
+    
+    if (!value.is_string()) {
+        throw runtime_error("StringField '" + name + "' expected a string");
+    }
+
+    string str = value.get<string>();
+    size_t copyLen = std::min(length, str.size());
+
+    memcpy(&buffer[offset], str.data(), copyLen);
+
+    // Pad the rest with nulls if string is shorter than field length
+    if (copyLen < length) {
+        memset(&buffer[offset + copyLen], 0, length - copyLen);
+    }
 }
+
+nlohmann::json StringField::decodeFromBuffer(
+    const std::vector<uint8_t>& buffer, size_t offset) const {
+
+    std::string result(reinterpret_cast<const char*>(&buffer[offset]), length);
+    // trim trailing '\0' chars
+    result.erase(std::find(result.begin(), result.end(), '\0'), result.end());
+    return result;
+}
+
+/* =============== VarStringField =============== */
+
+void VarStringField::encodeToBuffer(
+    const nlohmann::json& value, vector<uint8_t>& buffer, size_t offset) {
+
+    if (!value.is_string()) {
+        throw runtime_error("VarStringField '" + name + "' expected a string");
+    }
+
+    string str = value.get<string>();
+
+    if (stringBuffer == nullptr) {
+        throw runtime_error("Found nulptr when trying to add string to stringBuffer of VarStringField");
+    }
+
+    stringStart = stringBuffer->addString(str);
+    stringLength = static_cast<uint32_t>(str.length());
+
+    // Write stringStart (8 bytes)
+    memcpy(buffer.data() + offset, &stringStart, sizeof(uint64_t));
+    offset += sizeof(uint64_t);
+
+    // Write stringLength (4 bytes)
+    memcpy(buffer.data() + offset, &stringLength, sizeof(uint32_t));
+
+}
+
+nlohmann::json VarStringField::decodeFromBuffer(
+    const std::vector<uint8_t>& buffer, size_t offset) const {
+
+}
+
+
 
 /* ================== EnumField ================== */
 
-uint8_t EnumField::lookupEnumValue(const std::string& value) const {
+uint8_t EnumField::lookupEnumValue(const string& value) const {
     
-    auto it = std::find(enumValues.begin(), enumValues.end(), value);
+    auto it = find(enumValues.begin(), enumValues.end(), value);
     if (it == enumValues.end()) {
-        throw std::invalid_argument("Invalid enum value: " + value);
+        throw invalid_argument("Invalid enum value: " + value);
     }
-    return static_cast<uint8_t>(std::distance(enumValues.begin(), it));
+    return static_cast<uint8_t>(distance(enumValues.begin(), it));
 }
 
-void EnumField::encodeToBuffer(const std::string& value, std::vector<uint8_t>& buffer, size_t offset) const {
-    uint8_t enumValue = lookupEnumValue(value);
-    buffer[offset] = enumValue;
+void EnumField::encodeToBuffer(
+    const nlohmann::json& value, vector<uint8_t>& buffer, size_t offset) {
+
+    if (!value.is_string()) {
+        throw runtime_error("EnumField '" + name + "' expected a string");
+    }
+
+    uint32_t enumValue = lookupEnumValue(value.get<string>());
+
+    // Write the enum value to the buffer based on the configured byte size
+    for (size_t i = 0; i < storageSize; ++i) {
+        buffer[offset + i] = static_cast<uint8_t>((enumValue >> (8 * i)) & 0xFF);
+    }
 }
 
+nlohmann::json EnumField::decodeFromBuffer(
+    const std::vector<uint8_t>& buffer, size_t offset) const {
+
+    uint32_t enumValue = 0;
+    for (size_t i = 0; i < storageSize; ++i) {
+        enumValue |= (static_cast<uint32_t>(buffer[offset + i]) << (8 * i));
+    }
+    if (enumValue >= enumValues.size()) {
+        throw std::runtime_error("Invalid enum value in buffer");
+    }
+    return enumValues[enumValue];
+}
 
 /* ================== ObjectField ================== */
 
-void ObjectField::encodeToBuffer(const std::string& value, std::vector<uint8_t>& buffer, size_t offset) const {
+void ObjectField::encodeToBuffer(
+    const nlohmann::json& value, vector<uint8_t>& buffer, size_t offset) {
 
-
-}
-
-void ObjectField::addSubField(std::unique_ptr<DataField>) {
-
-
-}
-
-size_t ObjectField::getLength() const {
-
-    size_t totalLength = 0;
-    for (const unique_ptr<DataField>& field : subFields) {
-        totalLength += field->getLength();
+    if (!value.is_object()) {
+        throw std::runtime_error("ObjectField '" + name + "' expected a JSON object");
     }
-    return totalLength;
+
+    size_t subOffset = offset;
+    for (const auto& field : subFields) {
+        const std::string& subName = field->getName();
+        if (value.contains(subName)) {
+            field->encodeToBuffer(value[subName], buffer, subOffset);
+        } else {
+
+            cout << "TODO: Handle optional/required fields in ObjectField" << endl;
+            // TODO: Handle optional fields or throw if required
+            // Example:
+            // if (field->isRequired()) throw runtime_error("Missing required field " + subName);
+            // else zero-fill or skip
+        }
+        subOffset += field->getLength();
+    }
 }
+
+nlohmann::json ObjectField::decodeFromBuffer(
+    const std::vector<uint8_t>& buffer, size_t offset) const {
+
+    nlohmann::json obj = nlohmann::json::object();
+    size_t subOffset = offset;
+    for (const auto& field : subFields) {
+        obj[field->getName()] = field->decodeFromBuffer(buffer, subOffset);
+        subOffset += field->getLength();
+    }
+    return obj;
+}
+
+void ObjectField::addSubField(unique_ptr<DataField> field) {
+
+    subFields.push_back(std::move(field));
+}
+

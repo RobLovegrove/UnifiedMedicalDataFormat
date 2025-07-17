@@ -24,7 +24,7 @@ array<uint8_t, 16> UUID::generateUUID() {
     return uuid;
 }
 
-string UUID::toString() {
+string UUID::toString() const {
     ostringstream oss;
     oss << hex << setfill('0');
 
@@ -41,4 +41,8 @@ string UUID::toString() {
 
 const array<uint8_t, 16>& UUID::data() const {
     return uuid;
+}
+
+void UUID::setData(const std::array<uint8_t, 16>& newData) {
+    uuid = newData;
 }

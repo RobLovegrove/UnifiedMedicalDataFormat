@@ -2,12 +2,16 @@
 #include "Header/header.hpp"
 #include "Utility/utils.hpp"
 #include "Xref/xref.hpp"
+#include "DataModule/dataHeader.hpp"
+#include "DataModule/dataModule.hpp"
+
 
 #include <fstream>
 #include <cstdint>
 #include <vector>
 #include <iostream>
 #include <string>
+#include <sstream> 
 
 using namespace std;
 
@@ -23,20 +27,28 @@ bool Reader::readFile(const string& filename) {
     xrefTable = XRefTable::loadXrefTable(inFile);
 
     cout << "XRefTable successfully read" << endl;
-    const XrefEntry* patientModule = xrefTable.findEntry(ModuleType::Patient);
-    if (patientModule == nullptr) return false;
+    cout << xrefTable << endl;
 
-    inFile.seekg(patientModule->offset);
+    constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 1 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
 
-    std::vector<char> buffer(patientModule->size);
-    inFile.read(buffer.data(), patientModule->size);
+    // Iterate through XrefTable reading data
+    for (const XrefEntry& entry : xrefTable.getEntries()) {
+        if (entry.type == static_cast<uint8_t>(ModuleType::Tabular)) {
+            if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
+                vector<char> buffer(entry.size);
+                inFile.seekg(entry.offset);
+                inFile.read(buffer.data(), entry.size);
+                istringstream stream(string(buffer.begin(), buffer.end()));
 
-    string content(buffer.begin(), buffer.end());
+                unique_ptr<DataModule> dm = DataModule::fromStream(stream);
+                dm->printRows(cout);
 
-    cout << "Moved to patient data offset: " << patientModule->offset << endl;
-    cout << "Patient data of size: " << patientModule->size << endl;
-    cout << "out putting patient data:\n" << content << endl;
-    cout << endl;
+            }
+            else {
+                //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
 
+            }
+        }
+    }
     return true;
 }

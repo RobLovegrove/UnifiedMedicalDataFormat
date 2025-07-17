@@ -6,6 +6,8 @@
 #include <algorithm> 
 #include <vector>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
 
 using namespace std;
 
@@ -140,4 +142,19 @@ XRefTable XRefTable::loadXrefTable(std::ifstream& in) {
     }
 
     return table;
+}
+
+ostream& operator<<(ostream& os, const XRefTable& table) {
+    os << "XRefTable (" << table.entries.size() << " entries):\n";
+
+    for (const auto& entry : table.entries) {
+        os << "  UUID: " << entry.id.toString()
+           << " | Type: " << static_cast<ModuleType>(entry.type)
+           << " | Size: " << entry.size
+           << " | Offset: 0x" << std::hex << std::setw(16) << std::setfill('0') << entry.offset
+           << std::dec << '\n';
+    }
+
+    os << "  Xref Offset: 0x" << std::hex << table.xrefOffset << std::dec << '\n';
+    return os;
 }

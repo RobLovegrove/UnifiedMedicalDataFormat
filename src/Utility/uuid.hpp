@@ -9,9 +9,7 @@ private:
     std::array<uint8_t, 16> generateUUID();
 
 public:
-    UUID() {
-        uuid = generateUUID();
-    }
+    UUID() { uuid = generateUUID(); }
 
     // Overload == operator
     friend bool operator==(const UUID& lhs, const UUID& rhs) {
@@ -23,9 +21,10 @@ public:
         return !(lhs == rhs);
     }
 
-    std::string toString();
+    std::string toString() const;
 
     const std::array<uint8_t, 16>& data() const;
+    void setData(const std::array<uint8_t, 16>& newData);
 
 };
 

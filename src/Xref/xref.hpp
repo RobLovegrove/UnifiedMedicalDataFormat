@@ -3,7 +3,7 @@
 
 #include "Utility/utils.hpp"
 #include "Utility/uuid.hpp"
-#include "DataModule/moduleType.hpp"
+#include "Utility/moduleType.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -30,11 +30,14 @@ public:
     void addEntry(ModuleType type, UUID uuid, uint64_t offset, uint32_t size);
     bool deleteEntry(UUID entryId);
     const XrefEntry* findEntry(ModuleType);
+    const std::vector<XrefEntry>& getEntries() const { return entries; }
 
     void setXrefOffset(uint64_t offset) { xrefOffset = offset; }
     bool writeXref(std::ostream& out) const;
 
     static XRefTable loadXrefTable(std::ifstream& in);
+
+    friend std::ostream& operator<<(std::ostream& os, const XRefTable& table);
 
 };
 

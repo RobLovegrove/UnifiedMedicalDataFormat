@@ -29,6 +29,10 @@ struct DataHeader {
     void writeToFile(std::ostream& out);
     void writeDataSize(std::ostream& out, std::uint32_t size);
 
+    void readDataHeader(std::istream& in);
+
+    friend std::ostream& operator<<(std::ostream& os, const DataHeader& header);
+
 private:
     void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value) const;
     void writeTLVBool(std::ostream& out, HeaderFieldType type, bool value) const;
@@ -37,3 +41,48 @@ private:
 
 
 #endif
+
+
+
+
+
+/*
+
+HeaderSize – HeaderFieldType::HeaderSize
+uint8_t tag
+uint32_t length
+uint32_t value (placeholder at first, overwritten later)
+
+DataSize – HeaderFieldType::DataSize
+uint8_t tag
+uint32_t length
+uint64_t value
+
+ModuleType – HeaderFieldType::ModuleType
+uint8_t tag
+uint32_t length
+std::string value (variable size)
+
+SchemaPath – HeaderFieldType::SchemaPath
+uint8_t tag
+uint32_t length
+std::string value (variable size)
+
+Compression – HeaderFieldType::Compression
+uint8_t tag
+uint32_t length
+bool (stored as uint8_t)
+
+Endianness – HeaderFieldType::Endianness
+uint8_t tag
+uint32_t length
+bool (stored as uint8_t)
+
+ModuleID – HeaderFieldType::ModuleID
+uint8_t tag
+uint32_t length
+16-byte UUID (std::array<uint8_t, 16>)
+
+
+
+*/

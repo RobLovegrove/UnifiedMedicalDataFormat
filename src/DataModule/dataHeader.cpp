@@ -1,7 +1,10 @@
 #include "dataHeader.hpp"
 #include <string>
 #include <stdexcept>
+#include <iostream>
 
+
+/* ================ WRTIE FUNCTIONS ================ */
 
 void DataHeader::writeToFile(std::ostream& out) {
     // Remember where the header starts (before the TLVs)
@@ -16,6 +19,9 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     // Write all the remaining fields
     writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize));
+
+    std::cout << "The module type is: " << moduleType << std::endl;
+
     writeTLVString(out, HeaderFieldType::ModuleType, moduleType);
     writeTLVString(out, HeaderFieldType::SchemaPath, schemaPath);
     writeTLVBool(out, HeaderFieldType::Compression, compression);
@@ -27,6 +33,8 @@ void DataHeader::writeToFile(std::ostream& out) {
     // Calculate how many bytes we wrote for the header
     std::streampos headerEnd = out.tellp();
     uint32_t actualHeaderSize = static_cast<uint32_t>(headerEnd - headerStart);
+
+    std::cout << "The header is: " << actualHeaderSize << " bytes long." << std::endl;
 
     // Seek back and overwrite the value of the header size field
     out.seekp(headerSizePos + static_cast<std::streamoff>(sizeof(uint8_t) + sizeof(uint32_t)));
@@ -64,4 +72,89 @@ void DataHeader::writeTLVFixed(std::ostream& out, HeaderFieldType type, const vo
     out.write(reinterpret_cast<const char*>(&typeID), sizeof(typeID));
     out.write(reinterpret_cast<const char*>(&size), sizeof(size));
     out.write(reinterpret_cast<const char*>(data), size);
+}
+
+
+/* ================ READ FUNCTIONS ================ */
+
+void DataHeader::readDataHeader(std::istream& in) {
+
+    // Read header size
+
+    uint8_t typeId;
+    uint32_t length;
+    in.read(reinterpret_cast<char*>(&typeId), sizeof(typeId));
+    in.read(reinterpret_cast<char*>(&length), sizeof(length));
+
+    if (typeId != static_cast<uint8_t>(HeaderFieldType::HeaderSize)) {
+        throw std::runtime_error("Invalid header: expected HeaderSize first.");
+    }
+    
+    in.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
+
+    size_t bytesRead = sizeof(typeId) + sizeof(length) + sizeof(headerSize);    
+    while (bytesRead < headerSize) {
+        in.read(reinterpret_cast<char*>(&typeId), sizeof(typeId));
+        in.read(reinterpret_cast<char*>(&length), sizeof(length));
+        bytesRead += sizeof(typeId) + sizeof(length);
+
+        std::vector<char> buffer(length);
+        in.read(buffer.data(), length);
+        bytesRead += length;
+
+        auto type = static_cast<HeaderFieldType>(typeId);
+        switch (type) {
+            case HeaderFieldType::DataSize:
+                if (length != sizeof(dataSize)) throw std::runtime_error("Invalid DataSize length.");
+                std::memcpy(&dataSize, buffer.data(), sizeof(dataSize));
+                break;
+
+            case HeaderFieldType::ModuleType:
+                moduleType = std::string(buffer.data(), length);
+                break;
+
+            case HeaderFieldType::SchemaPath:
+                schemaPath = std::string(buffer.data(), length);
+                break;
+
+            case HeaderFieldType::Compression:
+                if (length != 1) throw std::runtime_error("Invalid Compression length.");
+                compression = buffer[0] != 0;
+                break;
+
+            case HeaderFieldType::Endianness:
+                if (length != 1) throw std::runtime_error("Invalid Endianness length.");
+                littleEndian = buffer[0] != 0;
+                break;
+
+            case HeaderFieldType::ModuleID:
+                if (length != 16) throw std::runtime_error("Invalid UUID length.");
+                std::array<uint8_t, 16> id;
+                std::memcpy(id.data(), buffer.data(), 16);
+                moduleID.setData(id);
+                break;
+
+            default:
+                throw std::runtime_error("Unknown HeaderFieldType: " + std::to_string(typeId));
+        }
+    }
+
+    if (bytesRead != headerSize) {
+        throw std::runtime_error("Header read mismatch.");
+    }
+
+}
+
+std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
+    os << "DataHeader {\n"
+       << "  headerSize   : " << header.headerSize << "\n"
+       << "  dataSize     : " << header.dataSize << "\n"
+       << "  moduleType   : " << header.moduleType << "\n"
+       << "  schemaPath   : " << header.schemaPath << "\n"
+       << "  compression  : " << std::boolalpha << header.compression << "\n"
+       << "  littleEndian : " << std::boolalpha << header.littleEndian << "\n"
+       << "  moduleID     : " << header.moduleID.toString() << "\n"
+       << "}";
+
+    return os;
 }

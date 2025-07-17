@@ -24,16 +24,28 @@ bool Writer::writeNewFile(const string& filename) {
 
     // CREATE DATA MODULE
     try {
-        DataModule dm("./schemas/patient/v1.0.json");
-        nlohmann::json schema = dm.getSchema();
+        DataModule dm("./schemas/patient/v1.0.json", UUID());
         dm.addRow({
             {"patient_id", "123e4567-e89b-12d3-a456-426614174000"},
             {"gender", "male"},
             {"birth_sex", "female"},
             {"birth_date", "1990-01-01"},
-            {"name", "Alice Smith"}
+            {"name", {
+                {"family", "Smith"},
+                {"given", "Alice"}
+            }}
         });
-        dm.writeBinary(outfile);
+        dm.addRow({
+            {"patient_id", "f49900f3-8dc7-47b9-b6f5-34939e4b42dc"},
+            {"gender", "male"},
+            {"birth_sex", "male"},
+            {"birth_date", "1994-12-29"},
+            {"name", {
+                {"family", "Lovegrove"},
+                {"given", "Sir Robert of the Squire, earl of the Thames, Mayor of sunbury, Lord of the south"}
+            }}
+        });
+        dm.writeBinary(outfile, xref);
 
     }
     catch (runtime_error e) {

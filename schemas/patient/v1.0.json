@@ -35,6 +35,13 @@
       "format": "date",
       "length": 10,
       "description": "Date of birth in YYYY-MM-DD format."
+    },
+    "name": {
+      "type": "object",
+      "properties": {
+        "given": { "type": "string" },
+        "family": { "type": "string" }
+      }
     }
   }
 }
