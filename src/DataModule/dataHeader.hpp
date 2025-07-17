@@ -9,25 +9,29 @@
 enum class HeaderFieldType : uint8_t {
     HeaderSize    = 1,
     DataSize      = 2,
-    ModuleType    = 3,
-    SchemaPath    = 4,
-    Compression   = 5,
-    Endianness    = 6,
-    ModuleID      = 7
+    StringBufferOffset = 3,
+    ModuleType    = 4,
+    SchemaPath    = 5,
+    Compression   = 6,
+    Endianness    = 7,
+    ModuleID      = 8
 };
 
 struct DataHeader {
     uint32_t headerSize = 0;
     uint64_t dataSize = 0;
+    uint64_t stringOffset = 0;
     std::string moduleType;
     std::string schemaPath;
     bool compression = false;
     bool littleEndian = true;
     UUID moduleID;
+
     uint32_t dataSizePos = 0;
+    uint64_t moduleStartOffset;
 
     void writeToFile(std::ostream& out);
-    void writeDataSize(std::ostream& out, std::uint32_t size);
+    void updateHeader(std::ostream& out, std::uint32_t size, uint64_t stringOffset);
 
     void readDataHeader(std::istream& in);
 

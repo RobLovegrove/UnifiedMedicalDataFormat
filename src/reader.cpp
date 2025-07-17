@@ -40,13 +40,13 @@ bool Reader::readFile(const string& filename) {
                 inFile.read(buffer.data(), entry.size);
                 istringstream stream(string(buffer.begin(), buffer.end()));
 
-                unique_ptr<DataModule> dm = DataModule::fromStream(stream);
+                unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset);
                 dm->printRows(cout);
 
             }
             else {
                 //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
-
+                cout << "TODO: Handle a large DataModule" << endl;
             }
         }
     }

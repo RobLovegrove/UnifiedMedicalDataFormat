@@ -29,7 +29,7 @@ public:
     virtual std::size_t getLength() const = 0;
 
     virtual void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) = 0;
-    virtual nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) const = 0;
+    virtual nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) = 0;
 
     // Overload operator<< for Field
     friend std::ostream& operator<<(std::ostream& os, const std::unique_ptr<DataField>& field);
@@ -50,7 +50,7 @@ public:
     std::size_t getLength() const override { return length; }
 
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
-    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) const override;
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
     
 };
 
@@ -69,7 +69,7 @@ public:
     std::size_t getLength() const override { return sizeof(stringStart) + sizeof(stringLength); }
 
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
-    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) const override;
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
     
 };
 
@@ -89,7 +89,7 @@ public:
     size_t getLength() const override { return storageSize; }
 
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
-    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) const override;
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
 };
 
 /* =============== ObjectField =============== */
@@ -107,7 +107,7 @@ public:
     void encodeToBuffer(
         const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
 
-    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) const override;
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
 
     void addSubField(std::unique_ptr<DataField>);
 

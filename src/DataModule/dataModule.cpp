@@ -31,21 +31,29 @@ DataModule::DataModule(const string& schemaPath, UUID uuid) {
     }
 }
 
-unique_ptr<DataModule> DataModule::fromStream(istream& in) {
+unique_ptr<DataModule> DataModule::fromStream(istream& in, uint64_t moduleStartOffset) {
 
-    //unique_ptr<DataModule> dm = unique_ptr<DataModule>(new DataModule());
 
     DataHeader dmHeader;
     dmHeader.readDataHeader(in);
     unique_ptr<DataModule> dm = make_unique<DataModule>(dmHeader.schemaPath, dmHeader.moduleID);
     dm->header = dmHeader;
+
+    dm->header.moduleStartOffset = moduleStartOffset;
+    size_t actualDataSize = dm->header.stringOffset - (dm->header.moduleStartOffset + dm->header.headerSize);
+
     cout << dm->header << endl;
 
     if (dm->header.compression) {
         cout << "TODO: Handle file compression" << endl;
     } else {
-        dm->decodeRows(in); // Data size is entire size including header size
+        dm->decodeRows(in, actualDataSize); // Data size is entire size including header size
     }
+
+    // Read in string buffer
+    size_t stringBufferSize = dm->header.dataSize - dm->header.headerSize - actualDataSize;
+    dm->stringBuffer.readFromFile(in, stringBufferSize);
+
     return dm;
 }
 
@@ -177,10 +185,17 @@ void DataModule::writeBinary(ostream& out, XRefTable& xref) {
         out.write(reinterpret_cast<const char*>(row.data()), row.size());
     }
 
+    streampos stringBufferStart = out.tellp();
+
+    // Write String Buffer
+    if (stringBuffer.getSize() != 0) {
+        stringBuffer.writeToFile(out);
+    }
+
     streampos moduleEnd = out.tellp();
 
     uint32_t totalModuleSize = static_cast<uint32_t>(moduleEnd - moduleStart);
-    header.writeDataSize(out, totalModuleSize);
+    header.updateHeader(out, totalModuleSize, static_cast<uint64_t>(stringBufferStart));
 
     out.seekp(moduleEnd);
 
@@ -188,9 +203,7 @@ void DataModule::writeBinary(ostream& out, XRefTable& xref) {
 }
 
 
-void DataModule::decodeRows(istream& in) {
-
-    size_t actualDataSize = header.dataSize - header.headerSize;
+void DataModule::decodeRows(istream& in, size_t actualDataSize) {
 
     if (actualDataSize % rowSize != 0) {
         throw format_error("Data does not match row format");

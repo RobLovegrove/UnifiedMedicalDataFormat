@@ -28,7 +28,7 @@ private:
                                             const nlohmann::json& definition,
                                             size_t& rowSize);
 
-    void decodeRows(std::istream& in);
+    void decodeRows(std::istream& in, size_t actualDataSize);
 
 public:
     explicit DataModule(const std::string& schemaPath, UUID uuid);
@@ -39,7 +39,7 @@ public:
 
     void printRows(std::ostream& out) const;
 
-    static std::unique_ptr<DataModule> fromStream(std::istream& in); 
+    static std::unique_ptr<DataModule> fromStream(std::istream& in, uint64_t moduleStartOffset); 
 
 };
 

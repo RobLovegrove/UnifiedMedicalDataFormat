@@ -38,7 +38,7 @@ void StringField::encodeToBuffer(
 }
 
 nlohmann::json StringField::decodeFromBuffer(
-    const std::vector<uint8_t>& buffer, size_t offset) const {
+    const std::vector<uint8_t>& buffer, size_t offset) {
 
     std::string result(reinterpret_cast<const char*>(&buffer[offset]), length);
     // trim trailing '\0' chars
@@ -74,8 +74,27 @@ void VarStringField::encodeToBuffer(
 }
 
 nlohmann::json VarStringField::decodeFromBuffer(
-    const std::vector<uint8_t>& buffer, size_t offset) const {
+    const std::vector<uint8_t>& buffer, size_t offset) {
 
+    if (!stringBuffer) {
+        throw runtime_error("StringBuffer pointer is null in VarStringField");
+    }
+
+    std::memcpy(&stringStart, buffer.data() + offset, sizeof(stringStart));
+    offset += sizeof(stringStart);
+
+    std::memcpy(&stringLength, buffer.data() + offset, sizeof(stringLength));
+    offset += sizeof(stringLength);
+
+    if (stringStart + stringLength > stringBuffer->getSize()) {
+        throw std::runtime_error("VarStringField decode error: string offset + length exceeds buffer size");
+    }
+
+    const std::vector<uint8_t>& buf = stringBuffer->getBuffer();
+
+    std::string result(reinterpret_cast<const char*>(buf.data() + stringStart), stringLength);
+
+    return nlohmann::json(result);
 }
 
 
@@ -107,7 +126,7 @@ void EnumField::encodeToBuffer(
 }
 
 nlohmann::json EnumField::decodeFromBuffer(
-    const std::vector<uint8_t>& buffer, size_t offset) const {
+    const std::vector<uint8_t>& buffer, size_t offset) {
 
     uint32_t enumValue = 0;
     for (size_t i = 0; i < storageSize; ++i) {
@@ -146,7 +165,7 @@ void ObjectField::encodeToBuffer(
 }
 
 nlohmann::json ObjectField::decodeFromBuffer(
-    const std::vector<uint8_t>& buffer, size_t offset) const {
+    const std::vector<uint8_t>& buffer, size_t offset) {
 
     nlohmann::json obj = nlohmann::json::object();
     size_t subOffset = offset;

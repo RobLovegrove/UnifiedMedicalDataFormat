@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <string>
-
+#include <fstream>
 
 class StringBuffer {
 private:
@@ -12,7 +12,12 @@ private:
 
 public:
     uint64_t addString(std::string string);
+    size_t getSize() const { return buffer.size(); }
 
+    const std::vector<uint8_t>& getBuffer() const;
+
+    void writeToFile(std::ostream& out);
+    void readFromFile(std::istream& in, size_t size);
 
 };
 

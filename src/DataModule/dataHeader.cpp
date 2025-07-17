@@ -18,10 +18,8 @@ void DataHeader::writeToFile(std::ostream& out) {
     dataSizePos = out.tellp();
 
     // Write all the remaining fields
-    writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize));
-
-    std::cout << "The module type is: " << moduleType << std::endl;
-
+    writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); // Updated after write
+    writeTLVFixed(out, HeaderFieldType::StringBufferOffset, &stringOffset, sizeof(stringOffset)); // Updated after write
     writeTLVString(out, HeaderFieldType::ModuleType, moduleType);
     writeTLVString(out, HeaderFieldType::SchemaPath, schemaPath);
     writeTLVBool(out, HeaderFieldType::Compression, compression);
@@ -44,13 +42,24 @@ void DataHeader::writeToFile(std::ostream& out) {
     out.seekp(headerEnd);
 }
 
-void DataHeader::writeDataSize(std::ostream& out, std::uint32_t size) {
+void DataHeader::updateHeader(std::ostream& out, std::uint32_t size, uint64_t stringOffset) {
 
     dataSize = size;
     if (dataSizePos == 0) { throw std::runtime_error("Failed to update dataSize"); }
     
     out.seekp(dataSizePos + static_cast<std::streamoff>(sizeof(uint8_t) + sizeof(uint32_t)));
     out.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
+
+    // Calculate position of stringOffset value:
+    // stringOffsetPos = dataSizePos + size of dataSize TLV (tag + length + value)
+    constexpr std::streamoff dataSizeTLVSize = 1 + 4 + sizeof(dataSize); // tag + length + value
+    std::streamoff stringOffsetPos = dataSizePos + dataSizeTLVSize + 1 + 4; // plus tag + length for stringOffset
+
+    // Seek to stringOffset value start
+    out.seekp(stringOffsetPos);
+
+    // Write stringOffset value (8 bytes)
+    out.write(reinterpret_cast<const char*>(&stringOffset), sizeof(stringOffset));
 
 }
 
@@ -109,6 +118,11 @@ void DataHeader::readDataHeader(std::istream& in) {
                 std::memcpy(&dataSize, buffer.data(), sizeof(dataSize));
                 break;
 
+            case HeaderFieldType::StringBufferOffset:
+                if (length != sizeof(stringOffset)) throw std::runtime_error("Invalid stringOffset.");
+                std::memcpy(&stringOffset, buffer.data(), sizeof(stringOffset));
+                break;
+
             case HeaderFieldType::ModuleType:
                 moduleType = std::string(buffer.data(), length);
                 break;
@@ -149,6 +163,7 @@ std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
     os << "DataHeader {\n"
        << "  headerSize   : " << header.headerSize << "\n"
        << "  dataSize     : " << header.dataSize << "\n"
+       << "  stringOffset : " << header.stringOffset << "\n"
        << "  moduleType   : " << header.moduleType << "\n"
        << "  schemaPath   : " << header.schemaPath << "\n"
        << "  compression  : " << std::boolalpha << header.compression << "\n"
