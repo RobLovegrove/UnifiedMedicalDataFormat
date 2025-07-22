@@ -4,6 +4,7 @@
   "title": "patient",
   "description": "Minimal schema for a patient module in UMDF.",
   "type": "object",
+  "module_type": "tabular",
   "endianness": "little",
   "required": ["patient_id", "name", "gender", "birth_date"],
   "properties": {
@@ -42,6 +43,10 @@
         "given": { "type": "string" },
         "family": { "type": "string" }
       }
+    },
+    "age": {
+      "type": "integer",
+      "format": "uint8"
     }
   }
 }

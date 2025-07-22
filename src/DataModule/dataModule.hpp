@@ -10,36 +10,31 @@
 #include <unordered_map>
 #include <nlohmann/json.hpp>
 #include <memory>
+#include <fstream>
 
 class DataModule {
-private:
+protected:
     DataHeader header;
     nlohmann::json schemaJson;
-    std::vector<std::unique_ptr<DataField>> fields;
-    std::vector<std::vector<uint8_t>> rows;
-    StringBuffer stringBuffer;
-    size_t rowSize = 0;
 
-    explicit DataModule() {};
+    void parseSchemaHeader(const nlohmann::json& schemaJson);
+    virtual void parseSchema(const nlohmann::json& schemaJson) = 0;
 
-    std::vector<std::unique_ptr<DataField>> parseSchema(const nlohmann::json& schemaJson);
-
-    std::unique_ptr<DataField> parseField(const std::string& name, 
+    virtual std::unique_ptr<DataField> parseField(const std::string& name, 
                                             const nlohmann::json& definition,
-                                            size_t& rowSize);
+                                            size_t& rowSize) = 0;
+    
+    explicit DataModule() {};
+    virtual ~DataModule() = default; 
 
-    void decodeRows(std::istream& in, size_t actualDataSize);
+    std::ifstream openSchemaFile(const std::string& schemaPath);
 
 public:
     explicit DataModule(const std::string& schemaPath, UUID uuid);
     
     const nlohmann::json& getSchema() const;
-    void addRow(const nlohmann::json& rowData);
-    void writeBinary(std::ostream& out, XRefTable& xref);
-
-    void printRows(std::ostream& out) const;
-
-    static std::unique_ptr<DataModule> fromStream(std::istream& in, uint64_t moduleStartOffset); 
+    virtual void addData(const nlohmann::json& rowData) = 0;
+    virtual void writeBinary(std::ostream& out, XRefTable& xref) = 0;
 
 };
 

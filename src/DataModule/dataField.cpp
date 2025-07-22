@@ -138,6 +138,50 @@ nlohmann::json EnumField::decodeFromBuffer(
     return enumValues[enumValue];
 }
 
+/* =============== ArrayField =============== */
+
+
+/* =============== IntegerField =============== */
+
+    IntegerFormatInfo IntegerField::parseIntegerFormat(const std::string& format) {
+        if (format == "uint8")  return { false, 1 };
+        if (format == "uint16") return { false, 2 };
+        if (format == "uint32") return { false, 4 };
+        if (format == "int8")   return { true, 1 };
+        if (format == "int16")  return { true, 2 };
+        if (format == "int32")  return { true, 4 };
+
+        throw std::runtime_error("Unsupported integer format: " + format);
+    }
+
+    void IntegerField::encodeToBuffer(
+        const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) {
+            if (value.is_null()) return;
+
+            int32_t val = value.get<int32_t>(); // generic container for both signed/unsigned
+            for (size_t i = 0; i < integerFormat.byteLength; ++i) {
+                buffer[offset + i] = static_cast<uint8_t>((val >> (8 * i)) & 0xFF);
+            }
+        }
+
+    nlohmann::json IntegerField::decodeFromBuffer(
+            const std::vector<uint8_t>& buffer, size_t offset) {
+            uint32_t rawVal = 0;
+            for (size_t i = 0; i < integerFormat.byteLength; ++i) {
+                rawVal |= static_cast<uint32_t>(buffer[offset + i]) << (8 * i);
+            }
+
+            if (integerFormat.isSigned) {
+                // Interpret the value as signed
+                if (integerFormat.byteLength == 1) return static_cast<int8_t>(rawVal);
+                if (integerFormat.byteLength == 2) return static_cast<int16_t>(rawVal);
+                if (integerFormat.byteLength == 4) return static_cast<int32_t>(rawVal);
+            }
+
+            return rawVal; // return as unsigned
+        }
+
+
 /* ================== ObjectField ================== */
 
 void ObjectField::encodeToBuffer(

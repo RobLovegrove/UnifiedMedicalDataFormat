@@ -92,6 +92,42 @@ public:
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
 };
 
+/* =============== ArrayField =============== */
+
+class ArrayField : public DataField {
+
+
+
+
+};
+
+/* =============== IntegerField =============== */
+
+struct IntegerFormatInfo {
+    bool isSigned;
+    size_t byteLength;
+};
+
+class IntegerField : public DataField {
+private:
+    IntegerFormatInfo integerFormat;
+
+public:
+    IntegerField(std::string name, IntegerFormatInfo formatInfo) 
+        : DataField(name, "integer"), integerFormat(formatInfo) {}
+
+
+    static IntegerFormatInfo parseIntegerFormat(const std::string& format);
+
+    void encodeToBuffer(
+        const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
+
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
+
+    size_t getLength() const override { return integerFormat.byteLength; }
+
+};
+
 /* =============== ObjectField =============== */
 
 class ObjectField : public DataField {

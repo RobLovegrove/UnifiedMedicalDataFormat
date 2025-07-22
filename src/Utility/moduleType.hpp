@@ -16,6 +16,8 @@ std::string module_type_to_string(ModuleType type);
 // Converts string to ModuleType (case-insensitive)
 ModuleType module_type_from_string(const std::string& str);
 
+bool isValidModuleType(const std::string& str);
+
 // Stream output support
 std::ostream& operator<<(std::ostream& os, ModuleType type);
 

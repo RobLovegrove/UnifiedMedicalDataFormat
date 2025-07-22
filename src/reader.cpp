@@ -3,7 +3,7 @@
 #include "Utility/utils.hpp"
 #include "Xref/xref.hpp"
 #include "DataModule/dataHeader.hpp"
-#include "DataModule/dataModule.hpp"
+#include "DataModule/Tabular/tabularData.hpp"
 
 
 #include <fstream>
@@ -40,7 +40,8 @@ bool Reader::readFile(const string& filename) {
                 inFile.read(buffer.data(), entry.size);
                 istringstream stream(string(buffer.begin(), buffer.end()));
 
-                unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset);
+                unique_ptr<TabularData> dm = TabularData::fromStream(stream, entry.offset);
+                
                 dm->printRows(cout);
 
             }

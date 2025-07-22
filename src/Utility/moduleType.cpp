@@ -29,6 +29,10 @@ ModuleType module_type_from_string(const string& str) {
     throw invalid_argument("Invalid ModuleType string: " + str);
 }
 
+bool isValidModuleType(const string& str) {
+     return (str == "fileHeader" || str == "xreftable" || str == "tabular" || str == "image");
+}
+
 ostream& operator<<(ostream& os, ModuleType type) {
     return os << module_type_to_string(type);
 }
