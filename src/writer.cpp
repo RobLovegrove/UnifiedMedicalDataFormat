@@ -23,7 +23,7 @@ bool Writer::writeNewFile(const string& filename) {
     // CREATE HEADER
     if (!header.writePrimaryHeader(outfile, xref)) return false;
 
-    // CREATE DATA MODULE
+    // CREATE TABULAR MODULE
     try {
         TabularData dm("./schemas/patient/v1.0.json", UUID(), ModuleType::Tabular);
         dm.addData({
@@ -55,6 +55,7 @@ bool Writer::writeNewFile(const string& filename) {
         cout << "Error: " << e.what() << endl;
     }
 
+    // CREATE IMAGE MODULE
     try {
         ImageData dm("./schemas/image/v1.0.json", UUID());
 
@@ -62,11 +63,12 @@ bool Writer::writeNewFile(const string& filename) {
         std::fill(fakeImage.begin(), fakeImage.end(), 128); // uniform gray
 
         dm.addData({
-            {"modality", "MR"},
+            {"modality", "MRI"},
             {"width", 64},
             {"height", 64},
             {"bit_depth", 8}
         });
+        dm.setImageData(fakeImage);
         dm.writeBinary(outfile, xref);
     }
     catch (runtime_error e) {

@@ -10,11 +10,6 @@
 
 using namespace std;
 
-DataModule::DataModule(const string& schemaPath, UUID uuid) {
-    header.schemaPath = schemaPath;
-    header.moduleID = uuid;
-}
-
 const nlohmann::json& DataModule::getSchema() const {
     return schemaJson;
 }
@@ -29,14 +24,14 @@ void DataModule::parseSchemaHeader(const nlohmann::json& schemaJson) {
 
     if (schemaJson.contains("endianness")) {
         string endian = schemaJson["endianness"];
-        header.littleEndian = (endian != "big");
+        header->littleEndian = (endian != "big");
     } else {
-        header.littleEndian = true;  // Default to little-endian
+        header->littleEndian = true;  // Default to little-endian
     }
 
     string moduleType = schemaJson["module_type"];
     if (isValidModuleType(moduleType)) {
-        header.moduleType = moduleType;
+        header->moduleType = module_type_from_string(moduleType);
     }
     else {
         cout << "TODO: Handle what happens when a non valid moduleType is found" << endl;

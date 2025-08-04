@@ -2,8 +2,9 @@
 #include "Header/header.hpp"
 #include "Utility/utils.hpp"
 #include "Xref/xref.hpp"
-#include "DataModule/dataHeader.hpp"
+#include "DataModule/Header/dataHeader.hpp"
 #include "DataModule/Tabular/tabularData.hpp"
+#include "DataModule/Image/imageData.hpp"
 
 
 #include <fstream>
@@ -33,22 +34,38 @@ bool Reader::readFile(const string& filename) {
 
     // Iterate through XrefTable reading data
     for (const XrefEntry& entry : xrefTable.getEntries()) {
-        if (entry.type == static_cast<uint8_t>(ModuleType::Tabular)) {
-            if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
-                vector<char> buffer(entry.size);
-                inFile.seekg(entry.offset);
-                inFile.read(buffer.data(), entry.size);
-                istringstream stream(string(buffer.begin(), buffer.end()));
+        if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
+            vector<char> buffer(entry.size);
+            inFile.seekg(entry.offset);
+            inFile.read(buffer.data(), entry.size);
+            istringstream stream(string(buffer.begin(), buffer.end()));
 
-                unique_ptr<TabularData> dm = TabularData::fromStream(stream, entry.offset);
-                
-                dm->printRows(cout);
+            unique_ptr<DataModule> dm = nullptr;
 
+            switch(entry.type) {
+            case static_cast<uint8_t>(ModuleType::Tabular):
+                cout << "Reading tabular module" << endl;
+                dm = TabularData::fromStream(stream, entry.offset);
+                break;
+            case static_cast<uint8_t>(ModuleType::Image):
+                cout << "Reading image module" << endl; 
+                dm = ImageData::fromStream(stream, entry.offset);
+                break;
+            default:
+                cout << "Unknown module type found: " << entry.type 
+                << endl;
             }
-            else {
-                //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
-                cout << "TODO: Handle a large DataModule" << endl;
+            
+            if (dm != nullptr) {
+                dm->printData(cout);
             }
+            
+
+
+        }
+        else {
+            //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
+            cout << "TODO: Handle a large DataModule" << endl;
         }
     }
     return true;

@@ -4,6 +4,7 @@
 #include "../../Utility/uuid.hpp"
 #include "../../Xref/xref.hpp"
 #include "../stringBuffer.hpp"
+#include "../Header/imageHeader.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -12,9 +13,12 @@
 
 using namespace std;
 
-TabularData::TabularData(const string& schemaPath, UUID uuid, ModuleType type) : DataModule(schemaPath, uuid) {
+TabularData::TabularData(const string& schemaPath, UUID uuid, ModuleType type) : DataModule() {
 
-    header.moduleType = module_type_to_string(type);
+    header = DataHeader::create(type);
+    header->moduleType = type;
+    header->schemaPath = schemaPath;
+    header->moduleID = uuid;
 
     ifstream file = openSchemaFile(schemaPath);
 
@@ -31,42 +35,40 @@ TabularData::TabularData(const string& schemaPath, UUID uuid, ModuleType type) :
     }
 }
 
-unique_ptr<TabularData> TabularData::fromStream(istream& in, uint64_t moduleStartOffset) {
+unique_ptr<TabularData> TabularData::fromStream(
+    istream& in, uint64_t moduleStartOffset) {
+    
+    unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
+    dmHeader->readDataHeader(in);
 
-    DataHeader dmHeader;
-    dmHeader.readDataHeader(in);
-    ModuleType type = module_type_from_string(dmHeader.moduleType);
-    unique_ptr<TabularData> dm;
-    if (type == ModuleType::Tabular) {
-        dm = make_unique<TabularData>(dmHeader.schemaPath, dmHeader.moduleID, type);
-    }
-    else if (type == ModuleType::Image) {
-        dm = make_unique<ImageData>(dmHeader.schemaPath, dmHeader.moduleID);
-    }
-    dm->header = dmHeader;
+    unique_ptr<TabularData> dm = make_unique<TabularData>(
+        dmHeader->schemaPath, dmHeader->moduleID, dmHeader->moduleType);
 
-    dm->header.moduleStartOffset = moduleStartOffset;
-    size_t actualDataSize = dm->header.stringOffset - (dm->header.moduleStartOffset + dm->header.headerSize);
+    dm->header = std::move(dmHeader);
 
-    cout << dm->header << endl;
+    dm->header->moduleStartOffset = moduleStartOffset;
+    size_t tabularDataSize = dm->header->stringOffset - (
+        dm->header->moduleStartOffset + dm->header->headerSize);
+    
+    cout << *(dm->header) << endl;
 
-    uint64_t relativeStringOffset = dm->header.stringOffset - moduleStartOffset;
+    uint64_t relativeStringOffset = dm->header->stringOffset - moduleStartOffset;
     uint64_t currentPos = in.tellg();
     
     in.seekg(relativeStringOffset);
 
     // Read in string buffer
-    size_t stringBufferSize = dm->header.dataSize - dm->header.headerSize - actualDataSize;
+    size_t stringBufferSize = dm->header->dataSize - dm->header->headerSize - tabularDataSize;
     dm->stringBuffer.readFromFile(in, stringBufferSize);
 
     // Return back to start of data
     in.seekg(currentPos);
 
     // Read in data
-    if (dm->header.compression) {
+    if (dm->header->compression) {
         cout << "TODO: Handle file compression" << endl;
     } else {
-        dm->decodeRows(in, actualDataSize); // Data size is entire size including header size
+        dm->decodeRows(in, tabularDataSize); // Data size is entire size including header size
     }
 
     return dm;
@@ -189,30 +191,39 @@ void TabularData::writeBinary(ostream& out, XRefTable& xref) {
     streampos moduleStart = out.tellp();
 
     // Write header
-    header.writeToFile(out);
+    header->writeToFile(out);
 
     // Write Data
-    for (const auto& row : rows) {
-        out.write(reinterpret_cast<const char*>(row.data()), row.size());
-    }
+    writeTabularData(out);
 
     streampos stringBufferStart = out.tellp();
 
     // Write String Buffer
-    if (stringBuffer.getSize() != 0) {
-        stringBuffer.writeToFile(out);
-    }
+    writeStringBuffer(out);
 
     streampos moduleEnd = out.tellp();
 
     uint32_t totalModuleSize = static_cast<uint32_t>(moduleEnd - moduleStart);
-    header.updateHeader(out, totalModuleSize, static_cast<uint64_t>(stringBufferStart));
 
+    // Update Header
+    header->updateHeader(out, totalModuleSize, static_cast<uint64_t>(stringBufferStart));
     out.seekp(moduleEnd);
 
-    xref.addEntry(ModuleType::Tabular, header.moduleID, moduleStart, totalModuleSize);
+    // Update XrefTable
+    xref.addEntry(header->moduleType, header->moduleID, moduleStart, totalModuleSize);
 }
+    void TabularData::writeTabularData(ostream& out) {
+        
+        for (const auto& row : rows) {
+            out.write(reinterpret_cast<const char*>(row.data()), row.size());
+        }
+    }
+    void TabularData::writeStringBuffer(ostream& out) {
 
+        if (stringBuffer.getSize() != 0) {
+            stringBuffer.writeToFile(out);
+        }
+    }
 
 void TabularData::decodeRows(istream& in, size_t actualDataSize) {
 
@@ -233,7 +244,7 @@ void TabularData::decodeRows(istream& in, size_t actualDataSize) {
     }
 }
 
-void TabularData::printRows(std::ostream& out) const {
+void TabularData::printData(std::ostream& out) const {
     for (const auto& row : rows) {
         size_t offset = 0;
         nlohmann::json rowJson = nlohmann::json::object();

@@ -5,14 +5,14 @@
 
 #include "../stringBuffer.hpp"
 #include "../dataModule.hpp"
-#include "../dataHeader.hpp"
+#include "../Header/dataHeader.hpp"
 #include "../dataField.hpp"
 #include "../../Xref/xref.hpp"
 #include "../../Utility/uuid.hpp"
 
 class TabularData : public DataModule { 
 
-private:
+protected:
     std::vector<std::unique_ptr<DataField>> fields;
     std::vector<std::vector<uint8_t>> rows;
     StringBuffer stringBuffer;
@@ -28,6 +28,9 @@ private:
 
     void decodeRows(std::istream& in, size_t actualDataSize);
 
+    void writeTabularData(std::ostream& out);
+    void writeStringBuffer(std::ostream& out);
+
 public:
     explicit TabularData(const std::string& schemaPath, UUID uuid, ModuleType type);
     virtual ~TabularData() override = default;
@@ -35,9 +38,10 @@ public:
     void addData(const nlohmann::json& rowData) override;
     void writeBinary(std::ostream& out, XRefTable& xref) override;
 
-    void printRows(std::ostream& out) const;
+    void printData(std::ostream& out) const override;
 
-    static std::unique_ptr<TabularData> fromStream(std::istream& in, uint64_t moduleStartOffset); 
+    static std::unique_ptr<TabularData> fromStream(
+        std::istream& in, uint64_t moduleStartOffset); 
 
 
 };

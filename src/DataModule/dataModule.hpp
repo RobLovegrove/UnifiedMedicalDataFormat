@@ -2,7 +2,7 @@
 #define DATAMODULE_HPP
 
 #include "dataField.hpp"
-#include "dataHeader.hpp"
+#include "Header/dataHeader.hpp"
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
 
@@ -14,7 +14,7 @@
 
 class DataModule {
 protected:
-    DataHeader header;
+    std::unique_ptr<DataHeader> header;
     nlohmann::json schemaJson;
 
     void parseSchemaHeader(const nlohmann::json& schemaJson);
@@ -23,19 +23,17 @@ protected:
     virtual std::unique_ptr<DataField> parseField(const std::string& name, 
                                             const nlohmann::json& definition,
                                             size_t& rowSize) = 0;
-    
-    explicit DataModule() {};
-    virtual ~DataModule() = default; 
 
     std::ifstream openSchemaFile(const std::string& schemaPath);
 
 public:
-    explicit DataModule(const std::string& schemaPath, UUID uuid);
-    
+    virtual ~DataModule() = default; 
+    explicit DataModule() {};
     const nlohmann::json& getSchema() const;
     virtual void addData(const nlohmann::json& rowData) = 0;
     virtual void writeBinary(std::ostream& out, XRefTable& xref) = 0;
 
+    virtual void printData(std::ostream& out) const = 0;
 };
 
 

@@ -4,43 +4,60 @@
 #include <string>
 #include <fstream>
 
-#include "../Utility/uuid.hpp"
+#include "../../Utility/uuid.hpp"
+#include "../../Utility/moduleType.hpp"
 
 enum class HeaderFieldType : uint8_t {
     HeaderSize    = 1,
     DataSize      = 2,
     StringBufferOffset = 3,
-    ModuleType    = 4,
-    SchemaPath    = 5,
-    Compression   = 6,
-    Endianness    = 7,
-    ModuleID      = 8
+    ImageDataOffset = 4,
+    ModuleType    = 5,
+    SchemaPath    = 6,
+    Compression   = 7,
+    Endianness    = 8,
+    ModuleID      = 9
 };
 
 struct DataHeader {
     uint32_t headerSize = 0;
     uint64_t dataSize = 0;
     uint64_t stringOffset = 0;
-    std::string moduleType;
+
+    ModuleType moduleType;
     std::string schemaPath;
     bool compression = false;
     bool littleEndian = true;
     UUID moduleID;
 
-    uint32_t dataSizePos = 0;
+    std::streampos dataSizePos = 0;
+    std::streampos stringOffsetPos = 0;
+    
     uint64_t moduleStartOffset;
 
+    virtual ~DataHeader() = default;
+
+    static std::unique_ptr<DataHeader> create(ModuleType type);
+
     void writeToFile(std::ostream& out);
+
+    virtual void writeAdditionalOffsets(std::ostream&) {}
+    virtual std::string outputAdditionalOffsets() const { return ""; }
+
     void updateHeader(std::ostream& out, std::uint32_t size, uint64_t stringOffset);
+    virtual void updateHeader(
+        std::ostream& out, std::uint32_t size, uint64_t stringOffset, uint64_t imageOffset);
 
     void readDataHeader(std::istream& in);
 
+    virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) { return false; }
+
     friend std::ostream& operator<<(std::ostream& os, const DataHeader& header);
 
-private:
+protected:
     void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value) const;
     void writeTLVBool(std::ostream& out, HeaderFieldType type, bool value) const;
-    void writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const;
+    std::streampos writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const;
 };
 
 
