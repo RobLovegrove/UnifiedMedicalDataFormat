@@ -1,24 +1,8 @@
 #include "dataHeader.hpp"
-#include "imageHeader.hpp"
 
 #include <string>
 #include <stdexcept>
 #include <iostream>
-
-
-std::unique_ptr<DataHeader> DataHeader::create(ModuleType type) {
-    if (type == ModuleType::Image) {
-        return std::make_unique<ImageHeader>();
-    } 
-    else if (type == ModuleType::Tabular) {
-        return std::make_unique<DataHeader>();
-    }
-    else {
-        std::cerr << "TODO: Handle unknown moduleType when creating data header" 
-        << std::endl;
-    }
-}
-
 
 /* ================ WRTIE FUNCTIONS ================ */
 
@@ -28,9 +12,10 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     // writeTLVFixed returns the position of the Value in the TLV flag
     headerSizePos = writeTLVFixed(out, HeaderFieldType::HeaderSize, &headerSize, sizeof(headerSize)); // Placeholder until finished writing header
+    metadataSizePos = writeTLVFixed(out, HeaderFieldType::MetadataSize, &metaDataSize, sizeof(metaDataSize)); // Updated after write
     dataSizePos = writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); // Updated after write
+    dataOffsetPos = writeTLVFixed(out, HeaderFieldType::DataOffset, &dataOffset, sizeof(dataOffset)); // Updated after write
     stringOffsetPos = writeTLVFixed(out, HeaderFieldType::StringBufferOffset, &stringOffset, sizeof(stringOffset)); // Updated after write
-    writeAdditionalOffsets(out);
 
     writeTLVString(out, HeaderFieldType::ModuleType, module_type_to_string(moduleType));
     writeTLVString(out, HeaderFieldType::SchemaPath, schemaPath);
@@ -54,22 +39,26 @@ void DataHeader::writeToFile(std::ostream& out) {
     out.seekp(headerEnd);
 }
 
-void DataHeader::updateHeader(std::ostream& out, uint64_t stringOffset) {
+void DataHeader::updateHeader(std::ostream& out, uint64_t stringOffset, uint64_t dataOffset) {
 
     if (dataSizePos == 0) { throw std::runtime_error("Failed to update dataSize"); }
     
+    // Update metadata size
+    out.seekp(metadataSizePos);
+    out.write(reinterpret_cast<const char*>(&metaDataSize), sizeof(metaDataSize));
+
+    // Update data size
     out.seekp(dataSizePos);
     out.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
 
-    // Seek to stringOffset value start
+    // Update dataOffset position
+    out.seekp(dataOffsetPos);
+    out.write(reinterpret_cast<const char*>(&dataOffset), sizeof(dataOffset));
+
+    // Update stringoffset position
     out.seekp(stringOffsetPos);
-    // Write stringOffset value (8 bytes)
     out.write(reinterpret_cast<const char*>(&stringOffset), sizeof(stringOffset));
 
-}
-
-void DataHeader::updateHeader(std::ostream& out, uint64_t stringOffset, uint64_t) {
-    updateHeader(out, stringOffset);
 }
 
 void DataHeader::writeTLVString(
@@ -125,9 +114,19 @@ void DataHeader::readDataHeader(std::istream& in) {
 
         auto type = static_cast<HeaderFieldType>(typeId);
         switch (type) {
+            case HeaderFieldType::MetadataSize:
+                if (length != sizeof(metaDataSize)) throw std::runtime_error("Invalid DataSize length.");
+                std::memcpy(&metaDataSize, buffer.data(), sizeof(metaDataSize));
+                break;
+
             case HeaderFieldType::DataSize:
                 if (length != sizeof(dataSize)) throw std::runtime_error("Invalid DataSize length.");
                 std::memcpy(&dataSize, buffer.data(), sizeof(dataSize));
+                break;
+
+            case HeaderFieldType::DataOffset:
+                if (length != sizeof(dataOffset)) throw std::runtime_error("Invalid dataOffset.");
+                std::memcpy(&dataOffset, buffer.data(), sizeof(dataOffset));
                 break;
 
             case HeaderFieldType::StringBufferOffset:
@@ -161,9 +160,7 @@ void DataHeader::readDataHeader(std::istream& in) {
                 break;
 
             default:
-                if (!handleExtraField(type, buffer)) {
-                    //throw std::runtime_error("Unknown HeaderFieldType: " + std::to_string(typeId));
-                }
+                throw std::runtime_error("Unknown HeaderFieldType: " + std::to_string(typeId));
         }
     }
 
@@ -176,9 +173,10 @@ void DataHeader::readDataHeader(std::istream& in) {
 std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
     os << "DataHeader {\n"
        << "  headerSize   : " << header.headerSize << "\n"
+       << "  metaDataSize : " << header.metaDataSize << "\n"
        << "  dataSize     : " << header.dataSize << "\n"
+       << "  dataOffset   : " << header.dataOffset << "\n"
        << "  stringOffset : " << header.stringOffset << "\n"
-       << header.outputAdditionalOffsets()
        << "  moduleType   : " << header.moduleType << "\n"
        << "  schemaPath   : " << header.schemaPath << "\n"
        << "  compression  : " << std::boolalpha << header.compression << "\n"

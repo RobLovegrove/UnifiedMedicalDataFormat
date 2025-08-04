@@ -34,33 +34,17 @@ bool Reader::readFile(const string& filename) {
 
     // Iterate through XrefTable reading data
     for (const XrefEntry& entry : xrefTable.getEntries()) {
-        if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
+        if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader));
+        else if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
             vector<char> buffer(entry.size);
             inFile.seekg(entry.offset);
             inFile.read(buffer.data(), entry.size);
             istringstream stream(string(buffer.begin(), buffer.end()));
-
-            unique_ptr<DataModule> dm = nullptr;
-
-            switch(entry.type) {
-            case static_cast<uint8_t>(ModuleType::Tabular):
-                cout << "Reading tabular module" << endl;
-                dm = TabularData::fromStream(stream, entry.offset, entry.size);
-                break;
-            case static_cast<uint8_t>(ModuleType::Image):
-                cout << "Reading image module" << endl; 
-                dm = ImageData::fromStream(stream, entry.offset, entry.size);
-                break;
-            default:
-                cout << "Unknown module type found: " << entry.type 
-                << endl;
+            unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset, entry.size, entry.type);
+            if (!dm) {
+                cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
+                continue;
             }
-            
-            if (dm != nullptr) {
-                dm->printData(cout);
-            }
-            
-
 
         }
         else {

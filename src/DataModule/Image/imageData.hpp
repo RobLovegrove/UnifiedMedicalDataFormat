@@ -12,26 +12,25 @@
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
 
-class ImageData : public TabularData { 
+class ImageData : public DataModule { 
 
 private:
     std::vector<uint8_t> rawImageData;
 
+    std::streampos writeData(std::ostream& out) override;
+
 public:
-    using TabularData::TabularData;
 
     virtual ~ImageData() override = default;
-    explicit ImageData(const std::string& schemaPath, UUID uuid) 
-    : TabularData(schemaPath, uuid, ModuleType::Image) {}
+    explicit ImageData(const std::string& schemaPath, UUID uuid);
 
     void setImageData(const std::vector<uint8_t>& data) {
         rawImageData = data;
     }
 
-    void writeBinary(std::ostream& out, XRefTable& xref) override;
-
-    static std::unique_ptr<ImageData> fromStream(
-        std::istream& in, uint64_t moduleStartOffset, uint64_t size); 
+    virtual void addData(const nlohmann::json& rowData) override;
+    virtual void decodeData(std::istream& in, size_t actualDataSize) override;
+    virtual void printData(std::ostream& out) const override;
 };
 
 #endif

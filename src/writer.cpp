@@ -25,7 +25,11 @@ bool Writer::writeNewFile(const string& filename) {
 
     // CREATE TABULAR MODULE
     try {
-        TabularData dm("./schemas/patient/v1.0.json", UUID(), ModuleType::Tabular);
+        TabularData dm("./schemas/patient/v1.0.json", UUID());
+        dm.addMetaData({
+            {"clinician", "Dr. Jane Doe"},
+            {"encounter_time", "2025-07-28"}
+        });
         dm.addData({
             {"patient_id", "123e4567-e89b-12d3-a456-426614174000"},
             {"gender", "male"},
@@ -62,7 +66,7 @@ bool Writer::writeNewFile(const string& filename) {
         std::vector<uint8_t> fakeImage(64 * 64); // 64x64 8-bit grayscale
         std::fill(fakeImage.begin(), fakeImage.end(), 128); // uniform gray
 
-        dm.addData({
+        dm.addMetaData({
             {"modality", "MRI"},
             {"width", 64},
             {"height", 64},

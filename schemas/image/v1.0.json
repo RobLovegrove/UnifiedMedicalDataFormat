@@ -6,23 +6,29 @@
   "type": "object",
   "module_type": "image",
   "endianness": "little",
-  "required": ["modality", "width", "height", "bit_depth", "image_data"],
+  "required": ["metadata"],
   "properties": {
-    "modality": {
-      "type": "string",
-      "length": 10
-    },
-    "width": {
-      "type": "integer",
-      "format": "uint16"
-    },
-    "height": {
-      "type": "integer",
-      "format": "uint16"
-    },
-    "bit_depth": {
-      "type": "integer",
-      "format": "uint8"
+    "metadata": {
+      "type": "object",
+      "required": ["modality", "width", "height", "bit_depth"],
+      "properties": {
+        "modality": {
+          "type": "string",
+          "length": 10
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint16"
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint16"
+        },
+        "bit_depth": {
+          "type": "integer",
+          "format": "uint8"
+        }
+      }
     }
   }
 }

@@ -15,34 +15,30 @@ class TabularData : public DataModule {
 protected:
     std::vector<std::unique_ptr<DataField>> fields;
     std::vector<std::vector<uint8_t>> rows;
-    StringBuffer stringBuffer;
+    
     size_t rowSize = 0;
 
     explicit TabularData() {};
 
-    void parseSchema(const nlohmann::json& schemaJson) override;
+    virtual void parseDataSchema(const nlohmann::json& schemaJson) override;
 
     std::unique_ptr<DataField> parseField(const std::string& name, 
                                             const nlohmann::json& definition,
                                             size_t& rowSize) override;
 
-    void decodeRows(std::istream& in, size_t actualDataSize);
+    void decodeData(std::istream& in, size_t actualDataSize);
 
-    void writeTabularData(std::ostream& out);
+    std::streampos writeData(std::ostream& out) override;
     void writeStringBuffer(std::ostream& out);
 
 public:
-    explicit TabularData(const std::string& schemaPath, UUID uuid, ModuleType type);
+    explicit TabularData(const std::string& schemaPath, UUID uuid);
     virtual ~TabularData() override = default;
     
     void addData(const nlohmann::json& rowData) override;
-    void writeBinary(std::ostream& out, XRefTable& xref) override;
+    // void writeBinary(std::ostream& out, XRefTable& xref) override;
 
     void printData(std::ostream& out) const override;
-
-    static std::unique_ptr<TabularData> fromStream(
-        std::istream& in, uint64_t moduleStartOffset, uint64_t moduleSize); 
-
 
 };
 

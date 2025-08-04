@@ -16,22 +16,47 @@ class DataModule {
 protected:
     std::unique_ptr<DataHeader> header;
     nlohmann::json schemaJson;
+    StringBuffer stringBuffer;
+    std::vector<std::unique_ptr<DataField>> metaDataFields;
+    std::vector<std::vector<uint8_t>> metaDataRows;
+
+    size_t metaDataRowSize = 0;
+
+    explicit DataModule() {};
+    DataModule(const std::string& schemaPath, UUID uuid, ModuleType type);
+
+    void initialise();
 
     void parseSchemaHeader(const nlohmann::json& schemaJson);
-    virtual void parseSchema(const nlohmann::json& schemaJson) = 0;
+    void parseSchema(const nlohmann::json& schemaJson);
+    virtual void parseDataSchema(const nlohmann::json& schemaJson) {};
 
     virtual std::unique_ptr<DataField> parseField(const std::string& name, 
                                             const nlohmann::json& definition,
-                                            size_t& rowSize) = 0;
+                                            size_t& rowSize);
 
     std::ifstream openSchemaFile(const std::string& schemaPath);
 
+    void writeMetaData(std::ostream& out);
+    virtual std::streampos writeData(std::ostream& out) = 0;
+    void writeStringBuffer(std::ostream& out);
+    void decodeMetadataRows(std::istream& in, size_t actualDataSize);
+    virtual void decodeData(std::istream& in, size_t actualDataSize) = 0;
+
 public:
     virtual ~DataModule() = default; 
-    explicit DataModule() {};
+
+    static std::unique_ptr<DataModule> fromStream(
+        std::istream& in, uint64_t moduleStartOffset, uint64_t moduleSize, uint8_t moduleType);
+
+    // static std::unique_ptr<DataModule> create(
+    //     const std::string& schemaPath, UUID uuid, ModuleType type);
+
     const nlohmann::json& getSchema() const;
+    //virtual void addMetaData(const nlohmann::json& rowData);
+    void addMetaData(const nlohmann::json& rowData);
     virtual void addData(const nlohmann::json& rowData) = 0;
-    virtual void writeBinary(std::ostream& out, XRefTable& xref) = 0;
+    void writeBinary(std::ostream& out, XRefTable& xref);
 
     virtual void printData(std::ostream& out) const = 0;
 };

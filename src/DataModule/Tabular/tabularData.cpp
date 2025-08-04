@@ -4,7 +4,7 @@
 #include "../../Utility/uuid.hpp"
 #include "../../Xref/xref.hpp"
 #include "../stringBuffer.hpp"
-#include "../Header/imageHeader.hpp"
+#include "../Header/dataHeader.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -13,72 +13,18 @@
 
 using namespace std;
 
-TabularData::TabularData(const string& schemaPath, UUID uuid, ModuleType type) : DataModule() {
-
-    header = DataHeader::create(type);
-    header->setModuleType(type);
-    header->setSchemaPath(schemaPath);
-    header->setModuleID(uuid);
-
-    ifstream file = openSchemaFile(schemaPath);
-
-    try {
-        file >> schemaJson;
-        parseSchemaHeader(schemaJson);
-        parseSchema(schemaJson);
-
-        for (unique_ptr<DataField>& f : fields) {
-            cout << f;
-        }
-    } catch (const exception& e) {
-        throw runtime_error("Failed to parse schema: " + string(e.what()));
-    }
+TabularData::TabularData(const string& schemaPath, UUID uuid) : DataModule(schemaPath, uuid, ModuleType::Tabular) {
+    initialise();
 }
 
-unique_ptr<TabularData> TabularData::fromStream(
-    istream& in, uint64_t moduleStartOffset, uint64_t moduleSize) {
-    
-    unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
-    dmHeader->readDataHeader(in);
+void TabularData::parseDataSchema(const nlohmann::json& schemaJson) {
 
-    unique_ptr<TabularData> dm = make_unique<TabularData>(
-        dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getModuleType());
-
-    dm->header = std::move(dmHeader);
-
-    dm->header->setModuleStartOffset(moduleStartOffset);
-    // size_t tabularDataSize = dm->header->getStringOffset() - (
-    //     dm->header->getModuleStartOffset() + dm->header->getHeaderSize());
-    
-    cout << *(dm->header) << endl;
-
-    uint64_t relativeStringOffset = dm->header->getStringOffset() - moduleStartOffset;
-    uint64_t currentPos = in.tellg();
-    
-    in.seekg(relativeStringOffset);
-
-    // Read in string buffer
-    size_t stringBufferSize = moduleSize - dm->header->getHeaderSize() - dm->header->getDataSize();
-    
-    cout << stringBufferSize << endl;
-    dm->stringBuffer.readFromFile(in, stringBufferSize);
-
-    // Return back to start of data
-    in.seekg(currentPos);
-
-    // Read in data
-    if (dm->header->getCompression()) {
-        cout << "TODO: Handle file compression" << endl;
-    } else {
-        dm->decodeRows(in, dm->header->getDataSize());
+    if (!schemaJson.contains("properties")) {
+        throw runtime_error("Schema missing essential 'properties' field.");
     }
-
-    return dm;
-}
-
-void TabularData::parseSchema(const nlohmann::json& schemaJson) {
 
     const auto& props = schemaJson["properties"];
+
     for (const auto& [name, definition] : props.items()) {
         fields.emplace_back(parseField(name, definition, rowSize));
     }
@@ -188,39 +134,19 @@ void TabularData::addData(const nlohmann::json& data) {
     rows.push_back(std::move(row));
 }
 
-void TabularData::writeBinary(ostream& out, XRefTable& xref) {
+streampos TabularData::writeData(ostream& out) {
 
-    streampos moduleStart = out.tellp();
+        streampos pos = out.tellp();
 
-    // Write header
-    header->writeToFile(out);
-
-    // Write Data
-    header->setDataSize(rows.size() * rowSize);
-    writeTabularData(out);
-
-    streampos stringBufferStart = out.tellp();
-
-    // Write String Buffer
-    writeStringBuffer(out);
-
-    streampos moduleEnd = out.tellp();
-
-    uint32_t totalModuleSize = static_cast<uint32_t>(moduleEnd - moduleStart);
-
-    // Update Header
-    header->updateHeader(out, static_cast<uint64_t>(stringBufferStart));
-    out.seekp(moduleEnd);
-
-    // Update XrefTable
-    xref.addEntry(header->getModuleType(), header->getModuleID(), moduleStart, totalModuleSize);
-}
-    void TabularData::writeTabularData(ostream& out) {
+        header->setDataSize(rows.size() * rowSize);
         
         for (const auto& row : rows) {
             out.write(reinterpret_cast<const char*>(row.data()), row.size());
         }
+
+        return pos;
     }
+
     void TabularData::writeStringBuffer(ostream& out) {
 
         if (stringBuffer.getSize() != 0) {
@@ -228,7 +154,7 @@ void TabularData::writeBinary(ostream& out, XRefTable& xref) {
         }
     }
 
-void TabularData::decodeRows(istream& in, size_t actualDataSize) {
+void TabularData::decodeData(istream& in, size_t actualDataSize) {
 
     if (actualDataSize % rowSize != 0) {
         throw format_error("Data does not match row format");

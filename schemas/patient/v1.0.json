@@ -8,45 +8,50 @@
   "endianness": "little",
   "required": ["patient_id", "name", "gender", "birth_date"],
   "properties": {
-    "patient_id": {
-      "type": "string",
-      "length": 36,
-      "description": "Unique patient identifier within the UMDF file."
-    },
-    "gender": {
-      "type": "string",
-      "enum": ["male", "female", "other", "unknown"],
-      "storage": {
-        "type": "uint8",
-        "format": "enum"
-      },
-      "description": "Administrative gender patient currently identifies by."
-    },
-    "birth_sex": {
-      "type": "string",
-      "enum": ["male", "female", "other", "unknown"],
-      "storage": {
-        "type": "uint8",
-        "format": "enum"
-      },
-      "description": "Administrative gender patient currently identifies by."
-    },
-    "birth_date": {
-      "type": "string",
-      "format": "date",
-      "length": 10,
-      "description": "Date of birth in YYYY-MM-DD format."
-    },
-    "name": {
+    "metadata": {
       "type": "object",
+      "required": ["clinician", "encounter_time"],
       "properties": {
-        "given": { "type": "string" },
-        "family": { "type": "string" }
+        "clinician": { "type": "string", "length": 32 },
+        "encounter_time": { "type": "string", "format": "date", "length": 10 }
       }
     },
-    "age": {
-      "type": "integer",
-      "format": "uint8"
+    "data": {
+      "type": "object",
+      "required": ["patient_id", "name", "gender", "birth_date"],
+      "properties": {
+        "patient_id": {
+          "type": "string",
+          "length": 36,
+          "description": "Unique patient identifier."
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["male", "female", "other", "unknown"],
+          "storage": { "type": "uint8", "format": "enum" }
+        },
+        "birth_sex": {
+          "type": "string",
+          "enum": ["male", "female", "other", "unknown"],
+          "storage": { "type": "uint8", "format": "enum" }
+        },
+        "birth_date": {
+          "type": "string",
+          "format": "date",
+          "length": 10
+        },
+        "name": {
+          "type": "object",
+          "properties": {
+            "given": { "type": "string" },
+            "family": { "type": "string" }
+          }
+        },
+        "age": {
+          "type": "integer",
+          "format": "uint8"
+        }
+      }
     }
   }
 }
