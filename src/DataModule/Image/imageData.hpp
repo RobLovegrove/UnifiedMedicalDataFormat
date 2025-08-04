@@ -31,7 +31,7 @@ public:
     void writeBinary(std::ostream& out, XRefTable& xref) override;
 
     static std::unique_ptr<ImageData> fromStream(
-        std::istream& in, uint64_t moduleStartOffset); 
+        std::istream& in, uint64_t moduleStartOffset, uint64_t size); 
 };
 
 #endif

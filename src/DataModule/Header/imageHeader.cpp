@@ -32,9 +32,9 @@ bool ImageHeader::handleExtraField(HeaderFieldType type, const std::vector<char>
 }
 
 void ImageHeader::updateHeader(
-    std::ostream& out, std::uint32_t size, uint64_t stringOffset, uint64_t imageOffset) {
-
-    DataHeader::updateHeader(out, size, stringOffset);
+    std::ostream& out, uint64_t stringOffset, uint64_t imageOffset) {
+    
+    DataHeader::updateHeader(out, stringOffset);
 
     // Seek to stringOffset value start
     out.seekp(imageOffsetPos);

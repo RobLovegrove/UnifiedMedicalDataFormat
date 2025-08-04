@@ -12,7 +12,7 @@
 struct XrefEntry {
     UUID id;
     uint8_t type;
-    uint32_t size;
+    uint64_t size;
     uint64_t offset;
 };
 

@@ -26,16 +26,10 @@ void DataHeader::writeToFile(std::ostream& out) {
     // Remember where the header starts (before the TLVs)
     std::streampos headerStart = out.tellp();
 
-    // Write placeholder for header size
-    uint32_t placeholderHeaderSize = 0;
-    std::streampos headerSizePos = out.tellp();  // Save this to seek back later
-    writeTLVFixed(out, HeaderFieldType::HeaderSize, &placeholderHeaderSize, sizeof(placeholderHeaderSize));
-
-
+    // writeTLVFixed returns the position of the Value in the TLV flag
+    headerSizePos = writeTLVFixed(out, HeaderFieldType::HeaderSize, &headerSize, sizeof(headerSize)); // Placeholder until finished writing header
     dataSizePos = writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); // Updated after write
-
     stringOffsetPos = writeTLVFixed(out, HeaderFieldType::StringBufferOffset, &stringOffset, sizeof(stringOffset)); // Updated after write
-
     writeAdditionalOffsets(out);
 
     writeTLVString(out, HeaderFieldType::ModuleType, module_type_to_string(moduleType));
@@ -53,16 +47,15 @@ void DataHeader::writeToFile(std::ostream& out) {
     std::cout << "The header is: " << actualHeaderSize << " bytes long." << std::endl;
 
     // Seek back and overwrite the value of the header size field
-    out.seekp(headerSizePos + static_cast<std::streamoff>(sizeof(uint8_t) + sizeof(uint32_t)));
+    out.seekp(headerSizePos);
     out.write(reinterpret_cast<const char*>(&actualHeaderSize), sizeof(actualHeaderSize));
 
     // Return write position to end
     out.seekp(headerEnd);
 }
 
-void DataHeader::updateHeader(std::ostream& out, std::uint32_t size, uint64_t stringOffset) {
+void DataHeader::updateHeader(std::ostream& out, uint64_t stringOffset) {
 
-    dataSize = size;
     if (dataSizePos == 0) { throw std::runtime_error("Failed to update dataSize"); }
     
     out.seekp(dataSizePos);
@@ -75,9 +68,8 @@ void DataHeader::updateHeader(std::ostream& out, std::uint32_t size, uint64_t st
 
 }
 
-void DataHeader::updateHeader(std::ostream& out, std::uint32_t size, uint64_t stringOffset, uint64_t) {
-    // Optional fallback behavior — e.g., just call the 3-arg version
-    updateHeader(out, size, stringOffset);
+void DataHeader::updateHeader(std::ostream& out, uint64_t stringOffset, uint64_t) {
+    updateHeader(out, stringOffset);
 }
 
 void DataHeader::writeTLVString(
@@ -170,7 +162,7 @@ void DataHeader::readDataHeader(std::istream& in) {
 
             default:
                 if (!handleExtraField(type, buffer)) {
-                    throw std::runtime_error("Unknown HeaderFieldType: " + std::to_string(typeId));
+                    //throw std::runtime_error("Unknown HeaderFieldType: " + std::to_string(typeId));
                 }
         }
     }

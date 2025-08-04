@@ -41,7 +41,7 @@ public:
     void printData(std::ostream& out) const override;
 
     static std::unique_ptr<TabularData> fromStream(
-        std::istream& in, uint64_t moduleStartOffset); 
+        std::istream& in, uint64_t moduleStartOffset, uint64_t moduleSize); 
 
 
 };

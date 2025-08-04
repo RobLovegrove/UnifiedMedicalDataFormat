@@ -16,9 +16,9 @@ using namespace std;
 TabularData::TabularData(const string& schemaPath, UUID uuid, ModuleType type) : DataModule() {
 
     header = DataHeader::create(type);
-    header->moduleType = type;
-    header->schemaPath = schemaPath;
-    header->moduleID = uuid;
+    header->setModuleType(type);
+    header->setSchemaPath(schemaPath);
+    header->setModuleID(uuid);
 
     ifstream file = openSchemaFile(schemaPath);
 
@@ -36,39 +36,41 @@ TabularData::TabularData(const string& schemaPath, UUID uuid, ModuleType type) :
 }
 
 unique_ptr<TabularData> TabularData::fromStream(
-    istream& in, uint64_t moduleStartOffset) {
+    istream& in, uint64_t moduleStartOffset, uint64_t moduleSize) {
     
     unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
     dmHeader->readDataHeader(in);
 
     unique_ptr<TabularData> dm = make_unique<TabularData>(
-        dmHeader->schemaPath, dmHeader->moduleID, dmHeader->moduleType);
+        dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getModuleType());
 
     dm->header = std::move(dmHeader);
 
-    dm->header->moduleStartOffset = moduleStartOffset;
-    size_t tabularDataSize = dm->header->stringOffset - (
-        dm->header->moduleStartOffset + dm->header->headerSize);
+    dm->header->setModuleStartOffset(moduleStartOffset);
+    // size_t tabularDataSize = dm->header->getStringOffset() - (
+    //     dm->header->getModuleStartOffset() + dm->header->getHeaderSize());
     
     cout << *(dm->header) << endl;
 
-    uint64_t relativeStringOffset = dm->header->stringOffset - moduleStartOffset;
+    uint64_t relativeStringOffset = dm->header->getStringOffset() - moduleStartOffset;
     uint64_t currentPos = in.tellg();
     
     in.seekg(relativeStringOffset);
 
     // Read in string buffer
-    size_t stringBufferSize = dm->header->dataSize - dm->header->headerSize - tabularDataSize;
+    size_t stringBufferSize = moduleSize - dm->header->getHeaderSize() - dm->header->getDataSize();
+    
+    cout << stringBufferSize << endl;
     dm->stringBuffer.readFromFile(in, stringBufferSize);
 
     // Return back to start of data
     in.seekg(currentPos);
 
     // Read in data
-    if (dm->header->compression) {
+    if (dm->header->getCompression()) {
         cout << "TODO: Handle file compression" << endl;
     } else {
-        dm->decodeRows(in, tabularDataSize); // Data size is entire size including header size
+        dm->decodeRows(in, dm->header->getDataSize());
     }
 
     return dm;
@@ -194,6 +196,7 @@ void TabularData::writeBinary(ostream& out, XRefTable& xref) {
     header->writeToFile(out);
 
     // Write Data
+    header->setDataSize(rows.size() * rowSize);
     writeTabularData(out);
 
     streampos stringBufferStart = out.tellp();
@@ -206,11 +209,11 @@ void TabularData::writeBinary(ostream& out, XRefTable& xref) {
     uint32_t totalModuleSize = static_cast<uint32_t>(moduleEnd - moduleStart);
 
     // Update Header
-    header->updateHeader(out, totalModuleSize, static_cast<uint64_t>(stringBufferStart));
+    header->updateHeader(out, static_cast<uint64_t>(stringBufferStart));
     out.seekp(moduleEnd);
 
     // Update XrefTable
-    xref.addEntry(header->moduleType, header->moduleID, moduleStart, totalModuleSize);
+    xref.addEntry(header->getModuleType(), header->getModuleID(), moduleStart, totalModuleSize);
 }
     void TabularData::writeTabularData(ostream& out) {
         

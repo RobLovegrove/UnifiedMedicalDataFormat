@@ -45,11 +45,11 @@ bool Reader::readFile(const string& filename) {
             switch(entry.type) {
             case static_cast<uint8_t>(ModuleType::Tabular):
                 cout << "Reading tabular module" << endl;
-                dm = TabularData::fromStream(stream, entry.offset);
+                dm = TabularData::fromStream(stream, entry.offset, entry.size);
                 break;
             case static_cast<uint8_t>(ModuleType::Image):
                 cout << "Reading image module" << endl; 
-                dm = ImageData::fromStream(stream, entry.offset);
+                dm = ImageData::fromStream(stream, entry.offset, entry.size);
                 break;
             default:
                 cout << "Unknown module type found: " << entry.type 

@@ -24,14 +24,14 @@ void DataModule::parseSchemaHeader(const nlohmann::json& schemaJson) {
 
     if (schemaJson.contains("endianness")) {
         string endian = schemaJson["endianness"];
-        header->littleEndian = (endian != "big");
+        header->setLittleEndian(endian != "big");
     } else {
-        header->littleEndian = true;  // Default to little-endian
+        header->setLittleEndian(true);  // Default to little-endian
     }
 
     string moduleType = schemaJson["module_type"];
     if (isValidModuleType(moduleType)) {
-        header->moduleType = module_type_from_string(moduleType);
+        header->setModuleType(module_type_from_string(moduleType));
     }
     else {
         cout << "TODO: Handle what happens when a non valid moduleType is found" << endl;

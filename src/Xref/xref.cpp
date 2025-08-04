@@ -49,7 +49,7 @@ bool XRefTable::writeXref(std::ostream& out) const{
     out.write(reinterpret_cast<const char*>(&count), sizeof(count));
 
     // 3. Write field widths: [id=16, type=1, size=4, offset=8]
-    uint8_t widths[4] = {16, 1, 4, 8};
+    uint8_t widths[4] = {16, 1, 8, 8};
     out.write(reinterpret_cast<const char*>(widths), sizeof(widths));
 
     // 4. Write Reserved (zeroed)
@@ -123,7 +123,7 @@ XRefTable XRefTable::loadXrefTable(std::ifstream& in) {
     uint8_t widths[4];
     in.read(reinterpret_cast<char*>(widths), sizeof(widths));
 
-    if (widths[0] != 16 || widths[1] != 1 || widths[2] != 4 || widths[3] != 8) {
+    if (widths[0] != 16 || widths[1] != 1 || widths[2] != 8 || widths[3] != 8) {
         throw std::runtime_error("Unexpected field widths.");
     }
 

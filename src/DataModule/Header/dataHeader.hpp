@@ -20,9 +20,16 @@ enum class HeaderFieldType : uint8_t {
 };
 
 struct DataHeader {
+protected:
+
     uint32_t headerSize = 0;
     uint64_t dataSize = 0;
     uint64_t stringOffset = 0;
+
+    uint64_t moduleStartOffset;
+    std::streampos headerSizePos = 0;
+    std::streampos dataSizePos = 0;
+    std::streampos stringOffsetPos = 0;
 
     ModuleType moduleType;
     std::string schemaPath;
@@ -30,34 +37,61 @@ struct DataHeader {
     bool littleEndian = true;
     UUID moduleID;
 
-    std::streampos dataSizePos = 0;
-    std::streampos stringOffsetPos = 0;
+    void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value) const;
+    void writeTLVBool(std::ostream& out, HeaderFieldType type, bool value) const;
+    std::streampos writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const;
     
-    uint64_t moduleStartOffset;
+    virtual void writeAdditionalOffsets(std::ostream&) {}
+    virtual std::string outputAdditionalOffsets() const { return ""; }
+    virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) { return false; }
 
+public:
+
+// GETTTERS AND SETTERS
+
+    ModuleType getModuleType() const { return moduleType; }
+    void setModuleType(ModuleType type) { moduleType = type; }
+
+    std::string getSchemaPath() const { return schemaPath; }
+    void setSchemaPath(std::string path) { schemaPath = path; }
+
+    UUID getModuleID() const { return moduleID; }
+    void setModuleID(UUID id) { moduleID = id; }
+
+    uint64_t getModuleStartOffset() const { return moduleStartOffset; }
+    void setModuleStartOffset(uint64_t offset) { moduleStartOffset = offset; }
+
+    uint64_t getStringOffset() const { return stringOffset; }
+    void setStringOffset(uint64_t offset) { stringOffset = offset; }
+
+    uint32_t getHeaderSize() const { return headerSize; }
+    void setHeaderSize(uint32_t size) { headerSize = size; }
+
+    uint64_t getDataSize() const { return dataSize; }
+    void setDataSize(uint64_t size) { dataSize = size; }
+
+    bool getCompression() const { return compression; }
+
+    bool getLittleEndian() const { return littleEndian; }
+    void setLittleEndian(bool lE) { littleEndian = lE; }
+
+    virtual uint64_t getAdditionalOffset() const { return 0; }
+    virtual void seAdditionalOffset(uint64_t offset) {}
+
+// METHODS
     virtual ~DataHeader() = default;
 
     static std::unique_ptr<DataHeader> create(ModuleType type);
 
     void writeToFile(std::ostream& out);
 
-    virtual void writeAdditionalOffsets(std::ostream&) {}
-    virtual std::string outputAdditionalOffsets() const { return ""; }
-
-    void updateHeader(std::ostream& out, std::uint32_t size, uint64_t stringOffset);
+    void updateHeader(std::ostream& out, uint64_t stringOffset);
     virtual void updateHeader(
-        std::ostream& out, std::uint32_t size, uint64_t stringOffset, uint64_t imageOffset);
+        std::ostream& out, uint64_t stringOffset, uint64_t imageOffset);
 
     void readDataHeader(std::istream& in);
 
-    virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) { return false; }
-
     friend std::ostream& operator<<(std::ostream& os, const DataHeader& header);
-
-protected:
-    void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value) const;
-    void writeTLVBool(std::ostream& out, HeaderFieldType type, bool value) const;
-    std::streampos writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const;
 };
 
 

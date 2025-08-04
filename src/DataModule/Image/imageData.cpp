@@ -17,6 +17,7 @@ void ImageData::writeBinary(std::ostream& out, XRefTable& xref) {
     header->writeToFile(out);
 
     // Write Data
+    header->setDataSize(rows.size() * rowSize);
     writeTabularData(out);
 
     streampos stringBufferStart = out.tellp();
@@ -36,25 +37,55 @@ void ImageData::writeBinary(std::ostream& out, XRefTable& xref) {
     uint32_t totalModuleSize = static_cast<uint32_t>(moduleEnd - moduleStart);
 
     // Update Header
-    header->updateHeader(out, totalModuleSize, static_cast<uint64_t>(stringBufferStart), static_cast<uint64_t>(iamgeDataStart));
+    header->updateHeader(out, static_cast<uint64_t>(stringBufferStart), static_cast<uint64_t>(iamgeDataStart));
     out.seekp(moduleEnd);
 
     // Update XrefTable
-    xref.addEntry(header->moduleType, header->moduleID, moduleStart, totalModuleSize);
+    xref.addEntry(header->getModuleType(), header->getModuleID(), moduleStart, totalModuleSize);
 
 }
 
 
 std::unique_ptr<ImageData> ImageData::fromStream(
-    std::istream& in, uint64_t moduleStartOffset) {
-    unique_ptr<DataHeader> dmHeader = make_unique<ImageHeader>();
+    std::istream& in, uint64_t moduleStartOffset, uint64_t moduleSize) {
+    unique_ptr<ImageHeader> dmHeader = make_unique<ImageHeader>();
     dmHeader->readDataHeader(in);
 
     unique_ptr<ImageData> dm = make_unique<ImageData>(
-        dmHeader->schemaPath, dmHeader->moduleID, dmHeader->moduleType);
+        dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getModuleType());
 
     dm->header = std::move(dmHeader);
-    dm->header->moduleStartOffset = moduleStartOffset;
+    dm->header->setModuleStartOffset(moduleStartOffset);
+
+    cout << *(dm->header) << endl;
+
+    uint64_t relativeStringOffset = dm->header->getStringOffset() - moduleStartOffset;
+    uint64_t currentPos = in.tellg();
+    
+    in.seekg(relativeStringOffset);
+
+    // Read in string buffer
+    // size_t stringBufferSize = moduleSize - dm->header->getHeaderSize() - dm->header->getDataSize();
+    
+    size_t stringBufferSize = dm->header->getAdditionalOffset() - dm->header->getStringOffset();
+    dm->stringBuffer.readFromFile(in, stringBufferSize);
+
+    // Return back to start of data
+    in.seekg(currentPos);
+
+    // Read in data
+    if (dm->header->getCompression()) {
+        cout << "TODO: Handle file compression" << endl;
+    } else {
+        dm->decodeRows(in, dm->header->getDataSize());
+    }
+
+    // Read in image data
+    // relativeOffset = dm->header->imageOffset - moduleStartOffset;
+    // in.seekg(relativeOffset);
+
+
+    return dm;
 } 
 
 
