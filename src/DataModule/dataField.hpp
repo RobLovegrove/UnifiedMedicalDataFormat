@@ -92,13 +92,35 @@ public:
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
 };
 
+/* =============== FloatField =============== */
+
+class FloatField : public DataField {
+private:
+    std::string format; // "float32", "float64", etc.
+
+public:
+    FloatField(std::string name, std::string format) 
+        : DataField(name, "number"), format(format) {}
+
+    size_t getLength() const override;
+    void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
+};
+
 /* =============== ArrayField =============== */
 
 class ArrayField : public DataField {
+private:
+    std::unique_ptr<DataField> itemField;
+    size_t minItems, maxItems;
 
-
-
-
+public:
+    ArrayField(std::string name, const nlohmann::json& itemDef, 
+               size_t minItems, size_t maxItems);
+    
+    size_t getLength() const override;
+    void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
 };
 
 /* =============== IntegerField =============== */

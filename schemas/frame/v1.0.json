@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "./schemas/frame/v1.0.json",
+  "title": "frame",
+  "description": "Schema for a single image frame with frame-specific metadata",
+  "type": "object",
+  "module_type": "frame",
+  "endianness": "little",
+  "required": ["metadata"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["position", "orientation"],
+      "properties": {
+        "position": {
+          "type": "object",
+          "description": "3D position of the frame",
+          "properties": {
+            "x": { "type": "number", "format": "float32" },
+            "y": { "type": "number", "format": "float32" },
+            "z": { "type": "number", "format": "float32" }
+          }
+        },
+        "orientation": {
+          "type": "object",
+          "description": "Frame orientation vectors",
+          "properties": {
+            "row_cosine": {
+              "type": "array",
+              "items": { "type": "number", "format": "float32" },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "column_cosine": {
+              "type": "array", 
+              "items": { "type": "number", "format": "float32" },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Frame acquisition timestamp"
+        },
+        "frame_number": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Frame number in sequence"
+        }
+      }
+    }
+  }
+} 

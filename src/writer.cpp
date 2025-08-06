@@ -4,6 +4,7 @@
 #include "Utility/uuid.hpp"
 #include "DataModule/Tabular/tabularData.hpp"
 #include "DataModule/Image/imageData.hpp"
+#include "DataModule/Image/FrameData.hpp"
 
 #include <nlohmann/json.hpp> 
 
@@ -61,18 +62,49 @@ bool Writer::writeNewFile(const string& filename) {
 
     // CREATE IMAGE MODULE
     try {
+        std::cout << "About to create ImageData..." << std::endl;
         ImageData dm("./schemas/image/v1.0.json", UUID());
+        std::cout << "ImageData created successfully" << std::endl;
 
-        std::vector<uint8_t> fakeImage(16 * 16); // 16x16 8-bit grayscale
-        std::fill(fakeImage.begin(), fakeImage.end(), 128); // uniform gray
-
+        std::cout << "About to add metadata to ImageData..." << std::endl;
         dm.addMetaData({
             {"modality", "MRI"},
             {"width", 16},
             {"height", 16},
-            {"bit_depth", 8}
+            {"bit_depth", 8},
+            {"encoding", "raw"},
+            {"num_frames", 1},
+            {"bodyPart", "HEAD"},
+            {"institution", "Test Hospital"},
+            {"acquisitionDate", "2024-01-01"},
+            {"technician", "Dr. Smith"},
+            {"patientName", "John Doe"},
+            {"patientID", "12345"}
         });
-        dm.addData(fakeImage);
+        std::cout << "Metadata added to ImageData successfully" << std::endl;
+
+        // Create a frame with fake image data
+        std::cout << "Creating frame..." << std::endl;
+        auto frame = std::make_unique<FrameData>("./schemas/frame/v1.0.json", UUID());
+        std::vector<uint8_t> fakeImage(16 * 16); // 16x16 8-bit grayscale
+        std::fill(fakeImage.begin(), fakeImage.end(), 128); // uniform gray
+        frame->pixelData = fakeImage;
+        
+        std::cout << "Adding frame metadata..." << std::endl;
+        // Add frame metadata (position, orientation, etc.)
+        frame->addMetaData({
+            {"position", {{"x", 0.0}, {"y", 0.0}, {"z", 0.0}}},
+            {"orientation", {
+                {"row_cosine", {1.0, 0.0, 0.0}},
+                {"column_cosine", {0.0, 1.0, 0.0}}
+            }},
+            {"timestamp", "2024-01-01T12:00:00Z"},
+            {"frame_number", 0}
+        });
+        
+        std::cout << "Adding frame to ImageData..." << std::endl;
+        dm.addFrame(std::move(frame));
+        std::cout << "Frame added successfully!" << std::endl;
         dm.writeBinary(outfile, xref);
     }
     catch (runtime_error e) {

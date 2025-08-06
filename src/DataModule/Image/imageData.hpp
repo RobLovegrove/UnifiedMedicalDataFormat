@@ -2,7 +2,8 @@
 #define IMAGEDATA_HPP
 
 #include <nlohmann/json.hpp> 
-
+#include <vector>
+#include "FrameData.hpp"
 #include "../stringBuffer.hpp"
 #include "../dataModule.hpp"
 #include "../Tabular/tabularData.hpp"
@@ -15,19 +16,21 @@
 class ImageData : public DataModule { 
 
 private:
-    std::vector<uint8_t> rawImageData;
+    std::vector<std::unique_ptr<FrameData>> frames;
 
-    std::streampos writeData(std::ostream& out) override;
+    std::streampos writeData(std::ostream& out) const override;
 
 public:
 
     virtual ~ImageData() override = default;
     explicit ImageData(const std::string& schemaPath, UUID uuid);
-    void addData(const std::vector<uint8_t>& data) {
-        rawImageData = data;
+    void addFrame(std::unique_ptr<FrameData> frame) {
+        frames.push_back(std::move(frame));
     }
+    size_t getNumFrames() const { return frames.size(); }
     virtual void decodeData(std::istream& in, size_t actualDataSize) override;
     virtual void printData(std::ostream& out) const override;
+    const std::vector<std::unique_ptr<FrameData>>& getFrames() const { return frames; }
 };
 
 #endif

@@ -26,9 +26,9 @@ protected:
                                             const nlohmann::json& definition,
                                             size_t& rowSize) override;
 
-    void decodeData(std::istream& in, size_t actualDataSize);
+    void decodeData(std::istream& in, size_t actualDataSize) override;
 
-    std::streampos writeData(std::ostream& out) override;
+    std::streampos writeData(std::ostream& out) const override;
     void writeStringBuffer(std::ostream& out);
 
 public:

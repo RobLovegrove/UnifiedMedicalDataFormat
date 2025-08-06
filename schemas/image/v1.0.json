@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "http://localhost:8080/schemas/image/v1.0.json",
+  "$id": "./schemas/image/v1.0.json",
   "title": "image",
-  "description": "Minimal schema for a basic image.",
+  "description": "Schema for a multi-frame medical image module, including essential DICOM fields and all additional tags.",
   "type": "object",
   "module_type": "image",
   "endianness": "little",
@@ -10,24 +10,28 @@
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["modality", "width", "height", "bit_depth"],
+      "required": ["modality", "width", "height", "bit_depth", "encoding"],
       "properties": {
-        "modality": {
-          "type": "string",
-          "length": 10
+        "modality": { "type": "string", "length": 10 },
+        "width": { "type": "integer", "format": "uint16" },
+        "height": { "type": "integer", "format": "uint16" },
+        "bit_depth": { "type": "integer", "format": "uint8" },
+        "encoding": { 
+          "type": "string", 
+          "enum": ["raw", "jpeg-lossless", "jpeg-ls", "jpeg2000-lossless", "rle", "deflate", "png"],
+          "default": "raw"
         },
-        "width": {
-          "type": "integer",
-          "format": "uint16"
+        "num_frames": { 
+          "type": "integer", 
+          "format": "uint16",
+          "description": "Number of frames in the image"
         },
-        "height": {
-          "type": "integer",
-          "format": "uint16"
-        },
-        "bit_depth": {
-          "type": "integer",
-          "format": "uint8"
-        }
+        "bodyPart": { "type": "string", "description": "Body part examined" },
+        "institution": { "type": "string", "description": "Institution name" },
+        "acquisitionDate": { "type": "string", "description": "Acquisition date" },
+        "technician": { "type": "string", "description": "Technician/operator name" },
+        "patientName": { "type": "string", "description": "Patient name" },
+        "patientID": { "type": "string", "description": "Patient ID" }
       }
     }
   }

@@ -42,6 +42,7 @@ const nlohmann::json& DataModule::getSchema() const {
 
 void DataModule::parseSchema(const nlohmann::json& schemaJson) {
 
+    std::cout << "Parsing schema: " << schemaJson["$id"] << std::endl;
     const auto& props = schemaJson["properties"];
 
     if (!props.contains("metadata")) {
@@ -51,7 +52,9 @@ void DataModule::parseSchema(const nlohmann::json& schemaJson) {
     // Parse metadata
     if (props.contains("metadata")) {
         const auto& metadataProps = props.at("metadata").at("properties");
+        std::cout << "Parsing metadata fields..." << std::endl;
         for (const auto& [name, definition] : metadataProps.items()) {
+            std::cout << "Parsing field: " << name << " -> " << definition.dump() << std::endl;
             metaDataFields.emplace_back(parseField(name, definition, metaDataRowSize));
         }
     }
@@ -105,12 +108,15 @@ unique_ptr<DataModule> DataModule::fromStream(
     try {
         switch (static_cast<ModuleType>(moduleType)) {
         case ModuleType::Tabular:
+            std::cout << "Creating TabularData module" << std::endl;
             dm = make_unique<TabularData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
             break;
         case ModuleType::Image:
+            std::cout << "Creating ImageData module" << std::endl;
             dm = make_unique<ImageData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
             break;
         default:
+            std::cout << "Unknown module type: " << static_cast<int>(moduleType) << std::endl;
             return nullptr;  // Gracefully skip unknown modules
         }
     } catch (const std::exception& e) {
@@ -149,6 +155,8 @@ unique_ptr<DataModule> DataModule::fromStream(
     if (dm->header->getCompression()) {
         cout << "TODO: Handle file compression" << endl;
     } else {
+        cout << "About to decode " << dm->header->getModuleType() << " data with size: " << dm->header->getDataSize() << endl;
+
         dm->decodeData(in, dm->header->getDataSize());
     }
 
@@ -192,7 +200,7 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
                                                 const nlohmann::json& definition,
                                                 size_t& rowSize) {
 
-    string type = definition.value("type", "string");
+    string type = definition.contains("type") ? definition["type"] : "string";
 
     // Handle enums
     if (definition.contains("enum")) {
@@ -223,6 +231,23 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 
         rowSize += integerFormat.byteLength;
         return make_unique<IntegerField>(name, integerFormat);
+    }
+
+    // Handle numbers/floats
+    else if (type == "number") {
+        if (!definition.contains("format")) {
+            throw runtime_error("Number field missing 'format': " + name);
+        }
+
+        std::string format = definition["format"];
+        
+        if (format == "float32" || format == "float64") {
+            size_t length = (format == "float32") ? 4 : 8;
+            rowSize += length;
+            return make_unique<FloatField>(name, format);
+        } else {
+            throw runtime_error("Unsupported number format: " + format);
+        }
     }
 
     // Handle strings
@@ -257,6 +282,41 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 
         rowSize += objectSize;
         return make_unique<ObjectField>(name, std::move(subfields), objectSize);
+    }
+
+    // Handle arrays
+    else if (type == "array") {
+        std::cout << "Parsing array field: " << name << std::endl;
+        if (!definition.contains("items")) {
+            throw runtime_error("Array field missing 'items': " + name);
+        }
+        if (!definition.contains("minItems") || !definition.contains("maxItems")) {
+            throw runtime_error("Array field missing minItems/maxItems: " + name);
+        }
+        
+        size_t minItems = definition["minItems"];
+        size_t maxItems = definition["maxItems"];
+        const auto& itemDef = definition["items"];
+        
+        std::cout << "Array item definition: " << itemDef.dump() << std::endl;
+        
+        size_t arraySize = 0;
+        // Create a temporary field to calculate item size
+        auto tempField = parseField("temp", itemDef, arraySize);
+        arraySize = tempField->getLength() * maxItems;
+        
+        rowSize += arraySize;
+        return make_unique<ArrayField>(name, itemDef, minItems, maxItems);
+    }
+
+    // Handle schema references ($ref)
+    else if (definition.contains("$ref")) {
+        std::cout << "Resolving schema reference: " << definition["$ref"] << std::endl;
+        std::string refPath = definition["$ref"];
+        nlohmann::json resolvedDef = resolveSchemaReference(refPath, header->getSchemaPath());
+        
+        // Recursively parse the resolved definition
+        return parseField(name, resolvedDef, rowSize);
     }
 
     // Handle bools
@@ -309,11 +369,17 @@ void DataModule::addMetaData(const nlohmann::json& data) {
     vector<uint8_t> row(metaDataRowSize, 0);
     size_t offset = 0;
 
+    std::cout << "Adding metadata. Available fields: ";
+    for (const auto& [key, value] : data.items()) {
+        std::cout << key << " ";
+    }
+    std::cout << std::endl;
+
     for (const unique_ptr<DataField>& field : metaDataFields) {
         const std::string& fieldName = field->getName();
         nlohmann::json value = data.contains(fieldName) ? data[fieldName] : nullptr;
 
-        std::cout << "Adding: "  << fieldName << ": " << value << std::endl;
+        std::cout << "Adding: "  << fieldName << ": " << value << " (type: " << value.type_name() << ")" << std::endl;
 
         field->encodeToBuffer(value, row, offset);
 
@@ -334,4 +400,46 @@ void DataModule::printMetadata(std::ostream& out) const {
         }
         out << rowJson.dump(2) << "\n";  // Pretty-print with 2-space indentation
     }
+}
+
+// Initialize static member
+std::unordered_map<std::string, nlohmann::json> DataModule::schemaCache;
+
+nlohmann::json DataModule::resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath) {
+    std::cout << "Resolving schema reference: " << refPath << std::endl;
+    
+    // Check if schema is already cached
+    if (schemaCache.find(refPath) != schemaCache.end()) {
+        std::cout << "Using cached schema for: " << refPath << std::endl;
+        return schemaCache[refPath];
+    }
+    
+    // Resolve relative path
+    std::string fullPath = refPath;
+    if (refPath.substr(0, 2) == "./") {
+        // Get directory of base schema
+        size_t lastSlash = baseSchemaPath.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            std::string baseDir = baseSchemaPath.substr(0, lastSlash + 1);
+            fullPath = baseDir + refPath.substr(2); // Remove "./" and prepend base directory
+        }
+    }
+    
+    std::cout << "Loading schema from: " << fullPath << std::endl;
+    
+    // Load the referenced schema
+    std::ifstream file(fullPath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open referenced schema file: " + fullPath);
+    }
+    
+    nlohmann::json referencedSchema;
+    file >> referencedSchema;
+    
+    std::cout << "Loaded schema: " << referencedSchema["$id"] << std::endl;
+    
+    // Cache the loaded schema
+    schemaCache[refPath] = referencedSchema;
+    
+    return referencedSchema;
 }

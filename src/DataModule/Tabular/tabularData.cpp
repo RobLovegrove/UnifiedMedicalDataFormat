@@ -35,7 +35,7 @@ unique_ptr<DataField> TabularData::parseField(const string& name,
                                                 const nlohmann::json& definition,
                                                 size_t& rowSize) {
 
-    string type = definition.value("type", "string");
+    string type = definition.contains("type") ? definition["type"] : "string";
 
     // Handle enums
     if (definition.contains("enum")) {
@@ -134,7 +134,7 @@ void TabularData::addData(const nlohmann::json& data) {
     rows.push_back(std::move(row));
 }
 
-streampos TabularData::writeData(ostream& out) {
+streampos TabularData::writeData(ostream& out) const {
 
         streampos pos = out.tellp();
 

@@ -138,8 +138,121 @@ nlohmann::json EnumField::decodeFromBuffer(
     return enumValues[enumValue];
 }
 
+/* =============== FloatField =============== */
+
+size_t FloatField::getLength() const {
+    if (format == "float32") return 4;
+    if (format == "float64") return 8;
+    throw std::runtime_error("Unsupported float format: " + format);
+}
+
+void FloatField::encodeToBuffer(
+    const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) {
+    
+    if (value.is_null()) return;
+    
+    if (!value.is_number()) {
+        throw std::runtime_error("FloatField '" + name + "' expected a number");
+    }
+    
+    float floatValue = value.get<float>();
+    
+    if (format == "float32") {
+        memcpy(&buffer[offset], &floatValue, sizeof(float));
+    } else if (format == "float64") {
+        double doubleValue = value.get<double>();
+        memcpy(&buffer[offset], &doubleValue, sizeof(double));
+    } else {
+        throw std::runtime_error("Unsupported float format: " + format);
+    }
+}
+
+nlohmann::json FloatField::decodeFromBuffer(
+    const std::vector<uint8_t>& buffer, size_t offset) {
+    
+    if (format == "float32") {
+        float value;
+        memcpy(&value, &buffer[offset], sizeof(float));
+        return value;
+    } else if (format == "float64") {
+        double value;
+        memcpy(&value, &buffer[offset], sizeof(double));
+        return value;
+    } else {
+        throw std::runtime_error("Unsupported float format: " + format);
+    }
+}
+
 /* =============== ArrayField =============== */
 
+ArrayField::ArrayField(std::string name, const nlohmann::json& itemDef, 
+                       size_t minItems, size_t maxItems)
+    : DataField(name, "array"), minItems(minItems), maxItems(maxItems) {
+    
+    // Parse the item definition to create the item field
+    std::string itemType = itemDef["type"];
+    std::string itemName = "item"; // Generic name for array items
+    
+    if (itemType == "number" && itemDef.contains("format")) {
+        std::string format = itemDef["format"];
+        itemField = std::make_unique<FloatField>(itemName, format);
+    } else if (itemType == "integer" && itemDef.contains("format")) {
+        std::string format = itemDef["format"];
+        IntegerFormatInfo integerFormat = IntegerField::parseIntegerFormat(format);
+        itemField = std::make_unique<IntegerField>(itemName, integerFormat);
+    } else {
+        throw std::runtime_error("Unsupported array item type: " + itemType);
+    }
+}
+
+size_t ArrayField::getLength() const {
+    return itemField->getLength() * maxItems;
+}
+
+void ArrayField::encodeToBuffer(
+    const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) {
+    
+    if (!value.is_array()) {
+        throw std::runtime_error("ArrayField '" + name + "' expected an array");
+    }
+    
+    const auto& array = value.get<std::vector<nlohmann::json>>();
+    
+    if (array.size() < minItems || array.size() > maxItems) {
+        throw std::runtime_error("ArrayField '" + name + "' size " + 
+                               std::to_string(array.size()) + " not in range [" + 
+                               std::to_string(minItems) + "," + std::to_string(maxItems) + "]");
+    }
+    
+    size_t itemOffset = offset;
+    for (const auto& item : array) {
+        itemField->encodeToBuffer(item, buffer, itemOffset);
+        itemOffset += itemField->getLength();
+    }
+    
+    // Zero-fill remaining space if array is shorter than maxItems
+    for (size_t i = array.size(); i < maxItems; ++i) {
+        itemField->encodeToBuffer(nlohmann::json(nullptr), buffer, itemOffset);
+        itemOffset += itemField->getLength();
+    }
+}
+
+nlohmann::json ArrayField::decodeFromBuffer(
+    const std::vector<uint8_t>& buffer, size_t offset) {
+    
+    nlohmann::json array = nlohmann::json::array();
+    size_t itemOffset = offset;
+    
+    for (size_t i = 0; i < maxItems; ++i) {
+        nlohmann::json item = itemField->decodeFromBuffer(buffer, itemOffset);
+        if (!item.is_null()) {
+            array.push_back(item);
+        }
+        itemOffset += itemField->getLength();
+    }
+    
+    return array;
+}
 
 /* =============== IntegerField =============== */
 

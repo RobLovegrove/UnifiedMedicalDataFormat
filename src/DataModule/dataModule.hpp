@@ -21,6 +21,10 @@ protected:
     std::vector<std::vector<uint8_t>> metaDataRows;
 
     size_t metaDataRowSize = 0;
+    
+    // Schema reference resolution
+    static std::unordered_map<std::string, nlohmann::json> schemaCache;
+    nlohmann::json resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath);
 
     explicit DataModule() {};
     DataModule(const std::string& schemaPath, UUID uuid, ModuleType type);
@@ -38,7 +42,7 @@ protected:
     std::ifstream openSchemaFile(const std::string& schemaPath);
 
     void writeMetaData(std::ostream& out);
-    virtual std::streampos writeData(std::ostream& out) = 0;
+    virtual std::streampos writeData(std::ostream& out) const = 0;
     void writeStringBuffer(std::ostream& out);
     void decodeMetadataRows(std::istream& in, size_t actualDataSize);
     virtual void decodeData(std::istream& in, size_t actualDataSize) = 0;
