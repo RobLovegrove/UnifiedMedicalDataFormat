@@ -23,12 +23,9 @@ public:
 
     virtual ~ImageData() override = default;
     explicit ImageData(const std::string& schemaPath, UUID uuid);
-
-    void setImageData(const std::vector<uint8_t>& data) {
+    void addData(const std::vector<uint8_t>& data) {
         rawImageData = data;
     }
-
-    virtual void addData(const nlohmann::json& rowData) override;
     virtual void decodeData(std::istream& in, size_t actualDataSize) override;
     virtual void printData(std::ostream& out) const override;
 };

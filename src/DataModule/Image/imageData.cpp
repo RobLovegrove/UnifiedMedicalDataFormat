@@ -26,9 +26,36 @@ streampos ImageData::writeData(std::ostream& out) {
     return pos;
 }
 
-void ImageData::addData(const nlohmann::json& data) {}
-void ImageData::decodeData(std::istream& in, size_t actualDataSize) {}
-void ImageData::printData(std::ostream& out) const {}
+void ImageData::decodeData(std::istream& in, size_t actualDataSize) {
+    rawImageData.resize(actualDataSize);
+    in.read(reinterpret_cast<char*>(rawImageData.data()), actualDataSize);
+
+    if (in.gcount() != static_cast<std::streamsize>(actualDataSize)) {
+        throw std::runtime_error("Failed to read expected image data size.");
+    }
+}
+
+
+void ImageData::printData(std::ostream& out) const {
+    constexpr int width = 16;
+    constexpr int height = 16;
+    const std::string shades = " .:-=+*#%@";  // 10 levels of intensity
+
+    if (rawImageData.size() < width * height) {
+        out << "Image data incomplete or incorrect size.\n";
+        return;
+    }
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            uint8_t pixel = rawImageData[y * width + x];
+            char shade = shades[pixel * shades.size() / 256];
+            out << shade;
+        }
+        out << '\n';
+    }
+
+}
 
 
         

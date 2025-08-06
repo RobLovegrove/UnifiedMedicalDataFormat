@@ -45,7 +45,8 @@ bool Reader::readFile(const string& filename) {
                 cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
                 continue;
             }
-
+            dm->printMetadata(cout);
+            dm->printData(cout);
         }
         else {
             //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);

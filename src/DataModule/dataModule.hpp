@@ -29,7 +29,7 @@ protected:
 
     void parseSchemaHeader(const nlohmann::json& schemaJson);
     void parseSchema(const nlohmann::json& schemaJson);
-    virtual void parseDataSchema(const nlohmann::json& schemaJson) {};
+    virtual void parseDataSchema(const nlohmann::json&) {};
 
     virtual std::unique_ptr<DataField> parseField(const std::string& name, 
                                             const nlohmann::json& definition,
@@ -55,9 +55,10 @@ public:
     const nlohmann::json& getSchema() const;
     //virtual void addMetaData(const nlohmann::json& rowData);
     void addMetaData(const nlohmann::json& rowData);
-    virtual void addData(const nlohmann::json& rowData) = 0;
+    // virtual void addData(const nlohmann::json& rowData) = 0;
     void writeBinary(std::ostream& out, XRefTable& xref);
 
+    void printMetadata(std::ostream& out) const;
     virtual void printData(std::ostream& out) const = 0;
 };
 

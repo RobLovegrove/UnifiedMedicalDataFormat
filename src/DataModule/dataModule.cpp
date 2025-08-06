@@ -322,3 +322,16 @@ void DataModule::addMetaData(const nlohmann::json& data) {
 
     metaDataRows.push_back(std::move(row));
 }
+
+void DataModule::printMetadata(std::ostream& out) const {
+    for (const auto& row : metaDataRows) {
+        size_t offset = 0;
+        nlohmann::json rowJson = nlohmann::json::object();
+
+        for (const auto& field : metaDataFields) {
+            rowJson[field->getName()] = field->decodeFromBuffer(row, offset);
+            offset += field->getLength();
+        }
+        out << rowJson.dump(2) << "\n";  // Pretty-print with 2-space indentation
+    }
+}

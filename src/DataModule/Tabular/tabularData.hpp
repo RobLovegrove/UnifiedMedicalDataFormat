@@ -35,7 +35,7 @@ public:
     explicit TabularData(const std::string& schemaPath, UUID uuid);
     virtual ~TabularData() override = default;
     
-    void addData(const nlohmann::json& rowData) override;
+    void addData(const nlohmann::json& rowData);
     // void writeBinary(std::ostream& out, XRefTable& xref) override;
 
     void printData(std::ostream& out) const override;

@@ -63,16 +63,16 @@ bool Writer::writeNewFile(const string& filename) {
     try {
         ImageData dm("./schemas/image/v1.0.json", UUID());
 
-        std::vector<uint8_t> fakeImage(64 * 64); // 64x64 8-bit grayscale
+        std::vector<uint8_t> fakeImage(16 * 16); // 16x16 8-bit grayscale
         std::fill(fakeImage.begin(), fakeImage.end(), 128); // uniform gray
 
         dm.addMetaData({
             {"modality", "MRI"},
-            {"width", 64},
-            {"height", 64},
+            {"width", 16},
+            {"height", 16},
             {"bit_depth", 8}
         });
-        dm.setImageData(fakeImage);
+        dm.addData(fakeImage);
         dm.writeBinary(outfile, xref);
     }
     catch (runtime_error e) {
