@@ -7,7 +7,8 @@ enum class ModuleType : uint8_t {
     FileHeader = 0,
     XrefTable,   
     Tabular,
-    Image
+    Image,
+    Frame
 };
 
 // Converts ModuleType to string

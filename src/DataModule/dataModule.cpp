@@ -27,10 +27,6 @@ void DataModule::initialise() {
     try {
         parseSchemaHeader(schemaJson);
         parseSchema(schemaJson);
-
-        for (const auto& f : metaDataFields) {
-            std::cout << f;
-        }
     } catch (const std::exception& e) {
         throw std::runtime_error("Failed to parse schema: " + std::string(e.what()));
     }
@@ -42,7 +38,6 @@ const nlohmann::json& DataModule::getSchema() const {
 
 void DataModule::parseSchema(const nlohmann::json& schemaJson) {
 
-    std::cout << "Parsing schema: " << schemaJson["$id"] << std::endl;
     const auto& props = schemaJson["properties"];
 
     if (!props.contains("metadata")) {
@@ -52,9 +47,7 @@ void DataModule::parseSchema(const nlohmann::json& schemaJson) {
     // Parse metadata
     if (props.contains("metadata")) {
         const auto& metadataProps = props.at("metadata").at("properties");
-        std::cout << "Parsing metadata fields..." << std::endl;
         for (const auto& [name, definition] : metadataProps.items()) {
-            std::cout << "Parsing field: " << name << " -> " << definition.dump() << std::endl;
             metaDataFields.emplace_back(parseField(name, definition, metaDataRowSize));
         }
     }
@@ -98,7 +91,7 @@ ifstream DataModule::openSchemaFile(const string& schemaPath) {
 }
 
 unique_ptr<DataModule> DataModule::fromStream(
-    istream& in, uint64_t moduleStartOffset, uint64_t moduleSize, uint8_t moduleType) {
+    istream& in, uint64_t moduleStartOffset, uint8_t moduleType) {
 
     unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
     dmHeader->readDataHeader(in);
@@ -108,15 +101,15 @@ unique_ptr<DataModule> DataModule::fromStream(
     try {
         switch (static_cast<ModuleType>(moduleType)) {
         case ModuleType::Tabular:
-            std::cout << "Creating TabularData module" << std::endl;
             dm = make_unique<TabularData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
             break;
         case ModuleType::Image:
-            std::cout << "Creating ImageData module" << std::endl;
             dm = make_unique<ImageData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
             break;
+        case ModuleType::Frame:
+            dm = make_unique<FrameData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
+            break;
         default:
-            std::cout << "Unknown module type: " << static_cast<int>(moduleType) << std::endl;
             return nullptr;  // Gracefully skip unknown modules
         }
     } catch (const std::exception& e) {
@@ -128,18 +121,16 @@ unique_ptr<DataModule> DataModule::fromStream(
     dm->header = std::move(dmHeader);
 
     dm->header->setModuleStartOffset(moduleStartOffset);
-    
-    cout << *(dm->header) << endl;
 
-    uint64_t relativeStringOffset = dm->header->getStringOffset() - moduleStartOffset;
+    uint64_t relativeStringOffset = dm->header->getHeaderSize() + dm->header->getMetadataSize() + dm->header->getDataSize();
     uint64_t currentPos = in.tellg();
     
     in.seekg(relativeStringOffset);
 
-    // Read in string buffer
-    size_t stringBufferSize = moduleSize - dm->header->getHeaderSize() - dm->header->getMetadataSize() - dm->header->getDataSize();
-
-    dm->stringBuffer.readFromFile(in, stringBufferSize);
+    // Only read string buffer if there's actually content
+    if (dm->header->getStringBufferSize() > 0) {
+        dm->stringBuffer.readFromFile(in, dm->header->getStringBufferSize());
+    }
 
     // Return back to start of data
     in.seekg(currentPos);
@@ -155,11 +146,8 @@ unique_ptr<DataModule> DataModule::fromStream(
     if (dm->header->getCompression()) {
         cout << "TODO: Handle file compression" << endl;
     } else {
-        cout << "About to decode " << dm->header->getModuleType() << " data with size: " << dm->header->getDataSize() << endl;
-
         dm->decodeData(in, dm->header->getDataSize());
     }
-
     return dm;
 }
 
@@ -172,7 +160,10 @@ void DataModule::writeMetaData(ostream& out) {
 
 void DataModule::writeStringBuffer(ostream& out) {
 
-    if (stringBuffer.getSize() != 0) {
+    uint64_t stringBufferSize = stringBuffer.getSize();
+    header->setStringBufferSize(stringBufferSize);
+
+    if (stringBufferSize != 0) {
         stringBuffer.writeToFile(out);
     }
 }
@@ -286,7 +277,6 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 
     // Handle arrays
     else if (type == "array") {
-        std::cout << "Parsing array field: " << name << std::endl;
         if (!definition.contains("items")) {
             throw runtime_error("Array field missing 'items': " + name);
         }
@@ -297,8 +287,6 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
         size_t minItems = definition["minItems"];
         size_t maxItems = definition["maxItems"];
         const auto& itemDef = definition["items"];
-        
-        std::cout << "Array item definition: " << itemDef.dump() << std::endl;
         
         size_t arraySize = 0;
         // Create a temporary field to calculate item size
@@ -311,7 +299,6 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 
     // Handle schema references ($ref)
     else if (definition.contains("$ref")) {
-        std::cout << "Resolving schema reference: " << definition["$ref"] << std::endl;
         std::string refPath = definition["$ref"];
         nlohmann::json resolvedDef = resolveSchemaReference(refPath, header->getSchemaPath());
         
@@ -336,6 +323,7 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 void DataModule::writeBinary(std::ostream& out, XRefTable& xref) {
     
     streampos moduleStart = out.tellp();
+    header->setModuleStartOffset(static_cast<uint64_t>(moduleStart));
 
     // Write header
     header->writeToFile(out);
@@ -345,23 +333,23 @@ void DataModule::writeBinary(std::ostream& out, XRefTable& xref) {
     writeMetaData(out);
 
     // Write Data
-    streampos dataOffset = writeData(out);
-
-    streampos stringBufferStart = out.tellp();
+    writeData(out);
 
     // Write String Buffer
     writeStringBuffer(out);
 
     streampos moduleEnd = out.tellp();
 
-    uint32_t totalModuleSize = static_cast<uint32_t>(moduleEnd - moduleStart);
+    header->setModuleSize(static_cast<uint64_t>(moduleEnd - moduleStart));
 
     // Update Header
-    header->updateHeader(out, static_cast<uint64_t>(stringBufferStart), dataOffset);
+    header->updateHeader(out);
     out.seekp(moduleEnd);
 
     // Update XrefTable
-    xref.addEntry(header->getModuleType(), header->getModuleID(), moduleStart, totalModuleSize);
+    xref.addEntry(
+        header->getModuleType(), 
+        header->getModuleID(), moduleStart, header->getModuleSize());
 
 }
 
@@ -369,18 +357,11 @@ void DataModule::addMetaData(const nlohmann::json& data) {
     vector<uint8_t> row(metaDataRowSize, 0);
     size_t offset = 0;
 
-    std::cout << "Adding metadata. Available fields: ";
-    for (const auto& [key, value] : data.items()) {
-        std::cout << key << " ";
-    }
-    std::cout << std::endl;
-
     for (const unique_ptr<DataField>& field : metaDataFields) {
         const std::string& fieldName = field->getName();
         nlohmann::json value = data.contains(fieldName) ? data[fieldName] : nullptr;
 
-        std::cout << "Adding: "  << fieldName << ": " << value << " (type: " << value.type_name() << ")" << std::endl;
-
+        std::cout << "Adding: " << fieldName << ": " << value << std::endl;
         field->encodeToBuffer(value, row, offset);
 
         offset += field->getLength();
@@ -398,8 +379,36 @@ void DataModule::printMetadata(std::ostream& out) const {
             rowJson[field->getName()] = field->decodeFromBuffer(row, offset);
             offset += field->getLength();
         }
-        out << rowJson.dump(2) << "\n";  // Pretty-print with 2-space indentation
+
+        out << rowJson.dump(2) << "\n";
     }
+}
+
+// Template method that handles common functionality
+ModuleData DataModule::getDataWithSchema() const {
+    return {
+        getMetadataAsJson(),
+        getModuleSpecificData()
+    };
+}
+
+// Helper method to reconstruct metadata from stored fields
+nlohmann::json DataModule::getMetadataAsJson() const {
+    nlohmann::json metadataArray = nlohmann::json::array();
+    
+    for (const auto& row : metaDataRows) {
+        size_t offset = 0;
+        nlohmann::json rowJson = nlohmann::json::object();
+
+        for (const auto& field : metaDataFields) {
+            rowJson[field->getName()] = field->decodeFromBuffer(row, offset);
+            offset += field->getLength();
+        }
+
+        metadataArray.push_back(rowJson);
+    }
+    
+    return metadataArray;
 }
 
 // Initialize static member

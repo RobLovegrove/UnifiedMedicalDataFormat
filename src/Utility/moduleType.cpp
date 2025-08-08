@@ -13,6 +13,7 @@ string module_type_to_string(ModuleType type) {
         case ModuleType::XrefTable:  return "xrefTable";
         case ModuleType::Tabular:  return "tabular";
         case ModuleType::Image:    return "image";
+        case ModuleType::Frame:    return "frame";
         default:                     return "unknown";
     }
 }
@@ -25,12 +26,13 @@ ModuleType module_type_from_string(const string& str) {
     if (s == "xreftable")   return ModuleType::XrefTable;
     if (s == "tabular")   return ModuleType::Tabular;
     if (s == "image")     return ModuleType::Image;
+    if (s == "frame")     return ModuleType::Frame;
 
     throw invalid_argument("Invalid ModuleType string: " + str);
 }
 
 bool isValidModuleType(const string& str) {
-     return (str == "fileHeader" || str == "xreftable" || str == "tabular" || str == "image");
+     return (str == "fileHeader" || str == "xreftable" || str == "tabular" || str == "image" || str == "frame");
 }
 
 ostream& operator<<(ostream& os, ModuleType type) {

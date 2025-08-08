@@ -11,13 +11,12 @@ enum class HeaderFieldType : uint8_t {
     HeaderSize    = 1,
     MetadataSize = 2,
     DataSize      = 3,
-    StringBufferOffset = 4,
-    DataOffset = 5,
-    ModuleType    = 6,
-    SchemaPath    = 7,
-    Compression   = 8,
-    Endianness    = 9,
-    ModuleID      = 10
+    StringSize    = 4,
+    ModuleType    = 5,
+    SchemaPath    = 6,
+    Compression   = 7,
+    Endianness    = 8,
+    ModuleID      = 9
 };
 
 struct DataHeader {
@@ -26,13 +25,16 @@ protected:
     uint32_t headerSize = 0;
     uint64_t metaDataSize = 0;
     uint64_t dataSize = 0;
-    uint64_t dataOffset = 0;
-    uint64_t stringOffset = 0;
+    uint64_t stringBufferSize = 0;
 
     uint64_t moduleStartOffset;
+    uint64_t totalModuleSize = 0;
+    
     std::streampos headerSizePos = 0;
     std::streampos metadataSizePos = 0;
     std::streampos dataSizePos = 0;
+    std::streampos stringBufferSizePos = 0;
+
     std::streampos dataOffsetPos = 0;
     std::streampos stringOffsetPos = 0;
 
@@ -64,8 +66,8 @@ public:
     uint64_t getModuleStartOffset() const { return moduleStartOffset; }
     void setModuleStartOffset(uint64_t offset) { moduleStartOffset = offset; }
 
-    uint64_t getStringOffset() const { return stringOffset; }
-    void setStringOffset(uint64_t offset) { stringOffset = offset; }
+    void setModuleSize(uint64_t size) { totalModuleSize = size; }
+    uint64_t getModuleSize() const;
 
     uint32_t getHeaderSize() const { return headerSize; }
     void setHeaderSize(uint32_t size) { headerSize = size; }
@@ -75,6 +77,9 @@ public:
 
     uint64_t getDataSize() const { return dataSize; }
     void setDataSize(uint64_t size) { dataSize = size; }
+
+    uint64_t getStringBufferSize() const { return stringBufferSize; }
+    void setStringBufferSize(uint64_t size) { stringBufferSize = size; }
 
     bool getCompression() const { return compression; }
 
@@ -89,8 +94,7 @@ public:
 
     void writeToFile(std::ostream& out);
 
-    virtual void updateHeader(
-        std::ostream& out, uint64_t stringOffset, uint64_t dataOffset);
+    virtual void updateHeader(std::ostream& out);
 
     void readDataHeader(std::istream& in);
 

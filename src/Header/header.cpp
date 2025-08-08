@@ -20,8 +20,6 @@ bool Header::writePrimaryHeader(ofstream& outfile, XRefTable& xref) {
 
     uint32_t size = MAGIC_NUMBER.size();
 
-    cout << size << endl;
-
     // WRITE MAGIC NUMBER
     outfile.write(MAGIC_NUMBER.data(), size);
 

@@ -10,6 +10,8 @@
 #include <istream>
 
 class FrameData : public DataModule {
+    friend class ImageData; // Allow ImageData to access protected members
+    
 public:
     std::vector<uint8_t> pixelData;
 
@@ -17,9 +19,17 @@ public:
     
     // No copy/move operations supported due to DataModule design
 
-    virtual std::streampos writeData(std::ostream& out) const override;
+    virtual void writeData(std::ostream& out) const override;
     virtual void decodeData(std::istream& in, size_t actualDataSize) override;
     virtual void printData(std::ostream& out) const override;
+    
+    // Override the virtual method for frame-specific data
+    std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
+    getModuleSpecificData() const override;
+    
+    // Metadata methods
+    size_t getMetadataSize() const;
+    void writeMetadata(std::ostream& out);
 };
 
 #endif // FRAMEDATA_HPP

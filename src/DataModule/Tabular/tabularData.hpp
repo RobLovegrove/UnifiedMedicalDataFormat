@@ -22,14 +22,14 @@ protected:
 
     virtual void parseDataSchema(const nlohmann::json& schemaJson) override;
 
-    std::unique_ptr<DataField> parseField(const std::string& name, 
-                                            const nlohmann::json& definition,
-                                            size_t& rowSize) override;
-
     void decodeData(std::istream& in, size_t actualDataSize) override;
 
-    std::streampos writeData(std::ostream& out) const override;
+    void writeData(std::ostream& out) const override;
     void writeStringBuffer(std::ostream& out);
+
+    // Override the virtual method for tabular-specific data
+    std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
+    getModuleSpecificData() const override;
 
 public:
     explicit TabularData(const std::string& schemaPath, UUID uuid);

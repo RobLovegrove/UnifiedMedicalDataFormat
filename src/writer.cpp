@@ -60,51 +60,54 @@ bool Writer::writeNewFile(const string& filename) {
         cout << "Error: " << e.what() << endl;
     }
 
+    cout << endl << endl;
+    
     // CREATE IMAGE MODULE
     try {
-        std::cout << "About to create ImageData..." << std::endl;
         ImageData dm("./schemas/image/v1.0.json", UUID());
-        std::cout << "ImageData created successfully" << std::endl;
 
-        std::cout << "About to add metadata to ImageData..." << std::endl;
         dm.addMetaData({
-            {"modality", "MRI"},
+            {"modality", "CT"},
             {"width", 16},
             {"height", 16},
             {"bit_depth", 8},
             {"encoding", "raw"},
-            {"num_frames", 1},
-            {"bodyPart", "HEAD"},
+            {"bodyPart", "CHEST"},
             {"institution", "Test Hospital"},
             {"acquisitionDate", "2024-01-01"},
             {"technician", "Dr. Smith"},
             {"patientName", "John Doe"},
-            {"patientID", "12345"}
-        });
-        std::cout << "Metadata added to ImageData successfully" << std::endl;
-
-        // Create a frame with fake image data
-        std::cout << "Creating frame..." << std::endl;
-        auto frame = std::make_unique<FrameData>("./schemas/frame/v1.0.json", UUID());
-        std::vector<uint8_t> fakeImage(16 * 16); // 16x16 8-bit grayscale
-        std::fill(fakeImage.begin(), fakeImage.end(), 128); // uniform gray
-        frame->pixelData = fakeImage;
-        
-        std::cout << "Adding frame metadata..." << std::endl;
-        // Add frame metadata (position, orientation, etc.)
-        frame->addMetaData({
-            {"position", {{"x", 0.0}, {"y", 0.0}, {"z", 0.0}}},
-            {"orientation", {
-                {"row_cosine", {1.0, 0.0, 0.0}},
-                {"column_cosine", {0.0, 1.0, 0.0}}
-            }},
-            {"timestamp", "2024-01-01T12:00:00Z"},
-            {"frame_number", 0}
+            {"patientID", "12345"},
+            {"dimensions", {16, 16, 8}},    // 3D: width, height, depth
+            {"dimension_names", {"x", "y", "z"}}
         });
         
-        std::cout << "Adding frame to ImageData..." << std::endl;
-        dm.addFrame(std::move(frame));
-        std::cout << "Frame added successfully!" << std::endl;
+        // Get dimensions from metadata (hardcoded for now)
+        int width = 16;
+        int height = 16;
+        int depth = 8;
+        
+        // Create frames for each slice
+        for (int slice = 0; slice < depth; slice++) {
+            auto frame = std::make_unique<FrameData>("./schemas/frame/v1.0.json", UUID());
+            std::vector<uint8_t> sliceData(width * height);
+            std::fill(sliceData.begin(), sliceData.end(), 128 + slice * 10); // different gray per slice
+            frame->pixelData = sliceData;
+            
+            // Add frame metadata
+            frame->addMetaData({
+                {"position", {{"x", 0.0}, {"y", 0.0}, {"z", static_cast<double>(slice)}}},
+                {"orientation", {
+                    {"row_cosine", {1.0, 0.0, 0.0}},
+                    {"column_cosine", {0.0, 1.0, 0.0}}
+                }},
+                {"timestamp", "2024-01-01T12:00:00Z"},
+                {"frame_number", slice}
+            });
+            
+            dm.addData(std::move(frame));
+        }
+        
         dm.writeBinary(outfile, xref);
     }
     catch (runtime_error e) {

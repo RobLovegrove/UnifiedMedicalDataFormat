@@ -21,17 +21,27 @@
           "enum": ["raw", "jpeg-lossless", "jpeg-ls", "jpeg2000-lossless", "rle", "deflate", "png"],
           "default": "raw"
         },
-        "num_frames": { 
-          "type": "integer", 
-          "format": "uint16",
-          "description": "Number of frames in the image"
-        },
+
         "bodyPart": { "type": "string", "description": "Body part examined" },
         "institution": { "type": "string", "description": "Institution name" },
         "acquisitionDate": { "type": "string", "description": "Acquisition date" },
         "technician": { "type": "string", "description": "Technician/operator name" },
         "patientName": { "type": "string", "description": "Patient name" },
-        "patientID": { "type": "string", "description": "Patient ID" }
+        "patientID": { "type": "string", "description": "Patient ID" },
+        "dimensions": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1, "format": "uint16" },
+          "minItems": 2,
+          "maxItems": 10,
+          "description": "Size of each dimension"
+        },
+        "dimension_names": {
+          "type": "array", 
+          "items": { "type": "string", "length": 16 },
+          "minItems": 2,
+          "maxItems": 10,
+                    "description": "Names of each dimension (x, y, z, time, channel, etc.)"
+        }
       }
     }
   }

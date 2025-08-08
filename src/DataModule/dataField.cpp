@@ -22,6 +22,12 @@ ostream& operator<<(ostream& os, const unique_ptr<DataField>& field) {
 void StringField::encodeToBuffer(
     const nlohmann::json& value, vector<uint8_t>& buffer, size_t offset) {
     
+    if (value.is_null()) {
+        // Fill with nulls for zero-filling
+        memset(&buffer[offset], 0, length);
+        return;
+    }
+    
     if (!value.is_string()) {
         throw runtime_error("StringField '" + name + "' expected a string");
     }
@@ -200,6 +206,10 @@ ArrayField::ArrayField(std::string name, const nlohmann::json& itemDef,
         std::string format = itemDef["format"];
         IntegerFormatInfo integerFormat = IntegerField::parseIntegerFormat(format);
         itemField = std::make_unique<IntegerField>(itemName, integerFormat);
+    } else if (itemType == "string") {
+        // For string arrays, we'll use StringField with a fixed length
+        size_t length = itemDef.value("length", 32); // Default to 32 bytes
+        itemField = std::make_unique<StringField>(itemName, "string", length);
     } else {
         throw std::runtime_error("Unsupported array item type: " + itemType);
     }

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "./schemas/dimension/v1.0.json",
+  "title": "dimension",
+  "description": "Schema for a dimension level in N-dimensional data",
+  "type": "object",
+  "module_type": "dimension",
+  "endianness": "little",
+  "required": ["metadata"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["dimension_name", "dimension_index"],
+      "properties": {
+        "dimension_name": {
+          "type": "string",
+          "description": "Name of this dimension (x, y, z, time, etc.)"
+        },
+        "dimension_index": {
+          "type": "integer",
+          "description": "Index of this dimension level"
+        },
+        "is_leaf": {
+          "type": "boolean",
+          "description": "Whether this dimension contains frames (true) or children (false)"
+        }
+      }
+    }
+  }
+} 

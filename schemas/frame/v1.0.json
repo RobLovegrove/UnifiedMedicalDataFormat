@@ -41,7 +41,8 @@
         },
         "timestamp": {
           "type": "string",
-          "description": "Frame acquisition timestamp"
+          "length": 20,
+          "description": "Frame acquisition timestamp (ISO 8601 format)"
         },
         "frame_number": {
           "type": "integer",

@@ -1,104 +1,162 @@
 #include "imageData.hpp"
-#include "FrameData.hpp"
 #include "../../Utility/uuid.hpp"
 #include "../Header/dataHeader.hpp"
 #include "../dataModule.hpp"
+#include "../../Xref/xref.hpp"
 
 #include "string"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 using namespace std;
 
 ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPath, uuid, ModuleType::Image) {
-    std::cout << "ImageData constructor called with schema: " << schemaPath << std::endl;
     initialise();
-    std::cout << "ImageData constructor completed successfully" << std::endl;
 }
 
-streampos ImageData::writeData(std::ostream& out) const {
-    streampos pos = out.tellp();
-    size_t totalDataSize = 0;
-    for (const auto& frame : frames) {
-        // Write each frame's pixel data
-        frame->writeData(out);
-        totalDataSize += frame->pixelData.size();
+void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
+    if (!schemaJson.contains("properties")) {
+        throw runtime_error("Schema missing essential 'properties' field.");
     }
-    header->setDataSize(totalDataSize);
-    return pos;
+
+    const auto& props = schemaJson["properties"];
+
+    for (const auto& [name, definition] : props.items()) {
+        fields.emplace_back(parseField(name, definition, rowSize));
+    }
 }
 
-void ImageData::decodeData(std::istream& in, size_t actualDataSize) {
-    std::cout << "=== ImageData::decodeData called with dataSize: " << actualDataSize << " ===" << std::endl;
+void ImageData::addData(std::unique_ptr<FrameData> frame) {
+    frames.push_back(std::move(frame));
+}
+
+void ImageData::addMetaData(const nlohmann::json& data) {
+    // Call base class implementation first
+    DataModule::addMetaData(data);
     
-    // First, we need to decode the metadata to get the number of frames
-    // The metadata should already be decoded by the parent DataModule class
+    // Extract dimensions from metadata and store in C++ array
+    if (data.contains("dimensions") && data["dimensions"].is_array()) {
+        dimensions.clear();
+        for (const auto& dim : data["dimensions"]) {
+            dimensions.push_back(dim.get<uint16_t>());
+        }
+    }
+}
+
+int ImageData::getDepth() const {
+    return dimensions.size() >= 3 ? dimensions[2] : 0;
+}
+
+void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
+    // Call base class to decode metadata normally
+    DataModule::decodeMetadataRows(in, actualDataSize);
     
-    // Get the number of frames from metadata
-    size_t numFrames = 1; // Default to 1 frame
-    if (!metaDataRows.empty()) {
-        std::cout << "Found " << metaDataRows.size() << " metadata rows" << std::endl;
-        // Try to find the num_frames field in metadata
-        size_t offset = 0;
-        for (const auto& field : metaDataFields) {
-            if (field->getName() == "num_frames") {
-                std::cout << "Found num_frames field at offset " << offset << std::endl;
-                // Decode the num_frames value from the first metadata row
-                nlohmann::json numFramesJson = field->decodeFromBuffer(metaDataRows[0], offset);
-                if (numFramesJson.is_number()) {
-                    numFrames = numFramesJson.get<size_t>();
-                    std::cout << "Decoded num_frames: " << numFrames << std::endl;
-                }
-                break;
+    // Now extract dimensions from the decoded metadata
+    dimensions.clear();
+    
+    // Get the decoded metadata and find the dimensions field
+    auto metadata = getMetadataAsJson();
+    
+    if (metadata.is_array() && !metadata.empty()) {
+        // Take the first row (assuming all rows have the same dimensions)
+        auto firstRow = metadata[0];
+        
+        if (firstRow.contains("dimensions") && firstRow["dimensions"].is_array()) {
+            for (const auto& dim : firstRow["dimensions"]) {
+                dimensions.push_back(dim.get<uint16_t>());
             }
-            offset += field->getLength();
         }
-    } else {
-        std::cout << "No metadata rows found" << std::endl;
+    }
+}
+
+void ImageData::writeData(std::ostream& out) const {
+    streampos startPos = out.tellp();
+    
+    // Write each frame as embedded data (not as separate modules)
+    for (size_t i = 0; i < frames.size(); i++) {
+        XRefTable tempXref;
+        frames[i]->writeBinary(out, tempXref);
     }
     
-    std::cout << "Reading " << numFrames << " frame(s) from ImageData" << std::endl;
+    streampos endPos = out.tellp();
+
+    uint64_t totalDataSize = endPos - startPos;
+
+    header->setDataSize(totalDataSize);
+
+}
+
+void ImageData::writeStringBuffer(std::ostream& out) {
+    if (stringBuffer.getSize() != 0) {
+        stringBuffer.writeToFile(out);
+    }
+}
+
+void ImageData::decodeData(std::istream& in, size_t) {
+    // Clear any existing frames
+    frames.clear();
     
-    // Create frames and read their data
-    size_t frameSize = actualDataSize / numFrames;
-    for (size_t i = 0; i < numFrames; ++i) {
-        // Create a new frame
-        auto frame = std::make_unique<FrameData>("./schemas/frame/v1.0.json", UUID());
+    // Get frame count from C++ dimensions array
+    int depth = getDepth();
+    
+    // Read each frame as a complete DataModule using fromStream
+    for (int i = 0; i < depth; i++) {
+        // Get current position
+        std::streampos frameStart = in.tellg();
         
-        // Read frame pixel data
-        frame->pixelData.resize(frameSize);
-        in.read(reinterpret_cast<char*>(frame->pixelData.data()), frameSize);
-        if (in.gcount() != static_cast<std::streamsize>(frameSize)) {
-            throw std::runtime_error("Failed to read expected frame data size.");
-        }
+        // Read frame header to get frame size (this advances the stream)
+        DataHeader frameHeader;
+
+        frameHeader.readDataHeader(in);
+
+        // Calculate frame size
+        uint64_t frameSize = frameHeader.getModuleSize();
         
-        // Add frame to the image
+        // Reset to frame start
+        in.seekg(frameStart);
+        
+        // Read the entire frame (including header) into a buffer
+        std::vector<char> frameBuffer(frameSize);
+        in.read(frameBuffer.data(), frameSize);
+
+        
+        // Create stringstream from the complete frame data
+        std::istringstream frameStream(std::string(frameBuffer.begin(), frameBuffer.end()));
+        
+        // Use DataModule::fromStream to read the frame
+        auto frame = std::unique_ptr<FrameData>(static_cast<FrameData*>(
+            DataModule::fromStream(frameStream, 0, static_cast<uint8_t>(ModuleType::Frame)).release()
+        ));
+        
         frames.push_back(std::move(frame));
+
+        in.seekg(frameStart + static_cast<std::streamoff>(frameSize));
     }
 }
 
 void ImageData::printData(std::ostream& out) const {
-    out << "ImageData contains " << frames.size() << " frame(s).\n";
-    for (size_t i = 0; i < frames.size(); ++i) {
-        out << "Frame " << i << ":\n";
-        const auto& frame = frames[i];
-        constexpr int width = 16;
-        constexpr int height = 16;
-        const std::string shades = " .:-=+*#%@";
-        if (frame->pixelData.size() < width * height) {
-            out << "  Frame data incomplete or incorrect size.\n";
-            continue;
-        }
-        for (int y = 0; y < height; ++y) {
-            out << "  ";
-            for (int x = 0; x < width; ++x) {
-                uint8_t pixel = frame->pixelData[y * width + x];
-                char shade = shades[pixel * shades.size() / 256];
-                out << shade;
-            }
-            out << '\n';
-        }
+    out << "ImageData with " << frames.size() << " frames:" << std::endl;
+    
+    for (size_t i = 0; i < frames.size(); i++) {
+        out << "Frame " << i << ": ";
+        frames[i]->printData(out);
     }
+}
+
+// Override the virtual method for image-specific data
+std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
+ImageData::getModuleSpecificData() const {
+    // Return the frames as a vector of ModuleData
+    std::vector<ModuleData> frameDataArray;
+    
+    for (const auto& frame : frames) {
+        // Get the frame's data with schema
+        ModuleData frameData = frame->getDataWithSchema();
+        frameDataArray.push_back(frameData);
+    }
+    
+    return frameDataArray;  // Returns vector of ModuleData for frames
 }
 
 

@@ -13,9 +13,8 @@ void DataHeader::writeToFile(std::ostream& out) {
     // writeTLVFixed returns the position of the Value in the TLV flag
     headerSizePos = writeTLVFixed(out, HeaderFieldType::HeaderSize, &headerSize, sizeof(headerSize)); // Placeholder until finished writing header
     metadataSizePos = writeTLVFixed(out, HeaderFieldType::MetadataSize, &metaDataSize, sizeof(metaDataSize)); // Updated after write
-    dataSizePos = writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); // Updated after write
-    dataOffsetPos = writeTLVFixed(out, HeaderFieldType::DataOffset, &dataOffset, sizeof(dataOffset)); // Updated after write
-    stringOffsetPos = writeTLVFixed(out, HeaderFieldType::StringBufferOffset, &stringOffset, sizeof(stringOffset)); // Updated after write
+    dataSizePos = writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); 
+    stringBufferSizePos = writeTLVFixed(out, HeaderFieldType::StringSize, &stringBufferSize, sizeof(stringBufferSize));// Updated after write
 
     writeTLVString(out, HeaderFieldType::ModuleType, module_type_to_string(moduleType));
     writeTLVString(out, HeaderFieldType::SchemaPath, schemaPath);
@@ -29,8 +28,6 @@ void DataHeader::writeToFile(std::ostream& out) {
     std::streampos headerEnd = out.tellp();
     uint32_t actualHeaderSize = static_cast<uint32_t>(headerEnd - headerStart);
 
-    std::cout << "The header is: " << actualHeaderSize << " bytes long." << std::endl;
-
     // Seek back and overwrite the value of the header size field
     out.seekp(headerSizePos);
     out.write(reinterpret_cast<const char*>(&actualHeaderSize), sizeof(actualHeaderSize));
@@ -39,7 +36,7 @@ void DataHeader::writeToFile(std::ostream& out) {
     out.seekp(headerEnd);
 }
 
-void DataHeader::updateHeader(std::ostream& out, uint64_t stringOffset, uint64_t dataOffset) {
+void DataHeader::updateHeader(std::ostream& out) {
 
     if (dataSizePos == 0) { throw std::runtime_error("Failed to update dataSize"); }
     
@@ -51,13 +48,9 @@ void DataHeader::updateHeader(std::ostream& out, uint64_t stringOffset, uint64_t
     out.seekp(dataSizePos);
     out.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
 
-    // Update dataOffset position
-    out.seekp(dataOffsetPos);
-    out.write(reinterpret_cast<const char*>(&dataOffset), sizeof(dataOffset));
-
-    // Update stringoffset position
-    out.seekp(stringOffsetPos);
-    out.write(reinterpret_cast<const char*>(&stringOffset), sizeof(stringOffset));
+    // Update string buffer size
+    out.seekp(stringBufferSizePos);
+    out.write(reinterpret_cast<const char*>(&stringBufferSize), sizeof(stringBufferSize));
 
 }
 
@@ -124,14 +117,9 @@ void DataHeader::readDataHeader(std::istream& in) {
                 std::memcpy(&dataSize, buffer.data(), sizeof(dataSize));
                 break;
 
-            case HeaderFieldType::DataOffset:
-                if (length != sizeof(dataOffset)) throw std::runtime_error("Invalid dataOffset.");
-                std::memcpy(&dataOffset, buffer.data(), sizeof(dataOffset));
-                break;
-
-            case HeaderFieldType::StringBufferOffset:
-                if (length != sizeof(stringOffset)) throw std::runtime_error("Invalid stringOffset.");
-                std::memcpy(&stringOffset, buffer.data(), sizeof(stringOffset));
+            case HeaderFieldType::StringSize:
+                if (length != sizeof(stringBufferSize)) throw std::runtime_error("Invalid StringSize length.");
+                std::memcpy(&stringBufferSize, buffer.data(), sizeof(stringBufferSize));
                 break;
 
             case HeaderFieldType::ModuleType:
@@ -170,18 +158,25 @@ void DataHeader::readDataHeader(std::istream& in) {
 
 }
 
+uint64_t DataHeader::getModuleSize() const {
+    if (totalModuleSize == 0) {
+        return headerSize + metaDataSize + dataSize + stringBufferSize;
+    } else {
+        return totalModuleSize;
+    }
+}
+
 std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
     os << "DataHeader {\n"
-       << "  headerSize   : " << header.headerSize << "\n"
-       << "  metaDataSize : " << header.metaDataSize << "\n"
-       << "  dataSize     : " << header.dataSize << "\n"
-       << "  dataOffset   : " << header.dataOffset << "\n"
-       << "  stringOffset : " << header.stringOffset << "\n"
-       << "  moduleType   : " << header.moduleType << "\n"
-       << "  schemaPath   : " << header.schemaPath << "\n"
-       << "  compression  : " << std::boolalpha << header.compression << "\n"
-       << "  littleEndian : " << std::boolalpha << header.littleEndian << "\n"
-       << "  moduleID     : " << header.moduleID.toString() << "\n"
+       << "  headerSize       : " << header.headerSize << "\n"
+       << "  metaDataSize     : " << header.metaDataSize << "\n"
+       << "  dataSize         : " << header.dataSize << "\n"
+       << "  stringBufferSize : " << header.stringBufferSize << "\n"
+       << "  moduleType       : " << header.moduleType << "\n"
+       << "  schemaPath       : " << header.schemaPath << "\n"
+       << "  compression      : " << std::boolalpha << header.compression << "\n"
+       << "  littleEndian     : " << std::boolalpha << header.littleEndian << "\n"
+       << "  moduleID         : " << header.moduleID.toString() << "\n"
        << "}";
 
     return os;
