@@ -11,7 +11,26 @@
 
 using namespace std;
 
+// Encoding conversion utilities implementation
+std::optional<ImageEncoding> stringToEncoding(const std::string& str) {
+    if (str == "raw") return ImageEncoding::RAW;
+    if (str == "jpeg-ls-lossless") return ImageEncoding::JPEG_LS_LOSSLESS;
+    if (str == "png") return ImageEncoding::PNG;
+    return std::nullopt;  // Invalid encoding
+}
+
+std::string encodingToString(ImageEncoding encoding) {
+    switch (encoding) {
+        case ImageEncoding::RAW: return "raw";
+        case ImageEncoding::JPEG_LS_LOSSLESS: return "jpeg-ls-lossless";
+        case ImageEncoding::PNG: return "png";
+        default: return "raw";  // Fallback
+    }
+}
+
 ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPath, uuid, ModuleType::Image) {
+    // Initialize encoding to RAW by default (always safe for medical data)
+    encoding = ImageEncoding::RAW;
     initialise();
 }
 
@@ -42,6 +61,20 @@ void ImageData::addMetaData(const nlohmann::json& data) {
             dimensions.push_back(dim.get<uint16_t>());
         }
     }
+    
+    // Extract encoding from metadata and store in C++ member
+    if (data.contains("encoding")) {
+        std::string enc_str = data["encoding"];
+        auto encoding_opt = stringToEncoding(enc_str);
+        if (encoding_opt.has_value()) {
+            encoding = encoding_opt.value();
+        } else {
+            // Invalid encoding - log warning and use default
+            std::cerr << "Warning: Invalid encoding '" << enc_str 
+                      << "' in metadata, using RAW encoding" << std::endl;
+            encoding = ImageEncoding::RAW;
+        }
+    }
 }
 
 int ImageData::getDepth() const {
@@ -52,20 +85,37 @@ void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
     // Call base class to decode metadata normally
     DataModule::decodeMetadataRows(in, actualDataSize);
     
-    // Now extract dimensions from the decoded metadata
+    // Now extract dimensions and encoding from the decoded metadata
     dimensions.clear();
     
-    // Get the decoded metadata and find the dimensions field
+    // Get the decoded metadata and find the dimensions and encoding fields
     auto metadata = getMetadataAsJson();
     
     if (metadata.is_array() && !metadata.empty()) {
-        // Take the first row (assuming all rows have the same dimensions)
+        // Take the first row (assuming all rows have the same dimensions and encoding)
         auto firstRow = metadata[0];
         
         if (firstRow.contains("dimensions") && firstRow["dimensions"].is_array()) {
             for (const auto& dim : firstRow["dimensions"]) {
                 dimensions.push_back(dim.get<uint16_t>());
             }
+        }
+        
+        // Extract encoding from decoded metadata
+        if (firstRow.contains("encoding")) {
+            std::string enc_str = firstRow["encoding"];
+            auto encoding_opt = stringToEncoding(enc_str);
+            if (encoding_opt.has_value()) {
+                encoding = encoding_opt.value();
+            } else {
+                // Invalid encoding - log warning and use default
+                std::cerr << "Warning: Invalid encoding '" << enc_str 
+                          << "' in decoded metadata, using RAW encoding" << std::endl;
+                encoding = ImageEncoding::RAW;
+            }
+        } else {
+            // No encoding in metadata, use default
+            encoding = ImageEncoding::RAW;
         }
     }
 }
@@ -159,5 +209,48 @@ ImageData::getModuleSpecificData() const {
     return frameDataArray;  // Returns vector of ModuleData for frames
 }
 
+// Encoding methods implementation
+void ImageData::setEncoding(ImageEncoding enc) {
+    encoding = enc;
+}
 
+ImageEncoding ImageData::getEncoding() const {
+    return encoding;
+}
+
+std::string ImageData::getEncodingString() const {
+    return encodingToString(encoding);
+}
+
+bool ImageData::setEncodingFromString(const std::string& enc_str) {
+    auto encoding_opt = stringToEncoding(enc_str);
+    if (encoding_opt.has_value()) {
+        encoding = encoding_opt.value();
+        return true;  // Success
+    } else {
+        return false;  // Invalid encoding
+    }
+}
+
+bool ImageData::validateEncodingInSchema() const {
+    // Check if the schema defines an encoding field with valid enum values
+    if (schemaJson.contains("properties") && 
+        schemaJson["properties"].contains("metadata") &&
+        schemaJson["properties"]["metadata"].contains("properties") &&
+        schemaJson["properties"]["metadata"]["properties"].contains("encoding")) {
         
+        const auto& encodingDef = schemaJson["properties"]["metadata"]["properties"]["encoding"];
+        
+        // Check if the schema has valid enum values
+        if (encodingDef.contains("enum") && encodingDef["enum"].is_array()) {
+            for (const auto& enumVal : encodingDef["enum"]) {
+                if (!stringToEncoding(enumVal).has_value()) {
+                    return false;  // Invalid enum value found
+                }
+            }
+            return true;  // All enum values are valid
+        }
+    }
+    return true;  // No encoding field in schema, which is valid
+}
+

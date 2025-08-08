@@ -23,6 +23,9 @@ public:
     nlohmann::json getModuleList() const;
     nlohmann::json getModuleData(const std::string& moduleId) const;
     std::vector<std::string> getModuleIds() const;
+    
+    // Getter for loaded modules (for pybind11 access)
+    const std::vector<std::unique_ptr<DataModule>>& getLoadedModules() const { return loadedModules; }
 
 };
 

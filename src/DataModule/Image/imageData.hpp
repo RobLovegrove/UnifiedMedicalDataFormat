@@ -3,6 +3,8 @@
 
 #include <nlohmann/json.hpp> 
 #include <vector>
+#include <optional>
+#include <string>
 
 #include "../stringBuffer.hpp"
 #include "../dataModule.hpp"
@@ -12,6 +14,17 @@
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
 #include "FrameData.hpp"
+
+// Image encoding enum
+enum class ImageEncoding {
+    RAW,               // No compression
+    JPEG_LS_LOSSLESS,  // JPEG-LS lossless compression
+    PNG                // PNG lossless compression
+};
+
+// Encoding conversion utilities
+std::optional<ImageEncoding> stringToEncoding(const std::string& str);
+std::string encodingToString(ImageEncoding encoding);
 
 class ImageData : public DataModule { 
 
@@ -26,6 +39,9 @@ protected:
     
     // C++ dimensions array for efficient access
     std::vector<uint16_t> dimensions;
+    
+    // Image encoding
+    ImageEncoding encoding;
 
     explicit ImageData() {};
 
@@ -56,6 +72,14 @@ public:
     // Dimension access methods
     int getDepth() const;
     const std::vector<uint16_t>& getDimensions() const { return dimensions; }
+    
+    // Encoding methods
+    void setEncoding(ImageEncoding enc);
+    ImageEncoding getEncoding() const;
+    std::string getEncodingString() const;
+    bool setEncodingFromString(const std::string& enc_str);
+    bool validateEncodingInSchema() const;
+    void initializeEncodingFromSchema();
 
 };
 

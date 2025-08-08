@@ -18,8 +18,8 @@
         "bit_depth": { "type": "integer", "format": "uint8" },
         "encoding": { 
           "type": "string", 
-          "enum": ["raw", "jpeg-lossless", "jpeg-ls", "jpeg2000-lossless", "rle", "deflate", "png"],
-          "default": "raw"
+          "enum": ["raw", "jpeg2000-lossless", "png"],
+          "description": "Image encoding format. Medical data requires lossless encoding only."
         },
 
         "bodyPart": { "type": "string", "description": "Body part examined" },
