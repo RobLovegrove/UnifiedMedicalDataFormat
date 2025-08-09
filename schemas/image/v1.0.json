@@ -10,12 +10,17 @@
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["modality", "width", "height", "bit_depth", "encoding"],
+      "required": ["modality", "width", "height", "bit_depth", "channels", "encoding"],
       "properties": {
         "modality": { "type": "string", "length": 10 },
         "width": { "type": "integer", "format": "uint16" },
         "height": { "type": "integer", "format": "uint16" },
         "bit_depth": { "type": "integer", "format": "uint8" },
+        "channels": { 
+          "type": "integer", 
+          "format": "uint8",
+          "description": "Number of image channels (1 for grayscale, 3 for RGB, etc.)"
+        },
         "encoding": { 
           "type": "string", 
           "enum": ["raw", "jpeg2000-lossless", "png"],

@@ -13,7 +13,8 @@ class FrameData : public DataModule {
     friend class ImageData; // Allow ImageData to access protected members
     
 public:
-    std::vector<uint8_t> pixelData;
+    mutable std::vector<uint8_t> pixelData; // Allow modification in const methods
+    mutable bool needsDecompression = false; // Track if data needs decompression
 
     FrameData(const std::string& schemaPath, UUID uuid);
     

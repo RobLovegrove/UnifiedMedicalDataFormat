@@ -15,10 +15,13 @@
 #include "../../Utility/moduleType.hpp"
 #include "FrameData.hpp"
 
+// OpenJPEG includes
+#include <openjpeg.h>
+
 // Image encoding enum
 enum class ImageEncoding {
     RAW,               // No compression
-    JPEG_LS_LOSSLESS,  // JPEG-LS lossless compression
+    JPEG2000_LOSSLESS, // JPEG 2000 lossless compression
     PNG                // PNG lossless compression
 };
 
@@ -42,6 +45,11 @@ protected:
     
     // Image encoding
     ImageEncoding encoding;
+    bool needsDecompression = false;
+    
+    // Image format attributes
+    uint8_t bitDepth;
+    uint8_t channels;
 
     explicit ImageData() {};
 
@@ -79,7 +87,17 @@ public:
     std::string getEncodingString() const;
     bool setEncodingFromString(const std::string& enc_str);
     bool validateEncodingInSchema() const;
-    void initializeEncodingFromSchema();
+    
+    // Image format getters
+    uint8_t getBitDepth() const { return bitDepth; }
+    uint8_t getChannels() const { return channels; }
+    
+    // OpenJPEG compression methods
+    std::vector<uint8_t> compressJPEG2000(const std::vector<uint8_t>& rawData, 
+                                          int width, int height) const;
+    std::vector<uint8_t> decompressJPEG2000(const std::vector<uint8_t>& compressedData) const;
+    std::vector<uint8_t> decompressFrameData(const std::vector<uint8_t>& compressedData) const;
+    bool testOpenJPEGIntegration() const;
 
 };
 

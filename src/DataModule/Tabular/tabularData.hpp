@@ -25,7 +25,6 @@ protected:
     void decodeData(std::istream& in, size_t actualDataSize) override;
 
     void writeData(std::ostream& out) const override;
-    void writeStringBuffer(std::ostream& out);
 
     // Override the virtual method for tabular-specific data
     std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 

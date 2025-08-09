@@ -74,7 +74,7 @@ bool Reader::readFile(const string& filename) {
                         cout << "  Frame " << i << ":" << endl;
                         cout << "    Metadata: " << data[i].metadata.dump(2) << endl;
                         // Handle the nested variant
-                        std::visit([&, i](const auto& d) {
+                        std::visit([&](const auto& d) {
                             using D = std::decay_t<decltype(d)>;
                             if constexpr (std::is_same_v<D, nlohmann::json>) {
                                 cout << "    Data: " << d.dump(2) << endl;

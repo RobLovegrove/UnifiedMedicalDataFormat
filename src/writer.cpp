@@ -71,7 +71,8 @@ bool Writer::writeNewFile(const string& filename) {
             {"width", 16},
             {"height", 16},
             {"bit_depth", 8},
-            {"encoding", "raw"},
+            {"channels", 1},  // Grayscale image
+            {"encoding", "jpeg2000-lossless"},  // Using raw for now since compression not fully implemented
             {"bodyPart", "CHEST"},
             {"institution", "Test Hospital"},
             {"acquisitionDate", "2024-01-01"},
@@ -79,7 +80,7 @@ bool Writer::writeNewFile(const string& filename) {
             {"patientName", "John Doe"},
             {"patientID", "12345"},
             {"dimensions", {16, 16, 8}},    // 3D: width, height, depth
-            {"dimension_names", {"x", "y", "z"}}
+            {"dimension_names", {"x", "y", "z"}}  // Match schema maxItems: 10
         });
         
         // Get dimensions from metadata (hardcoded for now)

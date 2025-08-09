@@ -30,7 +30,14 @@ ext_modules = [
             "src/DataModule/Tabular",
             "src/DataModule/Image",
             "src/Utility",
-            pybind11.get_include()
+            pybind11.get_include(),
+            "/opt/homebrew/include/openjpeg-2.5"  # OpenJPEG include path
+        ],
+        library_dirs=[
+            "/opt/homebrew/lib"  # OpenJPEG library path
+        ],
+        libraries=[
+            "openjp2"  # OpenJPEG library name
         ],
         language='c++',
         cxx_std=20,

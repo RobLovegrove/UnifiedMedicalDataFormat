@@ -58,13 +58,6 @@ void TabularData::writeData(ostream& out) const {
     }
 }
 
-void TabularData::writeStringBuffer(ostream& out) {
-
-    if (stringBuffer.getSize() != 0) {
-        stringBuffer.writeToFile(out);
-    }
-}
-
 void TabularData::decodeData(istream& in, size_t actualDataSize) {
 
     if (actualDataSize % rowSize != 0) {

@@ -2,7 +2,7 @@
 #include <cstring>
 
 FrameData::FrameData(const std::string& schemaPath, UUID uuid)
-    : DataModule(schemaPath, uuid, ModuleType::Frame)
+    : DataModule(schemaPath, uuid, ModuleType::Frame), needsDecompression(false)
 {
     initialise(); // Parse the schema and set up metadata fields
 }
@@ -22,6 +22,7 @@ void FrameData::writeData(std::ostream& out) const {
 void FrameData::decodeData(std::istream& in, size_t actualDataSize) {
     pixelData.resize(actualDataSize);
     in.read(reinterpret_cast<char*>(pixelData.data()), actualDataSize);
+    // Note: needsDecompression flag will be set by ImageData based on encoding
 }
 
 void FrameData::printData(std::ostream& out) const {
