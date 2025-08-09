@@ -78,7 +78,7 @@ public:
     void addMetaData(const nlohmann::json& data) override;
     
     // Dimension access methods
-    int getDepth() const;
+    int getFrameCount() const;
     const std::vector<uint16_t>& getDimensions() const { return dimensions; }
     
     // Encoding methods

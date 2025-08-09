@@ -68,45 +68,71 @@ bool Writer::writeNewFile(const string& filename) {
 
         dm.addMetaData({
             {"modality", "CT"},
-            {"width", 16},
-            {"height", 16},
+            {"width", 256},
+            {"height", 256},
             {"bit_depth", 8},
-            {"channels", 1},  // Grayscale image
-            {"encoding", "jpeg2000-lossless"},  // Using raw for now since compression not fully implemented
+            {"channels", 3},  // RGB image (3 channels)
+            {"encoding", "jpeg2000-lossless"},
             {"bodyPart", "CHEST"},
             {"institution", "Test Hospital"},
             {"acquisitionDate", "2024-01-01"},
             {"technician", "Dr. Smith"},
             {"patientName", "John Doe"},
             {"patientID", "12345"},
-            {"dimensions", {16, 16, 8}},    // 3D: width, height, depth
-            {"dimension_names", {"x", "y", "z"}}  // Match schema maxItems: 10
+            {"dimensions", {256, 256, 32, 10}},    // 4D: width, height, depth, time
+            {"dimension_names", {"x", "y", "z", "time"}}  // Match schema maxItems: 10
         });
         
         // Get dimensions from metadata (hardcoded for now)
-        int width = 16;
-        int height = 16;
-        int depth = 8;
+        int width = 256;
+        int height = 256;
+        int depth = 32;
+        int timePoints = 10;
+        int channels = 3;  // RGB
         
-        // Create frames for each slice
-        for (int slice = 0; slice < depth; slice++) {
-            auto frame = std::make_unique<FrameData>("./schemas/frame/v1.0.json", UUID());
-            std::vector<uint8_t> sliceData(width * height);
-            std::fill(sliceData.begin(), sliceData.end(), 128 + slice * 10); // different gray per slice
-            frame->pixelData = sliceData;
-            
-            // Add frame metadata
-            frame->addMetaData({
-                {"position", {{"x", 0.0}, {"y", 0.0}, {"z", static_cast<double>(slice)}}},
-                {"orientation", {
-                    {"row_cosine", {1.0, 0.0, 0.0}},
-                    {"column_cosine", {0.0, 1.0, 0.0}}
-                }},
-                {"timestamp", "2024-01-01T12:00:00Z"},
-                {"frame_number", slice}
-            });
-            
-            dm.addData(std::move(frame));
+        // Calculate total frame count for 4D data
+        int totalFrames = depth * timePoints;  // 32 * 10 = 320 frames
+        
+        // Create frames for each slice and time point
+        for (int time = 0; time < timePoints; time++) {
+            for (int slice = 0; slice < depth; slice++) {
+                auto frame = std::make_unique<FrameData>("./schemas/frame/v1.0.json", UUID());
+                std::vector<uint8_t> sliceData(width * height * channels);  // RGB data
+                
+                // Fill with RGB pattern - create a gradient pattern that changes with time and slice
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        size_t pixel_index = static_cast<size_t>(y * width + x);
+                        
+                        // Create RGB values - R gradient horizontally, G gradient vertically, B based on slice and time
+                        uint8_t r = static_cast<uint8_t>((x * 255) / width);  // Red gradient horizontally
+                        uint8_t g = static_cast<uint8_t>((y * 255) / height); // Green gradient vertically  
+                        uint8_t b = static_cast<uint8_t>(128 + slice * 4 + time * 12);    // Blue based on slice and time
+                        
+                        // Interleaved RGB format: RGBRGBRGB...
+                        sliceData[pixel_index * 3 + 0] = r;  // Red
+                        sliceData[pixel_index * 3 + 1] = g;  // Green
+                        sliceData[pixel_index * 3 + 2] = b;  // Blue
+                    }
+                }
+                
+                frame->pixelData = sliceData;
+                
+                // Add frame metadata with 4D positioning
+                frame->addMetaData({
+                    {"position", {{"x", 0.0}, {"y", 0.0}, {"z", static_cast<double>(slice)}, {"t", static_cast<double>(time)}}},
+                    {"orientation", {
+                        {"row_cosine", {1.0, 0.0, 0.0}},
+                        {"column_cosine", {0.0, 1.0, 0.0}}
+                    }},
+                    {"timestamp", "2024-01-01T12:00:00Z"},
+                    {"frame_number", slice + time * depth},
+                    {"time_point", time},
+                    {"slice_number", slice}
+                });
+                
+                dm.addData(std::move(frame));
+            }
         }
         
         dm.writeBinary(outfile, xref);

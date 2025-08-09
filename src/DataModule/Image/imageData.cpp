@@ -74,11 +74,31 @@ void ImageData::addMetaData(const nlohmann::json& data) {
     // Call base class implementation first
     DataModule::addMetaData(data);
     
-    // Extract dimensions from metadata and store in C++ array
+    dimensions.clear();
+    
+    // Extract width and height first (they're required fields)
+    uint16_t width = data["width"].get<uint16_t>();
+    uint16_t height = data["height"].get<uint16_t>();
+    
+    // Always put width and height first
+    dimensions.push_back(width);
+    dimensions.push_back(height);
+    
+    // Extract remaining dimensions from the dimensions array
     if (data.contains("dimensions") && data["dimensions"].is_array()) {
-        dimensions.clear();
-        for (const auto& dim : data["dimensions"]) {
-            dimensions.push_back(dim.get<uint16_t>());
+        const auto& dimsArray = data["dimensions"];
+        
+        // Skip first two if they match width/height (to avoid duplication)
+        size_t startIndex = 0;
+        if (dimsArray.size() >= 2 && 
+            dimsArray[0].get<uint16_t>() == width && 
+            dimsArray[1].get<uint16_t>() == height) {
+            startIndex = 2;
+        }
+        
+        // Add remaining dimensions
+        for (size_t i = startIndex; i < dimsArray.size(); ++i) {
+            dimensions.push_back(dimsArray[i].get<uint16_t>());
         }
     }
     
@@ -110,8 +130,15 @@ void ImageData::addMetaData(const nlohmann::json& data) {
     }
 }
 
-int ImageData::getDepth() const {
-    return dimensions.size() >= 3 ? dimensions[2] : 0;
+int ImageData::getFrameCount() const {
+    if (dimensions.size() <= 2) return 1;  // 2D image
+    
+    // Multiply all dimensions except first two (width, height)
+    int totalFrames = 1;
+    for (size_t i = 2; i < dimensions.size(); ++i) {
+        totalFrames *= dimensions[i];
+    }
+    return totalFrames;
 }
 
 void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
@@ -128,9 +155,50 @@ void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
         // Take the first row (assuming all rows have the same dimensions and encoding)
         auto firstRow = metadata[0];
         
+        // Extract width and height - try both direct fields and dimensions array
+        uint16_t width = 0, height = 0;
+        
+        // Try to get width and height from direct fields first
+        if (firstRow.contains("width")) {
+            width = firstRow["width"].get<uint16_t>();
+        }
+        if (firstRow.contains("height")) {
+            height = firstRow["height"].get<uint16_t>();
+        }
+        
+        // If width and height aren't available directly, try to get them from dimensions array
+        if (width == 0 && firstRow.contains("dimensions") && firstRow["dimensions"].is_array()) {
+            const auto& dimsArray = firstRow["dimensions"];
+            if (dimsArray.size() >= 2) {
+                width = dimsArray[0].get<uint16_t>();
+                height = dimsArray[1].get<uint16_t>();
+            }
+        }
+        
+        // Always put width and height first (if we found them)
+        if (width > 0 && height > 0) {
+            dimensions.push_back(width);
+            dimensions.push_back(height);
+        }
+        
+        // Extract remaining dimensions from the dimensions array
         if (firstRow.contains("dimensions") && firstRow["dimensions"].is_array()) {
-            for (const auto& dim : firstRow["dimensions"]) {
-                dimensions.push_back(dim.get<uint16_t>());
+            const auto& dimsArray = firstRow["dimensions"];
+            
+            // Skip first two if they match width/height (to avoid duplication)
+            size_t startIndex = 0;
+            if (dimsArray.size() >= 2 && width > 0 && height > 0 &&
+                dimsArray[0].get<uint16_t>() == width && 
+                dimsArray[1].get<uint16_t>() == height) {
+                startIndex = 2;
+            }
+            
+            // Add remaining dimensions
+            for (size_t i = startIndex; i < dimsArray.size(); ++i) {
+                uint16_t dim = dimsArray[i].get<uint16_t>();
+                if (dim > 0) {  // Only add non-zero dimensions
+                    dimensions.push_back(dim);
+                }
             }
         }
         
@@ -226,10 +294,10 @@ void ImageData::decodeData(std::istream& in, size_t) {
     frames.clear();
     
     // Get frame count from C++ dimensions array
-    int depth = getDepth();
+    int frameCount = getFrameCount();
     
     // Read each frame as a complete DataModule using fromStream
-    for (int i = 0; i < depth; i++) {
+    for (int i = 0; i < frameCount; i++) {
         // Get current position
         std::streampos frameStart = in.tellg();
         
@@ -335,7 +403,7 @@ bool ImageData::validateEncodingInSchema() const {
     if (schemaJson.contains("properties") && 
         schemaJson["properties"].contains("metadata") &&
         schemaJson["properties"]["metadata"].contains("properties") &&
-        schemaJson["properties"]["metadata"]["properties"].contains("encoding")) {
+        schemaJson["properties"]["metadata"]["propertiesclear"].contains("encoding")) {
         
         const auto& encodingDef = schemaJson["properties"]["metadata"]["properties"]["encoding"];
         
@@ -421,6 +489,15 @@ std::vector<uint8_t> ImageData::compressJPEG2000(const std::vector<uint8_t>& raw
               << " with " << (int)channels << " channels, " 
               << (int)bitDepth << "-bit depth" << std::endl;
     
+    // Validate input data size
+    size_t expectedSize = static_cast<size_t>(width) * height * channels;
+    if (rawData.size() != expectedSize) {
+        std::cout << "❌ Data size mismatch: expected " << expectedSize << " bytes for " 
+                  << width << "x" << height << "x" << (int)channels 
+                  << " but got " << rawData.size() << " bytes" << std::endl;
+        return rawData;
+    }
+    
     try {
         // Set up compression parameters
         opj_cparameters_t parameters;
@@ -490,17 +567,25 @@ std::vector<uint8_t> ImageData::compressJPEG2000(const std::vector<uint8_t>& raw
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 size_t pixel_index = static_cast<size_t>(y * width + x);
-                if (pixel_index < rawData.size()) {
-                    // For single channel, just copy directly
-                    if (channels == 1) {
-                        image->comps[0].data[y * width + x] = rawData[pixel_index];
-                    } else {
-                        // For multi-channel, assume interleaved data (RGBRGB...)
-                        for (int c = 0; c < channels; c++) {
-                            size_t data_index = pixel_index * channels + c;
-                            if (data_index < rawData.size()) {
-                                image->comps[c].data[y * width + x] = rawData[data_index];
-                            }
+                
+                if (pixel_index >= static_cast<size_t>(width * height)) {
+                    std::cout << "❌ Pixel index out of bounds: " << pixel_index << " >= " << (width * height) << std::endl;
+                    continue;
+                }
+                
+                if (channels == 1) {
+                    // Single channel (grayscale) - direct copy
+                    if (pixel_index < rawData.size()) {
+                        image->comps[0].data[pixel_index] = rawData[pixel_index];
+                    }
+                } else {
+                    // Multi-channel (interleaved) - RGBRGB... format
+                    for (int c = 0; c < channels; c++) {
+                        size_t data_index = pixel_index * channels + c;
+                        if (data_index < rawData.size()) {
+                            image->comps[c].data[pixel_index] = rawData[data_index];
+                        } else {
+                            std::cout << "❌ Data index out of bounds: " << data_index << " >= " << rawData.size() << std::endl;
                         }
                     }
                 }
@@ -712,6 +797,10 @@ std::vector<uint8_t> ImageData::decompressJPEG2000(const std::vector<uint8_t>& c
         std::cout << "Decompressed image: " << width << "x" << height 
                   << " with " << numComponents << " components" << std::endl;
         
+        // Validate expected output size
+        size_t expectedOutputSize = static_cast<size_t>(width) * height * numComponents;
+        std::cout << "Expected output size: " << expectedOutputSize << " bytes" << std::endl;
+        
         // Allocate output buffer
         size_t totalPixels = width * height;
         size_t totalBytes = totalPixels * numComponents;
@@ -722,17 +811,24 @@ std::vector<uint8_t> ImageData::decompressJPEG2000(const std::vector<uint8_t>& c
             for (int x = 0; x < width; x++) {
                 size_t pixel_index = static_cast<size_t>(y * width + x);
                 
+                if (pixel_index >= static_cast<size_t>(width * height)) {
+                    std::cout << "❌ Pixel index out of bounds during decompression: " << pixel_index << " >= " << (width * height) << std::endl;
+                    continue;
+                }
+                
                 if (numComponents == 1) {
                     // Single channel (grayscale)
                     if (pixel_index < static_cast<size_t>(image->comps[0].w * image->comps[0].h)) {
                         decompressedData[pixel_index] = static_cast<uint8_t>(image->comps[0].data[pixel_index]);
                     }
                 } else {
-                    // Multi-channel (interleaved)
+                    // Multi-channel (interleaved) - RGBRGB... format
                     for (int c = 0; c < numComponents; c++) {
                         size_t data_index = pixel_index * numComponents + c;
                         if (data_index < decompressedData.size() && pixel_index < static_cast<size_t>(image->comps[c].w * image->comps[c].h)) {
                             decompressedData[data_index] = static_cast<uint8_t>(image->comps[c].data[pixel_index]);
+                        } else if (data_index >= decompressedData.size()) {
+                            std::cout << "❌ Decompressed data index out of bounds: " << data_index << " >= " << decompressedData.size() << std::endl;
                         }
                     }
                 }
@@ -784,3 +880,4 @@ bool ImageData::testOpenJPEGIntegration() const {
     return true;
 }
 
+        
