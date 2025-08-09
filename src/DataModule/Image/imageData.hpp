@@ -14,9 +14,7 @@
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
 #include "FrameData.hpp"
-
-// OpenJPEG includes
-#include <openjpeg.h>
+#include "ImageEncoder.hpp"
 
 // Image encoding enum
 enum class ImageEncoding {
@@ -92,12 +90,11 @@ public:
     uint8_t getBitDepth() const { return bitDepth; }
     uint8_t getChannels() const { return channels; }
     
-    // OpenJPEG compression methods
-    std::vector<uint8_t> compressJPEG2000(const std::vector<uint8_t>& rawData, 
-                                          int width, int height) const;
-    std::vector<uint8_t> decompressJPEG2000(const std::vector<uint8_t>& compressedData) const;
+    // Image encoder for compression/decompression
+    std::unique_ptr<ImageEncoder> encoder;
+    
+    // Decompression helper method
     std::vector<uint8_t> decompressFrameData(const std::vector<uint8_t>& compressedData) const;
-    bool testOpenJPEGIntegration() const;
 
 };
 

@@ -1,4 +1,5 @@
 #include "imageData.hpp"
+#include "ImageEncoder.hpp"
 #include "../../Utility/uuid.hpp"
 #include "../Header/dataHeader.hpp"
 #include "../dataModule.hpp"
@@ -9,18 +10,10 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
-#include <openjpeg.h>
+#include <iomanip>
 
-// OpenJPEG event handlers for debugging
-void opj_info_callback(const char* msg, void* client_data) { 
-    std::cout << "[openjpeg info] " << msg; 
-}
-void opj_warn_callback(const char* msg, void* client_data) { 
-    std::cout << "[openjpeg warn] " << msg; 
-}
-void opj_error_callback(const char* msg, void* client_data) { 
-    std::cout << "[openjpeg err ] " << msg; 
-}
+
+
 
 using namespace std;
 
@@ -48,6 +41,9 @@ ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPat
     // Initialize image format attributes with defaults
     bitDepth = 8;   // Default 8-bit
     channels = 1;   // Default grayscale
+    
+    // Initialize the image encoder
+    encoder = std::make_unique<ImageEncoder>();
     
     initialise();
 }
@@ -259,19 +255,18 @@ void ImageData::writeData(std::ostream& out) const {
         if (encoding != ImageEncoding::RAW) {
             std::cout << "Compression needed for frame " << i << std::endl;
             // Compress the frame's pixel data
-            if (encoding == ImageEncoding::JPEG2000_LOSSLESS) {
-                std::cout << "Compressing frame " << i << " with JPEG 2000 lossless..." << std::endl;
+            if (encoding != ImageEncoding::RAW) {
+                std::cout << "Compressing frame " << i << " with " << encodingToString(encoding) << "..." << std::endl;
                 // Get width and height from dimensions array
                 int frameWidth = dimensions.size() > 0 ? dimensions[0] : 16;
                 int frameHeight = dimensions.size() > 1 ? dimensions[1] : 16;
-                frames[i]->pixelData = compressJPEG2000(frames[i]->pixelData, frameWidth, frameHeight);
+                
+                // Use the encoder to compress the frame
+                frames[i]->pixelData = encoder->compress(frames[i]->pixelData, encoding, 
+                                                       frameWidth, frameHeight, channels, bitDepth);
                 
                 // Update the frame's data size after compression
                 frames[i]->header->setDataSize(frames[i]->pixelData.size());
-            } else if (encoding == ImageEncoding::PNG) {
-                std::cout << "TODO: Compressing frame " << i << " with PNG..." << std::endl;
-                // TODO: Implement PNG compression
-                // frames[i]->pixelData = compressPNG(frames[i]->pixelData, frameWidth, frameHeight);
             }
         } else {
             std::cout << "No compression needed for frame " << i << " (RAW encoding)" << std::endl;
@@ -284,6 +279,29 @@ void ImageData::writeData(std::ostream& out) const {
     streampos endPos = out.tellp();
 
     uint64_t totalDataSize = endPos - startPos;
+
+    // Calculate and display total compression statistics
+    if (encoding != ImageEncoding::RAW) {
+        size_t totalOriginalSize = 0;
+        size_t totalCompressedSize = 0;
+        
+        for (const auto& frame : frames) {
+            // Estimate original size based on dimensions and channels
+            size_t frameOriginalSize = static_cast<size_t>(dimensions[0]) * dimensions[1] * channels;
+            totalOriginalSize += frameOriginalSize;
+            totalCompressedSize += frame->pixelData.size();
+        }
+        
+        double compressionRatio = 100.0 * totalCompressedSize / totalOriginalSize;
+        std::cout << "\n=== COMPRESSION SUMMARY ===" << std::endl;
+        std::cout << "Total frames: " << frames.size() << std::endl;
+        std::cout << "Total original size: " << totalOriginalSize << " bytes" << std::endl;
+        std::cout << "Total compressed size: " << totalCompressedSize << " bytes" << std::endl;
+        std::cout << "Overall compression: " << std::fixed << std::setprecision(2) 
+                  << compressionRatio << "% of original (" 
+                  << (100.0 - compressionRatio) << "% space saved)" << std::endl;
+        std::cout << "===========================" << std::endl << std::endl;
+    }
 
     header->setDataSize(totalDataSize);
 
@@ -420,464 +438,17 @@ bool ImageData::validateEncodingInSchema() const {
     return true;  // No encoding field in schema, which is valid
 }
 
-// Memory stream data structure for OpenJPEG
-struct MemoryStreamData {
-    const uint8_t* input_buffer;        // Input data for reading
-    uint8_t* output_buffer;             // Output buffer for writing
-    size_t input_size;                  // Size of input data
-    size_t output_size;                 // Size of output data
-    size_t current_pos;                 // Current position in stream
-    size_t max_output_size;             // Maximum output buffer size
-};
-
-// Custom stream read function for OpenJPEG
-OPJ_SIZE_T memory_read(void* buffer, OPJ_SIZE_T size, void* user_data) {
-    MemoryStreamData* ms = (MemoryStreamData*)user_data;
-    if (!ms || !ms->input_buffer) return 0;
-    size_t bytes_left = ms->input_size - ms->current_pos;
-    size_t bytes_to_read = std::min((size_t)size, bytes_left);
-    if (bytes_to_read > 0) {
-        memcpy(buffer, ms->input_buffer + ms->current_pos, bytes_to_read);
-        ms->current_pos += bytes_to_read;
-        return (OPJ_SIZE_T)bytes_to_read;
-    }
-    return 0; // EOF
-}
-
-// Custom stream write function for OpenJPEG
-OPJ_SIZE_T memory_write(void* buffer, OPJ_SIZE_T size, void* user_data) {
-    MemoryStreamData* ms = (MemoryStreamData*)user_data;
-    if (ms->current_pos + size <= ms->max_output_size) {
-        memcpy(ms->output_buffer + ms->current_pos, buffer, size);
-        ms->current_pos += size;
-        ms->output_size = std::max(ms->output_size, ms->current_pos);
-        return size;
-    }
-    return 0;
-}
-
-// Custom stream skip function for OpenJPEG
-OPJ_OFF_T memory_skip(OPJ_OFF_T offset, void* user_data) {
-    MemoryStreamData* ms = (MemoryStreamData*)user_data;
-    if (!ms) return -1;
-
-    // Use signed arithmetic to check bounds
-    long long new_pos = (long long)ms->current_pos + (long long)offset;
-    if (new_pos >= 0 && (size_t)new_pos <= ms->input_size) {
-        ms->current_pos = (size_t)new_pos;
-        return offset;
-    }
-    return -1;
-}
-
-// Custom stream seek function for OpenJPEG
-OPJ_BOOL memory_seek(OPJ_OFF_T offset, void* user_data) {
-    MemoryStreamData* ms = (MemoryStreamData*)user_data;
-    if (!ms) return OPJ_FALSE;
-    if (offset >= 0 && (size_t)offset <= ms->input_size) {
-        ms->current_pos = (size_t)offset;
-        return OPJ_TRUE;
-    }
-    return OPJ_FALSE;
-}
-
-// OpenJPEG compression methods implementation
-std::vector<uint8_t> ImageData::compressJPEG2000(const std::vector<uint8_t>& rawData, 
-                                                  int width, int height) const {
-    std::cout << "Compressing " << rawData.size() << " bytes to JPEG 2000 lossless..." << std::endl;
-    std::cout << "Image: " << width << "x" << height 
-              << " with " << (int)channels << " channels, " 
-              << (int)bitDepth << "-bit depth" << std::endl;
-    
-    // Validate input data size
-    size_t expectedSize = static_cast<size_t>(width) * height * channels;
-    if (rawData.size() != expectedSize) {
-        std::cout << "❌ Data size mismatch: expected " << expectedSize << " bytes for " 
-                  << width << "x" << height << "x" << (int)channels 
-                  << " but got " << rawData.size() << " bytes" << std::endl;
-        return rawData;
-    }
-    
-    try {
-        // Set up compression parameters
-        opj_cparameters_t parameters;
-        opj_set_default_encoder_parameters(&parameters);
-        parameters.tcp_numlayers = 1;
-        parameters.cp_disto_alloc = 1;
-        parameters.tcp_rates[0] = 0;  // Lossless compression
-        parameters.irreversible = 0;   // Lossless mode
-        
-        // Calculate optimal number of resolutions based on image size
-        int max_possible = 1;
-        int min_dim = std::min(width, height);
-        while (min_dim > 1) {
-            max_possible++;
-            min_dim /= 2;
-        }
-        // Don't count the 1x1 level as a resolution
-        max_possible = std::max(1, max_possible - 1);
-        // Use maximum, but cap at 6 for very large images
-        int num_resolutions = std::min(max_possible, 6);
-        parameters.numresolution = num_resolutions;
-        
-        std::cout << "Using " << num_resolutions << " resolutions for " 
-                  << width << "x" << height << " image with " << (int)channels << " channels" << std::endl;
-        
-        // Create image component parameters for all channels
-        std::vector<opj_image_cmptparm_t> cmptparm(channels);
-        for (int c = 0; c < channels; ++c) {
-            cmptparm[c].dx = 1;
-            cmptparm[c].dy = 1;
-            cmptparm[c].w = width;
-            cmptparm[c].h = height;
-            cmptparm[c].prec = bitDepth;
-            cmptparm[c].bpp = bitDepth;
-            cmptparm[c].sgnd = 0;  // unsigned
-        }
-        
-        // Pick colorspace based on channels
-        OPJ_COLOR_SPACE color_space = (channels == 1) ? OPJ_CLRSPC_GRAY : OPJ_CLRSPC_SRGB;
-        
-        // Create image
-        std::cout << "Creating OpenJPEG image with " << (int)channels << " components..." << std::endl;
-        opj_image_t* image = opj_image_create(channels, cmptparm.data(), color_space);
-        if (!image) {
-            std::cout << "❌ Failed to create OpenJPEG image" << std::endl;
-            return rawData;
-        }
-        std::cout << "✅ OpenJPEG image created successfully" << std::endl;
-        
-        // Set image bounds (required for opj_start_compress)
-        image->x0 = 0;
-        image->y0 = 0;
-        image->x1 = width;
-        image->y1 = height;
-        
-        // Check if image data is allocated for all components
-        for (int c = 0; c < channels; ++c) {
-            if (!image->comps[c].data) {
-                std::cout << "❌ Image component " << c << " data not allocated" << std::endl;
-                opj_image_destroy(image);
-                return rawData;
-            }
-        }
-        std::cout << "✅ Image data allocated for all " << (int)channels << " components" << std::endl;
-        
-        // Copy pixel data to image (interleaved for multi-channel)
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                size_t pixel_index = static_cast<size_t>(y * width + x);
-                
-                if (pixel_index >= static_cast<size_t>(width * height)) {
-                    std::cout << "❌ Pixel index out of bounds: " << pixel_index << " >= " << (width * height) << std::endl;
-                    continue;
-                }
-                
-                if (channels == 1) {
-                    // Single channel (grayscale) - direct copy
-                    if (pixel_index < rawData.size()) {
-                        image->comps[0].data[pixel_index] = rawData[pixel_index];
-                    }
-                } else {
-                    // Multi-channel (interleaved) - RGBRGB... format
-                    for (int c = 0; c < channels; c++) {
-                        size_t data_index = pixel_index * channels + c;
-                        if (data_index < rawData.size()) {
-                            image->comps[c].data[pixel_index] = rawData[data_index];
-                        } else {
-                            std::cout << "❌ Data index out of bounds: " << data_index << " >= " << rawData.size() << std::endl;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Create output memory stream
-        std::vector<uint8_t> output_buffer(rawData.size() * 2);  // Start with 2x size
-        MemoryStreamData ms_data = {
-            nullptr,                    // No input data for compression
-            output_buffer.data(),       // Output buffer
-            0,                          // No input size
-            0,                          // Output size starts at 0
-            0,                          // Current position starts at 0
-            output_buffer.size()        // Max output size
-        };
-        
-        // Create OpenJPEG stream
-        std::cout << "Creating OpenJPEG stream..." << std::endl;
-        opj_stream_t* stream = opj_stream_create(OPJ_J2K_STREAM_CHUNK_SIZE, OPJ_FALSE);
-        if (!stream) {
-            std::cout << "❌ Failed to create OpenJPEG stream" << std::endl;
-            opj_image_destroy(image);
-            return rawData;
-        }
-        std::cout << "✅ OpenJPEG stream created successfully" << std::endl;
-        
-        // Set up stream functions
-        opj_stream_set_write_function(stream, memory_write);
-        opj_stream_set_skip_function(stream, memory_skip);
-        opj_stream_set_seek_function(stream, memory_seek);
-        opj_stream_set_user_data(stream, &ms_data, nullptr);
-        
-        // Create codec
-        std::cout << "Creating OpenJPEG codec..." << std::endl;
-        opj_codec_t* codec = opj_create_compress(OPJ_CODEC_J2K);
-        if (!codec) {
-            std::cout << "❌ Failed to create OpenJPEG codec" << std::endl;
-            opj_stream_destroy(stream);
-            opj_image_destroy(image);
-            return rawData;
-        }
-        std::cout << "✅ OpenJPEG codec created successfully" << std::endl;
-        
-        // Set up codec
-        std::cout << "Setting up OpenJPEG encoder..." << std::endl;
-        if (!opj_setup_encoder(codec, &parameters, image)) {
-            std::cout << "❌ Failed to setup OpenJPEG encoder" << std::endl;
-            opj_stream_destroy(stream);
-            opj_image_destroy(image);
-            opj_destroy_codec(codec);
-            return rawData;
-        }
-        std::cout << "✅ OpenJPEG encoder setup successfully" << std::endl;
-        
-        // Start compression
-        std::cout << "Starting OpenJPEG compression..." << std::endl;
-        
-        // Compress
-        if (!opj_start_compress(codec, image, stream)) {
-            std::cout << "❌ Failed to start OpenJPEG compression" << std::endl;
-            opj_stream_destroy(stream);
-            opj_image_destroy(image);
-            opj_destroy_codec(codec);
-            return rawData;
-        }
-        std::cout << "✅ OpenJPEG compression started successfully" << std::endl;
-        
-        if (!opj_encode(codec, stream)) {
-            std::cout << "Failed to encode with OpenJPEG" << std::endl;
-            opj_stream_destroy(stream);
-            opj_image_destroy(image);
-            opj_destroy_codec(codec);
-            return rawData;
-        }
-        
-        if (!opj_end_compress(codec, stream)) {
-            std::cout << "Failed to end OpenJPEG compression" << std::endl;
-            opj_stream_destroy(stream);
-            opj_image_destroy(image);
-            opj_destroy_codec(codec);
-            return rawData;
-        }
-        
-        // Clean up
-        opj_stream_destroy(stream);
-        opj_image_destroy(image);
-        opj_destroy_codec(codec);
-        
-        // Return compressed data
-        std::vector<uint8_t> compressed_data(ms_data.output_buffer, 
-                                           ms_data.output_buffer + ms_data.output_size);
-        
-        std::cout << "Compression complete: " << rawData.size() << " -> " 
-                  << compressed_data.size() << " bytes (" 
-                  << (100.0 * compressed_data.size() / rawData.size()) << "% of original)" << std::endl;
-        
-        // Debug: Print first few bytes of compressed data
-        std::cout << "Compressed data structure (first 32 bytes): ";
-        for (size_t i = 0; i < std::min(compressed_data.size(), size_t(32)); i++) {
-            printf("%02X ", compressed_data[i]);
-        }
-        if (compressed_data.size() > 32) {
-            std::cout << "...";
-        }
-        std::cout << std::endl;
-        
-        return compressed_data;
-        
-    } catch (const std::exception& e) {
-        std::cout << "OpenJPEG compression error: " << e.what() << std::endl;
-        return rawData;
-    }
-}
-
-std::vector<uint8_t> ImageData::decompressJPEG2000(const std::vector<uint8_t>& compressedData) const {
-    std::cout << "Decompressing " << compressedData.size() << " bytes from JPEG 2000 lossless..." << std::endl;
-    
-    // Sanity check: ensure we have enough data for a valid JPEG 2000 codestream
-    if (compressedData.size() < 16) {
-        std::cout << "❌ Compressed data too small for valid JPEG 2000 codestream" << std::endl;
-        return compressedData;
-    }
-    
-    try {
-        // Create input memory stream
-        MemoryStreamData ms_data = {
-            compressedData.data(),        // Input data
-            nullptr,                      // No output buffer for reading
-            compressedData.size(),        // Input data size
-            0,                           // No output size for reading
-            0,                           // Current position starts at 0
-            0                            // No max output size for reading
-        };
-        
-        // Create OpenJPEG stream for reading
-        opj_stream_t* stream = opj_stream_create(OPJ_J2K_STREAM_CHUNK_SIZE, OPJ_TRUE);
-        if (!stream) {
-            std::cout << "❌ Failed to create OpenJPEG stream for decompression" << std::endl;
-            return compressedData;
-        }
-        
-        // Set up stream functions for reading
-        opj_stream_set_read_function(stream, memory_read);
-        opj_stream_set_skip_function(stream, memory_skip);
-        opj_stream_set_seek_function(stream, memory_seek);
-        opj_stream_set_user_data(stream, &ms_data, nullptr);
-        opj_stream_set_user_data_length(stream, ms_data.input_size);
-        
-        // Create decoder
-        opj_codec_t* codec = opj_create_decompress(OPJ_CODEC_J2K);
-        if (!codec) {
-            std::cout << "❌ Failed to create OpenJPEG decoder" << std::endl;
-            opj_stream_destroy(stream);
-            return compressedData;
-        }
-
-        // Attach handlers for debugging
-        opj_set_info_handler(codec, opj_info_callback, nullptr);
-        opj_set_warning_handler(codec, opj_warn_callback, nullptr);
-        opj_set_error_handler(codec, opj_error_callback, nullptr);
-
-        // NEW: Set decoder parameters
-        opj_dparameters_t parameters;
-        opj_set_default_decoder_parameters(&parameters);
-        if (!opj_setup_decoder(codec, &parameters)) {
-            std::cout << "❌ Failed to setup OpenJPEG decoder" << std::endl;
-            opj_stream_destroy(stream);
-            opj_destroy_codec(codec);
-            return compressedData;
-        }
-
-        // Read header
-        opj_image_t* image = nullptr;
-        if (!opj_read_header(stream, codec, &image)) {
-            std::cout << "❌ Failed to read JPEG 2000 header" << std::endl;
-            opj_stream_destroy(stream);
-            opj_destroy_codec(codec);
-            return compressedData;
-        }
-
-        std::cout << "✅ Successfully read JPEG 2000 header" << std::endl;
-        std::cout << "Image dimensions: " << image->comps[0].w << "x" << image->comps[0].h 
-                  << " with " << image->numcomps << " components" << std::endl;
-
-        // Decode the image
-        std::cout << "Attempting to decode JPEG 2000 image..." << std::endl;
-        if (!opj_decode(codec, stream, image)) {
-            std::cout << "❌ Failed to decode JPEG 2000 image" << std::endl;
-            opj_stream_destroy(stream);
-            opj_destroy_codec(codec);
-            opj_image_destroy(image);
-            return compressedData;
-        }
-        std::cout << "✅ Successfully decoded JPEG 2000 image" << std::endl;
-
-        if (!opj_end_decompress(codec, stream)) {
-            std::cout << "❌ Failed to end decompression" << std::endl;
-        }
-        
-        // Extract pixel data from the decoded image
-        std::vector<uint8_t> decompressedData;
-        
-        // Calculate expected size
-        int width = image->comps[0].w;
-        int height = image->comps[0].h;
-        int numComponents = image->numcomps;
-        
-        std::cout << "Decompressed image: " << width << "x" << height 
-                  << " with " << numComponents << " components" << std::endl;
-        
-        // Validate expected output size
-        size_t expectedOutputSize = static_cast<size_t>(width) * height * numComponents;
-        std::cout << "Expected output size: " << expectedOutputSize << " bytes" << std::endl;
-        
-        // Allocate output buffer
-        size_t totalPixels = width * height;
-        size_t totalBytes = totalPixels * numComponents;
-        decompressedData.resize(totalBytes);
-        
-        // Copy pixel data from image components
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                size_t pixel_index = static_cast<size_t>(y * width + x);
-                
-                if (pixel_index >= static_cast<size_t>(width * height)) {
-                    std::cout << "❌ Pixel index out of bounds during decompression: " << pixel_index << " >= " << (width * height) << std::endl;
-                    continue;
-                }
-                
-                if (numComponents == 1) {
-                    // Single channel (grayscale)
-                    if (pixel_index < static_cast<size_t>(image->comps[0].w * image->comps[0].h)) {
-                        decompressedData[pixel_index] = static_cast<uint8_t>(image->comps[0].data[pixel_index]);
-                    }
-                } else {
-                    // Multi-channel (interleaved) - RGBRGB... format
-                    for (int c = 0; c < numComponents; c++) {
-                        size_t data_index = pixel_index * numComponents + c;
-                        if (data_index < decompressedData.size() && pixel_index < static_cast<size_t>(image->comps[c].w * image->comps[c].h)) {
-                            decompressedData[data_index] = static_cast<uint8_t>(image->comps[c].data[pixel_index]);
-                        } else if (data_index >= decompressedData.size()) {
-                            std::cout << "❌ Decompressed data index out of bounds: " << data_index << " >= " << decompressedData.size() << std::endl;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Clean up
-        opj_stream_destroy(stream);
-        opj_destroy_codec(codec);
-        opj_image_destroy(image);
-        
-        std::cout << "Decompression complete: " << compressedData.size() << " -> " 
-                  << decompressedData.size() << " bytes" << std::endl;
-        
-        return decompressedData;
-        
-    } catch (const std::exception& e) {
-        std::cout << "OpenJPEG decompression error: " << e.what() << std::endl;
-        return compressedData;
-    }
-}
-
 std::vector<uint8_t> ImageData::decompressFrameData(const std::vector<uint8_t>& compressedData) const {
-    switch (encoding) {
-        case ImageEncoding::JPEG2000_LOSSLESS:
-            return decompressJPEG2000(compressedData);
-        case ImageEncoding::PNG:
-            // TODO: Implement PNG decompression
-            std::cout << "PNG decompression not yet implemented" << std::endl;
-            return compressedData;
-        default:
-            return compressedData; // Already uncompressed
+    if (encoding == ImageEncoding::RAW) {
+        return compressedData; // Already uncompressed
     }
+    
+    // Use the encoder to decompress the frame
+    return encoder->decompress(compressedData, encoding);
 }
 
-bool ImageData::testOpenJPEGIntegration() const {
-    // Test that OpenJPEG is properly linked and working
-    std::cout << "Testing OpenJPEG integration..." << std::endl;
-    
-    // Check OpenJPEG version
-    std::cout << "OpenJPEG version: " << opj_version() << std::endl;
-    
-    // Test basic OpenJPEG functionality
-    opj_cparameters_t parameters;
-    opj_set_default_encoder_parameters(&parameters);
-    
-    std::cout << "OpenJPEG encoder parameters initialized successfully" << std::endl;
-    
-    return true;
-}
+
+
+
 
         

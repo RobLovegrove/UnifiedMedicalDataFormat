@@ -19,6 +19,8 @@ CXX := g++
 CXXFLAGS := -std=c++20 -Iinclude -Isrc -Wall -Wextra -MMD -MP
 OPENJPEG_CFLAGS := -I/opt/homebrew/include/openjpeg-2.5
 OPENJPEG_LIBS := -L/opt/homebrew/lib -lopenjp2
+PNG_CFLAGS := -I/opt/homebrew/include
+PNG_LIBS := -L/opt/homebrew/lib -lpng
 
 SRC_DIR := src
 BUILD_DIR := build
@@ -41,10 +43,10 @@ VPATH := $(SRC_DIR)
 # Default target is release
 all: release
 
-debug: CXXFLAGS += -g -O0 $(OPENJPEG_CFLAGS)
+debug: CXXFLAGS += -g -O0 $(OPENJPEG_CFLAGS) $(PNG_CFLAGS)
 debug: $(TARGET)
 
-release: CXXFLAGS += -O3 -DNDEBUG $(OPENJPEG_CFLAGS)
+release: CXXFLAGS += -O3 -DNDEBUG $(OPENJPEG_CFLAGS) $(PNG_CFLAGS)
 release: $(TARGET)
 
 # Ensure build directory exists before compiling objects
@@ -58,7 +60,7 @@ $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 
 # Link all object files into the final executable
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(OPENJPEG_LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(OPENJPEG_LIBS) $(PNG_LIBS)
 
 # Include dependency files to enable automatic rebuilding
 -include $(DEPS)

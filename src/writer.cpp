@@ -72,7 +72,7 @@ bool Writer::writeNewFile(const string& filename) {
             {"height", 256},
             {"bit_depth", 8},
             {"channels", 3},  // RGB image (3 channels)
-            {"encoding", "jpeg2000-lossless"},
+            {"encoding", "png"},
             {"bodyPart", "CHEST"},
             {"institution", "Test Hospital"},
             {"acquisitionDate", "2024-01-01"},
