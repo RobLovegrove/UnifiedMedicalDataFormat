@@ -81,15 +81,20 @@ fi
 
 echo -e "${BLUE}📁 Found compiled module: $SO_FILE${NC}"
 
-echo -e "${BLUE}📋 Step 2: Copying module to UI project...${NC}"
+echo -e "${BLUE}📋 Step 2: Linking module to UI project...${NC}"
 
-# Copy the .so file
-cp "$SO_FILE" "$CPP_INTERFACE_DIR/"
+# Remove existing module if it exists
+if [ -f "$CPP_INTERFACE_DIR/$(basename "$SO_FILE")" ]; then
+    rm "$CPP_INTERFACE_DIR/$(basename "$SO_FILE")"
+fi
+
+# Create symbolic link instead of copying to preserve code signature
+ln -sf "$SO_FILE" "$CPP_INTERFACE_DIR/"
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Module copied successfully!${NC}"
+    echo -e "${GREEN}✅ Module linked successfully!${NC}"
 else
-    echo -e "${RED}❌ Failed to copy module${NC}"
+    echo -e "${RED}❌ Failed to link module${NC}"
     exit 1
 fi
 
@@ -126,7 +131,7 @@ echo -e "${GREEN}🎉 Update complete!${NC}"
 echo ""
 echo -e "${BLUE}📝 Summary:${NC}"
 echo "  ✅ C++ module rebuilt"
-echo "  ✅ Module copied to UI project"
+echo "  ✅ Module linked to UI project"
 echo "  ✅ Schemas updated (if needed)"
 echo "  ✅ Basic test completed"
 echo ""

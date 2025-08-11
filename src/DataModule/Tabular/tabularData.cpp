@@ -39,7 +39,10 @@ void TabularData::addData(const nlohmann::json& data) {
         const std::string& fieldName = field->getName();
         nlohmann::json value = data.contains(fieldName) ? data[fieldName] : nullptr;
 
-        std::cout << "Adding: "  << fieldName << ": " << value << std::endl;
+        // Show debug output for all modules except Frame (FrameData)
+        if (getModuleType() != ModuleType::Frame) {
+            std::cout << "Adding: "  << fieldName << ": " << value << std::endl;
+        }
 
         field->encodeToBuffer(value, row, offset);
 

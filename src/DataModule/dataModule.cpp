@@ -359,9 +359,14 @@ void DataModule::addMetaData(const nlohmann::json& data) {
 
     for (const unique_ptr<DataField>& field : metaDataFields) {
         const std::string& fieldName = field->getName();
+        
         nlohmann::json value = data.contains(fieldName) ? data[fieldName] : nullptr;
 
-        std::cout << "Adding: " << fieldName << ": " << value << std::endl;
+        // Show debug output for all modules except Frame (FrameData)
+        if (getModuleType() != ModuleType::Frame) {
+            std::cout << "Adding: " << fieldName << ": " << value << std::endl;
+        }
+
         field->encodeToBuffer(value, row, offset);
 
         offset += field->getLength();
@@ -415,11 +420,8 @@ nlohmann::json DataModule::getMetadataAsJson() const {
 std::unordered_map<std::string, nlohmann::json> DataModule::schemaCache;
 
 nlohmann::json DataModule::resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath) {
-    std::cout << "Resolving schema reference: " << refPath << std::endl;
-    
     // Check if schema is already cached
     if (schemaCache.find(refPath) != schemaCache.end()) {
-        std::cout << "Using cached schema for: " << refPath << std::endl;
         return schemaCache[refPath];
     }
     
@@ -434,8 +436,6 @@ nlohmann::json DataModule::resolveSchemaReference(const std::string& refPath, co
         }
     }
     
-    std::cout << "Loading schema from: " << fullPath << std::endl;
-    
     // Load the referenced schema
     std::ifstream file(fullPath);
     if (!file.is_open()) {
@@ -444,8 +444,6 @@ nlohmann::json DataModule::resolveSchemaReference(const std::string& refPath, co
     
     nlohmann::json referencedSchema;
     file >> referencedSchema;
-    
-    std::cout << "Loaded schema: " << referencedSchema["$id"] << std::endl;
     
     // Cache the loaded schema
     schemaCache[refPath] = referencedSchema;

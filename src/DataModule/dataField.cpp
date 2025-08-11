@@ -216,7 +216,7 @@ ArrayField::ArrayField(std::string name, const nlohmann::json& itemDef,
 }
 
 size_t ArrayField::getLength() const {
-    return itemField->getLength() * maxItems;
+    return 2 + (itemField->getLength() * maxItems); // 2 bytes for length + max possible items
 }
 
 void ArrayField::encodeToBuffer(
@@ -234,15 +234,14 @@ void ArrayField::encodeToBuffer(
                                std::to_string(minItems) + "," + std::to_string(maxItems) + "]");
     }
     
-    size_t itemOffset = offset;
+    // Store the actual array length as the first item
+    uint16_t actualLength = static_cast<uint16_t>(array.size());
+    buffer[offset] = static_cast<uint8_t>(actualLength & 0xFF);
+    buffer[offset + 1] = static_cast<uint8_t>((actualLength >> 8) & 0xFF);
+    
+    size_t itemOffset = offset + 2; // Skip the length field
     for (const auto& item : array) {
         itemField->encodeToBuffer(item, buffer, itemOffset);
-        itemOffset += itemField->getLength();
-    }
-    
-    // Zero-fill remaining space if array is shorter than maxItems
-    for (size_t i = array.size(); i < maxItems; ++i) {
-        itemField->encodeToBuffer(nlohmann::json(nullptr), buffer, itemOffset);
         itemOffset += itemField->getLength();
     }
 }
@@ -251,13 +250,17 @@ nlohmann::json ArrayField::decodeFromBuffer(
     const std::vector<uint8_t>& buffer, size_t offset) {
     
     nlohmann::json array = nlohmann::json::array();
-    size_t itemOffset = offset;
     
-    for (size_t i = 0; i < maxItems; ++i) {
+    // Read the actual array length from the first 2 bytes
+    uint16_t actualLength = static_cast<uint16_t>(buffer[offset]) | 
+                           (static_cast<uint16_t>(buffer[offset + 1]) << 8);
+    
+    size_t itemOffset = offset + 2; // Skip the length field
+    
+    // Only decode the actual number of items that were stored
+    for (size_t i = 0; i < actualLength; ++i) {
         nlohmann::json item = itemField->decodeFromBuffer(buffer, itemOffset);
-        if (!item.is_null()) {
-            array.push_back(item);
-        }
+        array.push_back(item);
         itemOffset += itemField->getLength();
     }
     
@@ -280,6 +283,11 @@ nlohmann::json ArrayField::decodeFromBuffer(
     void IntegerField::encodeToBuffer(
         const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) {
             if (value.is_null()) return;
+
+            // Check if the value is actually a number
+            if (!value.is_number()) {
+                throw std::runtime_error("IntegerField: expected number, got: " + value.dump());
+            }
 
             int32_t val = value.get<int32_t>(); // generic container for both signed/unsigned
             for (size_t i = 0; i < integerFormat.byteLength; ++i) {

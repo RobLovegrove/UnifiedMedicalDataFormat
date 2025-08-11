@@ -30,7 +30,7 @@ bool Reader::readFile(const string& filename) {
     cout << "XRefTable successfully read" << endl;
     cout << xrefTable << endl;
 
-    constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 1 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
+    constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 2 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
 
     // Clear any previously loaded modules
     loadedModules.clear();
@@ -69,22 +69,7 @@ bool Reader::readFile(const string& filename) {
                 } else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
                     cout << "Data: " << data.size() << " bytes of pixel data" << endl;
                 } else if constexpr (std::is_same_v<T, std::vector<ModuleData>>) {
-                    cout << "Data: " << data.size() << " frames:" << endl;
-                    for (size_t i = 0; i < data.size(); ++i) {
-                        cout << "  Frame " << i << ":" << endl;
-                        cout << "    Metadata: " << data[i].metadata.dump(2) << endl;
-                        // Handle the nested variant
-                        std::visit([&](const auto& d) {
-                            using D = std::decay_t<decltype(d)>;
-                            if constexpr (std::is_same_v<D, nlohmann::json>) {
-                                cout << "    Data: " << d.dump(2) << endl;
-                            } else if constexpr (std::is_same_v<D, std::vector<uint8_t>>) {
-                                cout << "    Data: " << d.size() << " bytes of pixel data" << endl;
-                            } else if constexpr (std::is_same_v<D, std::vector<ModuleData>>) {
-                                cout << "    Data: nested data structure" << endl;
-                            }
-                        }, data[i].data);
-                    }
+                    cout << "Data: " << data.size() << " frames" << endl;
                 }
             }, moduleData.data);
             cout << endl;

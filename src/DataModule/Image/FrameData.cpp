@@ -8,7 +8,6 @@ FrameData::FrameData(const std::string& schemaPath, UUID uuid)
 }
 
 
-
 void FrameData::writeData(std::ostream& out) const {
     // Write pixelData to stream
     if (!pixelData.empty()) {

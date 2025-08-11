@@ -12,6 +12,9 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <cmath>
+#include <vector>
+#include <utility>
 
 using namespace std;
 
@@ -66,48 +69,81 @@ bool Writer::writeNewFile(const string& filename) {
     try {
         ImageData dm("./schemas/image/v1.0.json", UUID());
 
+        int width = 256;
+        int height = 256;
+        int depth = 12;  // Match the dimensions array: {256, 256, 12, 5}
+        int timePoints = 5;  // Match schema maxItems: 10
+        int channels = 3;  // RGB
+
         dm.addMetaData({
             {"modality", "CT"},
-            {"width", 256},
-            {"height", 256},
             {"bit_depth", 8},
-            {"channels", 3},  // RGB image (3 channels)
-            {"encoding", "png"},
+            {"channels", channels},  // RGB image (3 channels)
+            {"encoding", "jpeg2000-lossless"},
             {"bodyPart", "CHEST"},
             {"institution", "Test Hospital"},
             {"acquisitionDate", "2024-01-01"},
             {"technician", "Dr. Smith"},
             {"patientName", "John Doe"},
             {"patientID", "12345"},
-            {"dimensions", {256, 256, 32, 10}},    // 4D: width, height, depth, time
+            {"dimensions", {width, height, depth, timePoints}},    // 4D: width, height, depth, time
             {"dimension_names", {"x", "y", "z", "time"}}  // Match schema maxItems: 10
-        });
+        });// 12 * 5 = 60 frames
         
-        // Get dimensions from metadata (hardcoded for now)
-        int width = 256;
-        int height = 256;
-        int depth = 32;
-        int timePoints = 10;
-        int channels = 3;  // RGB
-        
-        // Calculate total frame count for 4D data
-        int totalFrames = depth * timePoints;  // 32 * 10 = 320 frames
+        // Prepare frame data pairs for batch addition
+        std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>> frameDataPairs;
         
         // Create frames for each slice and time point
         for (int time = 0; time < timePoints; time++) {
             for (int slice = 0; slice < depth; slice++) {
-                auto frame = std::make_unique<FrameData>("./schemas/frame/v1.0.json", UUID());
                 std::vector<uint8_t> sliceData(width * height * channels);  // RGB data
                 
-                // Fill with RGB pattern - create a gradient pattern that changes with time and slice
+                // Fill with RGB pattern - create high contrast patterns that change with slice and time
                 for (int y = 0; y < height; y++) {
                     for (int x = 0; x < width; x++) {
                         size_t pixel_index = static_cast<size_t>(y * width + x);
                         
-                        // Create RGB values - R gradient horizontally, G gradient vertically, B based on slice and time
-                        uint8_t r = static_cast<uint8_t>((x * 255) / width);  // Red gradient horizontally
-                        uint8_t g = static_cast<uint8_t>((y * 255) / height); // Green gradient vertically  
-                        uint8_t b = static_cast<uint8_t>(128 + slice * 4 + time * 12);    // Blue based on slice and time
+                        
+                        // Z dimension (slice) affects brightness - creates a clear light-to-dark gradient
+                        // First slice (z=0) is brightest, last slice (z=depth-1) is darkest
+                        double zBrightness = 1.0 - (static_cast<double>(slice) / (depth - 1)) * 0.7;
+                        zBrightness = std::max(0.3, std::min(1.0, zBrightness));
+                        
+                        // Time dimension affects color dominance - each time point gets a distinct color
+                        uint8_t r, g, b;
+                        
+                        if (time == 0) {
+                            // Time 0: Red dominant
+                            r = static_cast<uint8_t>(255 * zBrightness);
+                            g = static_cast<uint8_t>(80 * zBrightness);
+                            b = static_cast<uint8_t>(80 * zBrightness);
+                        } else if (time == 1) {
+                            // Time 1: Green dominant
+                            r = static_cast<uint8_t>(80 * zBrightness);
+                            g = static_cast<uint8_t>(255 * zBrightness);
+                            b = static_cast<uint8_t>(80 * zBrightness);
+                        } else if (time == 2) {
+                            // Time 2: Blue dominant
+                            r = static_cast<uint8_t>(80 * zBrightness);
+                            g = static_cast<uint8_t>(80 * zBrightness);
+                            b = static_cast<uint8_t>(255 * zBrightness);
+                        } else if (time == 3) {
+                            // Time 3: Cyan dominant (Green + Blue)
+                            r = static_cast<uint8_t>(80 * zBrightness);
+                            g = static_cast<uint8_t>(255 * zBrightness);
+                            b = static_cast<uint8_t>(255 * zBrightness);
+                        } else {
+                            // Time 4: Magenta dominant (Red + Blue)
+                            r = static_cast<uint8_t>(255 * zBrightness);
+                            g = static_cast<uint8_t>(80 * zBrightness);
+                            b = static_cast<uint8_t>(255 * zBrightness);
+                        }
+                        
+                        // Add subtle radial texture for visual interest
+                        double textureFactor = 0.9 + 0.1 * sin(x * 0.1) * cos(y * 0.1);
+                        r = static_cast<uint8_t>(r * textureFactor);
+                        g = static_cast<uint8_t>(g * textureFactor);
+                        b = static_cast<uint8_t>(b * textureFactor);
                         
                         // Interleaved RGB format: RGBRGBRGB...
                         sliceData[pixel_index * 3 + 0] = r;  // Red
@@ -116,10 +152,8 @@ bool Writer::writeNewFile(const string& filename) {
                     }
                 }
                 
-                frame->pixelData = sliceData;
-                
-                // Add frame metadata with 4D positioning
-                frame->addMetaData({
+                // Create frame metadata with 4D positioning
+                nlohmann::json frameMetadata = {
                     {"position", {{"x", 0.0}, {"y", 0.0}, {"z", static_cast<double>(slice)}, {"t", static_cast<double>(time)}}},
                     {"orientation", {
                         {"row_cosine", {1.0, 0.0, 0.0}},
@@ -129,11 +163,15 @@ bool Writer::writeNewFile(const string& filename) {
                     {"frame_number", slice + time * depth},
                     {"time_point", time},
                     {"slice_number", slice}
-                });
+                };
                 
-                dm.addData(std::move(frame));
+                // Add the pair to our collection
+                frameDataPairs.push_back({frameMetadata, sliceData});
             }
         }
+        
+        // Add all frames at once using the new batch method
+        dm.addData(frameDataPairs);
         
         dm.writeBinary(outfile, xref);
     }

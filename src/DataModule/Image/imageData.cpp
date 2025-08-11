@@ -49,14 +49,11 @@ ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPat
 }
 
 void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
-    if (!schemaJson.contains("properties")) {
-        throw runtime_error("Schema missing essential 'properties' field.");
-    }
-
-    const auto& props = schemaJson["properties"];
-
-    for (const auto& [name, definition] : props.items()) {
-        fields.emplace_back(parseField(name, definition, rowSize));
+    // Extract frame schema reference from data section
+    if (schemaJson.contains("$frame_schema")) {
+        frameSchemaPath = schemaJson["$frame_schema"];
+    } else {
+        throw runtime_error("Image schema missing required '$frame_schema' field in data section");
     }
 }
 
@@ -66,35 +63,101 @@ void ImageData::addData(std::unique_ptr<FrameData> frame) {
     frames.push_back(std::move(frame));
 }
 
+void ImageData::addData(const std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>>& frameDataPairs) {
+    // Load the frame schema if not already loaded
+    if (frameSchemaPath.empty()) {
+        throw std::runtime_error("Frame schema path not set. Call parseDataSchema first.");
+    }
+    
+    // Start timing for total compression
+    auto compressionStart = std::chrono::high_resolution_clock::now();
+    
+    // Create FrameData objects for each pair
+    for (const auto& [metadata, pixelData] : frameDataPairs) {
+
+        auto frame = std::make_unique<FrameData>(frameSchemaPath, UUID());
+
+        // Set the frame metadata
+        frame->addMetaData(metadata);
+        // Set the pixel data
+        frame->pixelData = pixelData;
+        // Set decompression flag based on current encoding
+        frame->needsDecompression = (encoding != ImageEncoding::RAW);
+        // Add to frames collection
+        frames.push_back(std::move(frame));
+    }
+    
+    // End timing and output total compression time
+    auto compressionEnd = std::chrono::high_resolution_clock::now();
+    auto compressionDuration = std::chrono::duration_cast<std::chrono::microseconds>(compressionEnd - compressionStart);
+    
+    std::cout << "Total compression time for " << frameDataPairs.size() << " frames (" 
+              << (encoding == ImageEncoding::JPEG2000_LOSSLESS ? "JPEG2000" : 
+                  encoding == ImageEncoding::PNG ? "PNG" : "RAW") << "): " 
+              << compressionDuration.count() << " microseconds" << std::endl;
+}
+
 void ImageData::addMetaData(const nlohmann::json& data) {
     // Call base class implementation first
     DataModule::addMetaData(data);
     
     dimensions.clear();
+    dimensionNames.clear();
     
-    // Extract width and height first (they're required fields)
-    uint16_t width = data["width"].get<uint16_t>();
-    uint16_t height = data["height"].get<uint16_t>();
+    // Extract dimensions array first (required field)
+    if (!data.contains("dimensions") || !data["dimensions"].is_array()) {
+        throw std::runtime_error("ImageData: 'dimensions' array is required in metadata");
+    }
     
-    // Always put width and height first
-    dimensions.push_back(width);
-    dimensions.push_back(height);
+    const auto& dimsArray = data["dimensions"];
+    if (dimsArray.size() < 2) {
+        throw std::runtime_error("ImageData: 'dimensions' array must have at least 2 elements (width, height)");
+    }
     
-    // Extract remaining dimensions from the dimensions array
-    if (data.contains("dimensions") && data["dimensions"].is_array()) {
-        const auto& dimsArray = data["dimensions"];
-        
-        // Skip first two if they match width/height (to avoid duplication)
-        size_t startIndex = 0;
-        if (dimsArray.size() >= 2 && 
-            dimsArray[0].get<uint16_t>() == width && 
-            dimsArray[1].get<uint16_t>() == height) {
-            startIndex = 2;
+    // First two elements are width and height
+    if (!dimsArray[0].is_number()) {
+        throw std::runtime_error("ImageData: first dimension must be a number, got: " + dimsArray[0].dump());
+    }
+    if (!dimsArray[1].is_number()) {
+        throw std::runtime_error("ImageData: second dimension must be a number, got: " + dimsArray[1].dump());
+    }
+    
+    // Add all dimensions to our internal array
+    for (size_t i = 0; i < dimsArray.size(); ++i) {
+        if (!dimsArray[i].is_number()) {
+            throw std::runtime_error("ImageData: dimension " + std::to_string(i) + " must be a number, got: " + dimsArray[i].dump());
         }
+        dimensions.push_back(dimsArray[i].get<uint16_t>());
+    }
+    
+    // Extract dimension names from the dimension_names array if available
+    if (data.contains("dimension_names") && data["dimension_names"].is_array()) {
+        const auto& namesArray = data["dimension_names"];
         
-        // Add remaining dimensions
-        for (size_t i = startIndex; i < dimsArray.size(); ++i) {
-            dimensions.push_back(dimsArray[i].get<uint16_t>());
+        // Ensure we have names for all dimensions
+        if (namesArray.size() >= dimensions.size()) {
+            for (size_t i = 0; i < dimensions.size(); ++i) {
+                dimensionNames.push_back(namesArray[i].get<std::string>());
+            }
+        } else {
+            // Fallback: use default names for missing ones
+            for (size_t i = 0; i < dimensions.size(); ++i) {
+                if (i < namesArray.size()) {
+                    dimensionNames.push_back(namesArray[i].get<std::string>());
+                } else {
+                    // Generate default names for missing dimensions
+                    if (i == 0) dimensionNames.push_back("x");
+                    else if (i == 1) dimensionNames.push_back("y");
+                    else dimensionNames.push_back("dim" + std::to_string(i));
+                }
+            }
+        }
+    } else {
+        // No dimension names provided, generate defaults
+        for (size_t i = 0; i < dimensions.size(); ++i) {
+            if (i == 0) dimensionNames.push_back("x");
+            else if (i == 1) dimensionNames.push_back("y");
+            else dimensionNames.push_back("dim" + std::to_string(i));
         }
     }
     
@@ -137,12 +200,39 @@ int ImageData::getFrameCount() const {
     return totalFrames;
 }
 
+std::vector<uint16_t> ImageData::getNonZeroDimensions() const {
+    std::vector<uint16_t> nonZeroDims;
+    
+    // Add all non-zero dimensions
+    for (size_t i = 0; i < dimensions.size(); ++i) {
+        if (dimensions[i] > 0) {
+            nonZeroDims.push_back(dimensions[i]);
+        }
+    }
+    
+    return nonZeroDims;
+}
+
+std::vector<std::string> ImageData::getNonZeroDimensionNames() const {
+    std::vector<std::string> nonZeroNames;
+    
+    // Add names for all non-zero dimensions
+    for (size_t i = 0; i < dimensions.size() && i < dimensionNames.size(); ++i) {
+        if (dimensions[i] > 0) {
+            nonZeroNames.push_back(dimensionNames[i]);
+        }
+    }
+    
+    return nonZeroNames;
+}
+
 void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
     // Call base class to decode metadata normally
     DataModule::decodeMetadataRows(in, actualDataSize);
     
     // Now extract dimensions and encoding from the decoded metadata
     dimensions.clear();
+    dimensionNames.clear();
     
     // Get the decoded metadata and find the dimensions and encoding fields
     auto metadata = getMetadataAsJson();
@@ -151,52 +241,30 @@ void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
         // Take the first row (assuming all rows have the same dimensions and encoding)
         auto firstRow = metadata[0];
         
-        // Extract width and height - try both direct fields and dimensions array
-        uint16_t width = 0, height = 0;
+        // Extract dimensions directly from the dimensions array
         
-        // Try to get width and height from direct fields first
-        if (firstRow.contains("width")) {
-            width = firstRow["width"].get<uint16_t>();
-        }
-        if (firstRow.contains("height")) {
-            height = firstRow["height"].get<uint16_t>();
-        }
-        
-        // If width and height aren't available directly, try to get them from dimensions array
-        if (width == 0 && firstRow.contains("dimensions") && firstRow["dimensions"].is_array()) {
-            const auto& dimsArray = firstRow["dimensions"];
-            if (dimsArray.size() >= 2) {
-                width = dimsArray[0].get<uint16_t>();
-                height = dimsArray[1].get<uint16_t>();
-            }
-        }
-        
-        // Always put width and height first (if we found them)
-        if (width > 0 && height > 0) {
-            dimensions.push_back(width);
-            dimensions.push_back(height);
-        }
-        
-        // Extract remaining dimensions from the dimensions array
+        // Extract dimensions directly from the dimensions array
         if (firstRow.contains("dimensions") && firstRow["dimensions"].is_array()) {
             const auto& dimsArray = firstRow["dimensions"];
-            
-            // Skip first two if they match width/height (to avoid duplication)
-            size_t startIndex = 0;
-            if (dimsArray.size() >= 2 && width > 0 && height > 0 &&
-                dimsArray[0].get<uint16_t>() == width && 
-                dimsArray[1].get<uint16_t>() == height) {
-                startIndex = 2;
-            }
-            
-            // Add remaining dimensions
-            for (size_t i = startIndex; i < dimsArray.size(); ++i) {
+            for (size_t i = 0; i < dimsArray.size(); ++i) {
                 uint16_t dim = dimsArray[i].get<uint16_t>();
                 if (dim > 0) {  // Only add non-zero dimensions
                     dimensions.push_back(dim);
                 }
             }
         }
+        
+        // Extract dimension names from the dimension_names array if available
+        if (firstRow.contains("dimension_names") && firstRow["dimension_names"].is_array()) {
+            const auto& namesArray = firstRow["dimension_names"];
+            for (size_t i = 0; i < namesArray.size() && i < dimensions.size(); ++i) {
+                dimensionNames.push_back(namesArray[i].get<std::string>());
+            }
+        }
+        
+
+        
+
         
         // Extract encoding from decoded metadata
         if (firstRow.contains("encoding")) {
@@ -241,35 +309,21 @@ void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
 void ImageData::writeData(std::ostream& out) const {
     streampos startPos = out.tellp();
     
-    // Debug: Print encoding at start of writeData
-    std::cout << "=== ImageData::writeData() called ===" << std::endl;
-    std::cout << "Encoding: " << encodingToString(encoding) << std::endl;
-    std::cout << "Number of frames: " << frames.size() << std::endl;
-    
     // Write each frame as embedded data (not as separate modules)
     for (size_t i = 0; i < frames.size(); i++) {
-        // Debug: Print current encoding
-        std::cout << "Frame " << i << " - Current encoding: " << encodingToString(encoding) << std::endl;
-        
         // Check if we need to compress this frame
         if (encoding != ImageEncoding::RAW) {
-            std::cout << "Compression needed for frame " << i << std::endl;
             // Compress the frame's pixel data
-            if (encoding != ImageEncoding::RAW) {
-                std::cout << "Compressing frame " << i << " with " << encodingToString(encoding) << "..." << std::endl;
-                // Get width and height from dimensions array
-                int frameWidth = dimensions.size() > 0 ? dimensions[0] : 16;
-                int frameHeight = dimensions.size() > 1 ? dimensions[1] : 16;
-                
-                // Use the encoder to compress the frame
-                frames[i]->pixelData = encoder->compress(frames[i]->pixelData, encoding, 
-                                                       frameWidth, frameHeight, channels, bitDepth);
-                
-                // Update the frame's data size after compression
-                frames[i]->header->setDataSize(frames[i]->pixelData.size());
-            }
-        } else {
-            std::cout << "No compression needed for frame " << i << " (RAW encoding)" << std::endl;
+            // Get width and height from dimensions array
+            int frameWidth = dimensions.size() > 0 ? dimensions[0] : 16;
+            int frameHeight = dimensions.size() > 1 ? dimensions[1] : 16;
+            
+            // Use the encoder to compress the frame
+            frames[i]->pixelData = encoder->compress(frames[i]->pixelData, encoding, 
+                                                   frameWidth, frameHeight, channels, bitDepth);
+            
+            // Update the frame's data size after compression
+            frames[i]->header->setDataSize(frames[i]->pixelData.size());
         }
         
         XRefTable tempXref;
@@ -365,30 +419,36 @@ ImageData::getModuleSpecificData() const {
     // Return the frames as a vector of ModuleData
     std::vector<ModuleData> frameDataArray;
     
-    std::cout << "=== ImageData::getModuleSpecificData() called ===" << std::endl;
-    std::cout << "Encoding: " << encodingToString(encoding) << std::endl;
-    std::cout << "Number of frames: " << frames.size() << std::endl;
+    // Start timing for total decompression
+    auto decompressionStart = std::chrono::high_resolution_clock::now();
     
+    // Process all frames
     for (size_t i = 0; i < frames.size(); i++) {
         const auto& frame = frames[i];
-        std::cout << "Frame " << i << " - needsDecompression: " << (frame->needsDecompression ? "true" : "false") << std::endl;
         
         // Check if frame needs decompression and hasn't been decompressed yet
         if (frame->needsDecompression) {
-            std::cout << "Decompressing frame " << i << "..." << std::endl;
             // Decompress the frame's pixel data in-place
             std::vector<uint8_t> decompressedData = decompressFrameData(frame->pixelData);
             frame->pixelData = decompressedData; // Overwrite with decompressed data
             frame->needsDecompression = false; // Mark as decompressed
-            std::cout << "Frame " << i << " decompressed: " << frame->pixelData.size() << " bytes" << std::endl;
-        } else {
-            std::cout << "Frame " << i << " does not need decompression" << std::endl;
         }
         
         // Get the frame's data with schema (now decompressed)
         ModuleData frameData = frame->getDataWithSchema();
         frameDataArray.push_back(frameData);
     }
+    
+    // End timing and output total decompression time
+    auto decompressionEnd = std::chrono::high_resolution_clock::now();
+    auto decompressionDuration = std::chrono::duration_cast<std::chrono::microseconds>(decompressionEnd - decompressionStart);
+    
+    // Print summary of frame processing with timing
+    std::cout << "ImageData: Processed " << frames.size() << " frames with " 
+              << encodingToString(encoding) << " encoding" << std::endl;
+    std::cout << "Total decompression time for " << frames.size() << " frames (" 
+              << encodingToString(encoding) << "): " 
+              << decompressionDuration.count() << " microseconds" << std::endl;
     
     return frameDataArray;  // Returns vector of ModuleData for frames
 }

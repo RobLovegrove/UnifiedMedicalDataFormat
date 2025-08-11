@@ -6,15 +6,13 @@
   "type": "object",
   "module_type": "image",
   "endianness": "little",
-  "required": ["metadata"],
+  "required": ["metadata", "data"],
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["modality", "width", "height", "bit_depth", "channels", "encoding"],
+      "required": ["modality", "bit_depth", "channels", "encoding", "dimensions", "dimension_names"],
       "properties": {
         "modality": { "type": "string", "length": 10 },
-        "width": { "type": "integer", "format": "uint16" },
-        "height": { "type": "integer", "format": "uint16" },
         "bit_depth": { "type": "integer", "format": "uint8" },
         "channels": { 
           "type": "integer", 
@@ -48,6 +46,9 @@
                     "description": "Names of each dimension (x, y, z, time, channel, etc.)"
         }
       }
+    },
+    "data": {
+      "$frame_schema": "./schemas/frame/v1.0.json"
     }
   }
 }

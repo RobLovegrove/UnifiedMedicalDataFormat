@@ -5,6 +5,8 @@
 #include <vector>
 #include <optional>
 #include <string>
+#include <utility>
+#include <chrono>
 
 #include "../stringBuffer.hpp"
 #include "../dataModule.hpp"
@@ -30,25 +32,20 @@ std::string encodingToString(ImageEncoding encoding);
 class ImageData : public DataModule { 
 
 protected:
-    std::vector<std::unique_ptr<DataField>> fields;
-    std::vector<std::vector<uint8_t>> rows;
-    
-    size_t rowSize = 0;
-    
     // Frame storage
     std::vector<std::unique_ptr<FrameData>> frames;
-    
-    // C++ dimensions array for efficient access
     std::vector<uint16_t> dimensions;
+    std::vector<std::string> dimensionNames;
+    uint8_t bitDepth;
+    uint8_t channels;
     
     // Image encoding
     ImageEncoding encoding;
     bool needsDecompression = false;
     
-    // Image format attributes
-    uint8_t bitDepth;
-    uint8_t channels;
-
+    // Frame schema reference
+    std::string frameSchemaPath;
+    
     explicit ImageData() {};
 
     virtual void parseDataSchema(const nlohmann::json& schemaJson) override;
@@ -68,6 +65,7 @@ public:
     virtual ~ImageData() override = default;
     
     void addData(std::unique_ptr<FrameData> frame);
+    void addData(const std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>>& frameDataPairs);
     // void writeBinary(std::ostream& out, XRefTable& xref) override;
 
     void printData(std::ostream& out) const override;
@@ -78,6 +76,12 @@ public:
     // Dimension access methods
     int getFrameCount() const;
     const std::vector<uint16_t>& getDimensions() const { return dimensions; }
+    
+    // Get only non-zero dimensions
+    std::vector<uint16_t> getNonZeroDimensions() const;
+    
+    // Get dimension names for non-zero dimensions
+    std::vector<std::string> getNonZeroDimensionNames() const;
     
     // Encoding methods
     void setEncoding(ImageEncoding enc);
@@ -92,6 +96,9 @@ public:
     
     // Image encoder for compression/decompression
     std::unique_ptr<ImageEncoder> encoder;
+    
+    // Frame schema access
+    const std::string& getFrameSchemaPath() const { return frameSchemaPath; }
     
     // Decompression helper method
     std::vector<uint8_t> decompressFrameData(const std::vector<uint8_t>& compressedData) const;
