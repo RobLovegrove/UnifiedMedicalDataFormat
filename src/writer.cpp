@@ -77,17 +77,25 @@ bool Writer::writeNewFile(const string& filename) {
 
         dm.addMetaData({
             {"modality", "CT"},
-            {"bit_depth", 8},
-            {"channels", channels},  // RGB image (3 channels)
-            {"encoding", "jpeg2000-lossless"},
+            {"image_structure", {
+                {"channels", channels},  // RGB image (3 channels)
+                {"bit_depth", 8},
+                {"encoding", "jpeg2000-lossless"},
+                {"memory_order", "row_major"},
+                {"spatial_orientation", {
+                    {"row_direction", "top_to_bottom"},
+                    {"column_direction", "left_to_right"}
+                }},
+                {"layout", "interleaved"},  // RGB interleaved format
+                {"dimensions", {width, height, depth, timePoints}},    // 4D: width, height, depth, time
+                {"dimension_names", {"x", "y", "z", "time"}}  // Match schema maxItems: 10
+            }},
             {"bodyPart", "CHEST"},
             {"institution", "Test Hospital"},
             {"acquisitionDate", "2024-01-01"},
             {"technician", "Dr. Smith"},
             {"patientName", "John Doe"},
-            {"patientID", "12345"},
-            {"dimensions", {width, height, depth, timePoints}},    // 4D: width, height, depth, time
-            {"dimension_names", {"x", "y", "z", "time"}}  // Match schema maxItems: 10
+            {"patientID", "12345"}
         });// 12 * 5 = 60 frames
         
         // Prepare frame data pairs for batch addition

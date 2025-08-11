@@ -57,12 +57,6 @@ void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
     }
 }
 
-void ImageData::addData(std::unique_ptr<FrameData> frame) {
-    // Set decompression flag based on current encoding
-    frame->needsDecompression = (encoding != ImageEncoding::RAW);
-    frames.push_back(std::move(frame));
-}
-
 void ImageData::addData(const std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>>& frameDataPairs) {
     // Load the frame schema if not already loaded
     if (frameSchemaPath.empty()) {
@@ -98,94 +92,227 @@ void ImageData::addData(const std::vector<std::pair<nlohmann::json, std::vector<
 }
 
 void ImageData::addMetaData(const nlohmann::json& data) {
-    // Call base class implementation first
+    // Call base class implementation first to populate the fields vector
     DataModule::addMetaData(data);
     
     dimensions.clear();
     dimensionNames.clear();
     
-    // Extract dimensions array first (required field)
-    if (!data.contains("dimensions") || !data["dimensions"].is_array()) {
-        throw std::runtime_error("ImageData: 'dimensions' array is required in metadata");
-    }
-    
-    const auto& dimsArray = data["dimensions"];
-    if (dimsArray.size() < 2) {
-        throw std::runtime_error("ImageData: 'dimensions' array must have at least 2 elements (width, height)");
-    }
-    
-    // First two elements are width and height
-    if (!dimsArray[0].is_number()) {
-        throw std::runtime_error("ImageData: first dimension must be a number, got: " + dimsArray[0].dump());
-    }
-    if (!dimsArray[1].is_number()) {
-        throw std::runtime_error("ImageData: second dimension must be a number, got: " + dimsArray[1].dump());
-    }
-    
-    // Add all dimensions to our internal array
-    for (size_t i = 0; i < dimsArray.size(); ++i) {
-        if (!dimsArray[i].is_number()) {
-            throw std::runtime_error("ImageData: dimension " + std::to_string(i) + " must be a number, got: " + dimsArray[i].dump());
-        }
-        dimensions.push_back(dimsArray[i].get<uint16_t>());
-    }
-    
-    // Extract dimension names from the dimension_names array if available
-    if (data.contains("dimension_names") && data["dimension_names"].is_array()) {
-        const auto& namesArray = data["dimension_names"];
+    // Check if we have the new nested image_structure format
+    if (data.contains("image_structure") && data["image_structure"].is_object()) {
+        const auto& imageStruct = data["image_structure"];
         
-        // Ensure we have names for all dimensions
-        if (namesArray.size() >= dimensions.size()) {
-            for (size_t i = 0; i < dimensions.size(); ++i) {
-                dimensionNames.push_back(namesArray[i].get<std::string>());
+        // Extract dimensions array first (required field)
+        if (!imageStruct.contains("dimensions") || !imageStruct["dimensions"].is_array()) {
+            throw std::runtime_error("ImageData: 'dimensions' array is required in image_structure");
+        }
+        
+        const auto& dimsArray = imageStruct["dimensions"];
+        if (dimsArray.size() < 2) {
+            throw std::runtime_error("ImageData: 'dimensions' array must have at least 2 elements (width, height)");
+        }
+        
+        // First two elements are width and height
+        if (!dimsArray[0].is_number()) {
+            throw std::runtime_error("ImageData: first dimension must be a number, got: " + dimsArray[0].dump());
+        }
+        if (!dimsArray[1].is_number()) {
+            throw std::runtime_error("ImageData: second dimension must be a number, got: " + dimsArray[1].dump());
+        }
+        
+        // Add all dimensions to our internal array
+        for (size_t i = 0; i < dimsArray.size(); ++i) {
+            if (!dimsArray[i].is_number()) {
+                throw std::runtime_error("ImageData: dimension " + std::to_string(i) + " must be a number, got: " + dimsArray[i].dump());
+            }
+            dimensions.push_back(dimsArray[i].get<uint16_t>());
+        }
+        
+        // Extract dimension names from the dimension_names array if available
+        if (imageStruct.contains("dimension_names") && imageStruct["dimension_names"].is_array()) {
+            const auto& namesArray = imageStruct["dimension_names"];
+            
+            // Ensure we have names for all dimensions
+            if (namesArray.size() >= dimensions.size()) {
+                for (size_t i = 0; i < dimensions.size(); ++i) {
+                    dimensionNames.push_back(namesArray[i].get<std::string>());
+                }
+            } else {
+                // Fallback: use default names for missing ones
+                for (size_t i = 0; i < dimensions.size(); ++i) {
+                    if (i < namesArray.size()) {
+                        dimensionNames.push_back(namesArray[i].get<std::string>());
+                    } else {
+                        // Generate default names for missing dimensions
+                        if (i == 0) dimensionNames.push_back("x");
+                        else if (i == 1) dimensionNames.push_back("y");
+                        else dimensionNames.push_back("dim" + std::to_string(i));
+                    }
+                }
             }
         } else {
-            // Fallback: use default names for missing ones
+            // No dimension names provided, generate defaults
             for (size_t i = 0; i < dimensions.size(); ++i) {
-                if (i < namesArray.size()) {
-                    dimensionNames.push_back(namesArray[i].get<std::string>());
-                } else {
-                    // Generate default names for missing dimensions
-                    if (i == 0) dimensionNames.push_back("x");
-                    else if (i == 1) dimensionNames.push_back("y");
-                    else dimensionNames.push_back("dim" + std::to_string(i));
+                if (i == 0) dimensionNames.push_back("x");
+                else if (i == 1) dimensionNames.push_back("y");
+                else dimensionNames.push_back("dim" + std::to_string(i));
+            }
+        }
+        
+        // Extract encoding from image_structure and store in C++ member
+        if (imageStruct.contains("encoding")) {
+            std::string enc_str = imageStruct["encoding"];
+            auto encoding_opt = stringToEncoding(enc_str);
+            if (encoding_opt.has_value()) {
+                encoding = encoding_opt.value();
+            } else {
+                // Invalid encoding - log warning and use default
+                std::cerr << "Warning: Invalid encoding '" << enc_str 
+                          << "' in image_structure, using RAW encoding" << std::endl;
+                encoding = ImageEncoding::RAW;
+            }
+        }
+        
+        // Extract bit depth from image_structure
+        if (imageStruct.contains("bit_depth")) {
+            bitDepth = imageStruct["bit_depth"].get<uint8_t>();
+        }
+        
+        // Extract channels from image_structure (if available)
+        if (imageStruct.contains("channels")) {
+            channels = imageStruct["channels"].get<uint8_t>();
+        } else {
+            // Default to grayscale for medical images
+            channels = 1;
+        }
+        
+        // Extract memory order and layout if available
+        if (imageStruct.contains("memory_order")) {
+            std::string order = imageStruct["memory_order"];
+            if (order == "row_major") {
+                memoryOrder = MemoryOrder::ROW_MAJOR;
+            } else if (order == "column_major") {
+                memoryOrder = MemoryOrder::COLUMN_MAJOR;
+            }
+        }
+        
+        if (imageStruct.contains("layout")) {
+            std::string layout = imageStruct["layout"];
+            if (layout == "interleaved") {
+                pixelLayout = PixelLayout::INTERLEAVED;
+            } else if (layout == "planar") {
+                pixelLayout = PixelLayout::PLANAR;
+            }
+        }
+        
+        // Extract spatial orientation if available
+        if (imageStruct.contains("spatial_orientation") && imageStruct["spatial_orientation"].is_object()) {
+            const auto& spatial = imageStruct["spatial_orientation"];
+            
+            if (spatial.contains("row_direction")) {
+                std::string rowDir = spatial["row_direction"];
+                if (rowDir == "top_to_bottom") {
+                    rowDirection = RowDirection::TOP_TO_BOTTOM;
+                } else if (rowDir == "bottom_to_top") {
+                    rowDirection = RowDirection::BOTTOM_TO_TOP;
+                }
+            }
+            
+            if (spatial.contains("column_direction")) {
+                std::string colDir = spatial["column_direction"];
+                if (colDir == "left_to_right") {
+                    columnDirection = ColumnDirection::LEFT_TO_RIGHT;
+                } else if (colDir == "right_to_left") {
+                    columnDirection = ColumnDirection::RIGHT_TO_LEFT;
                 }
             }
         }
+        
     } else {
-        // No dimension names provided, generate defaults
-        for (size_t i = 0; i < dimensions.size(); ++i) {
-            if (i == 0) dimensionNames.push_back("x");
-            else if (i == 1) dimensionNames.push_back("y");
-            else dimensionNames.push_back("dim" + std::to_string(i));
+        // Fallback to old format for backward compatibility
+        // Extract dimensions array first (required field)
+        if (!data.contains("dimensions") || !data["dimensions"].is_array()) {
+            throw std::runtime_error("ImageData: 'dimensions' array is required in metadata");
         }
-    }
-    
-    // Extract encoding from metadata and store in C++ member
-    if (data.contains("encoding")) {
-        std::string enc_str = data["encoding"];
-        auto encoding_opt = stringToEncoding(enc_str);
-        if (encoding_opt.has_value()) {
-            encoding = encoding_opt.value();
+        
+        const auto& dimsArray = data["dimensions"];
+        if (dimsArray.size() < 2) {
+            throw std::runtime_error("ImageData: 'dimensions' array must have at least 2 elements (width, height)");
+        }
+        
+        // First two elements are width and height
+        if (!dimsArray[0].is_number()) {
+            throw std::runtime_error("ImageData: first dimension must be a number, got: " + dimsArray[0].dump());
+        }
+        if (!dimsArray[1].is_number()) {
+            throw std::runtime_error("ImageData: second dimension must be a number, got: " + dimsArray[1].dump());
+        }
+        
+        // Add all dimensions to our internal array
+        for (size_t i = 0; i < dimsArray.size(); ++i) {
+            if (!dimsArray[i].is_number()) {
+                throw std::runtime_error("ImageData: dimension " + std::to_string(i) + " must be a number, got: " + dimsArray[i].dump());
+            }
+            dimensions.push_back(dimsArray[i].get<uint16_t>());
+        }
+        
+        // Extract dimension names from the dimension_names array if available
+        if (data.contains("dimension_names") && data["dimension_names"].is_array()) {
+            const auto& namesArray = data["dimension_names"];
+            
+            // Ensure we have names for all dimensions
+            if (namesArray.size() >= dimensions.size()) {
+                for (size_t i = 0; i < dimensions.size(); ++i) {
+                    dimensionNames.push_back(namesArray[i].get<std::string>());
+                }
+            } else {
+                // Fallback: use default names for missing ones
+                for (size_t i = 0; i < dimensions.size(); ++i) {
+                    if (i < namesArray.size()) {
+                        dimensionNames.push_back(namesArray[i].get<std::string>());
+                    } else {
+                        // Generate default names for missing dimensions
+                        if (i == 0) dimensionNames.push_back("x");
+                        else if (i == 1) dimensionNames.push_back("y");
+                        else dimensionNames.push_back("dim" + std::to_string(i));
+                    }
+                }
+            }
         } else {
-            // Invalid encoding - log warning and use default
-            std::cerr << "Warning: Invalid encoding '" << enc_str 
-                      << "' in metadata, using RAW encoding" << std::endl;
-            encoding = ImageEncoding::RAW;
+            // No dimension names provided, generate defaults
+            for (size_t i = 0; i < dimensions.size(); ++i) {
+                if (i == 0) dimensionNames.push_back("x");
+                else if (i == 1) dimensionNames.push_back("y");
+                else dimensionNames.push_back("dim" + std::to_string(i));
+            }
         }
-    }
-    
-    // Extract bit depth from metadata
-    if (data.contains("bit_depth")) {
-        bitDepth = data["bit_depth"].get<uint8_t>();
-    }
-    
-    // Extract channels from metadata (if available)
-    if (data.contains("channels")) {
-        channels = data["channels"].get<uint8_t>();
-    } else {
-        // Default to grayscale for medical images
-        channels = 1;
+        
+        // Extract encoding from metadata and store in C++ member
+        if (data.contains("encoding")) {
+            std::string enc_str = data["encoding"];
+            auto encoding_opt = stringToEncoding(enc_str);
+            if (encoding_opt.has_value()) {
+                encoding = encoding_opt.value();
+            } else {
+                // Invalid encoding - log warning and use default
+                std::cerr << "Warning: Invalid encoding '" << enc_str 
+                          << "' in metadata, using RAW encoding" << std::endl;
+                encoding = ImageEncoding::RAW;
+            }
+        }
+        
+        // Extract bit depth from metadata
+        if (data.contains("bit_depth")) {
+            bitDepth = data["bit_depth"].get<uint8_t>();
+        }
+        
+        // Extract channels from metadata (if available)
+        if (data.contains("channels")) {
+            channels = data["channels"].get<uint8_t>();
+        } else {
+            // Default to grayscale for medical images
+            channels = 1;
+        }
     }
 }
 

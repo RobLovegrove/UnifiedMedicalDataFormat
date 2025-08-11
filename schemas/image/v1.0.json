@@ -10,40 +10,98 @@
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["modality", "bit_depth", "channels", "encoding", "dimensions", "dimension_names"],
+      "required": ["modality", "image_structure"],
       "properties": {
-        "modality": { "type": "string", "length": 10 },
-        "bit_depth": { "type": "integer", "format": "uint8" },
-        "channels": { 
-          "type": "integer", 
-          "format": "uint8",
-          "description": "Number of image channels (1 for grayscale, 3 for RGB, etc.)"
-        },
-        "encoding": { 
+        "modality": { 
           "type": "string", 
-          "enum": ["raw", "jpeg2000-lossless", "png"],
-          "description": "Image encoding format. Medical data requires lossless encoding only."
+          "length": 10,
+          "description": "Medical imaging modality (CT, MRI, X-ray, etc.)"
         },
-
-        "bodyPart": { "type": "string", "description": "Body part examined" },
-        "institution": { "type": "string", "description": "Institution name" },
-        "acquisitionDate": { "type": "string", "description": "Acquisition date" },
-        "technician": { "type": "string", "description": "Technician/operator name" },
-        "patientName": { "type": "string", "description": "Patient name" },
-        "patientID": { "type": "string", "description": "Patient ID" },
-        "dimensions": {
-          "type": "array",
-          "items": { "type": "integer", "minimum": 1, "format": "uint16" },
-          "minItems": 2,
-          "maxItems": 10,
-          "description": "Size of each dimension"
+        "image_structure": {
+          "type": "object",
+          "required": ["channels", "bit_depth", "encoding", "memory_order", "spatial_orientation", "dimensions", "dimension_names"],
+          "properties": {
+            "channels": { 
+              "type": "integer", 
+              "format": "uint8",
+              "description": "Number of image channels (1 for grayscale, 3 for RGB, etc.)"
+            },
+            "bit_depth": { 
+              "type": "integer", 
+              "format": "uint8",
+              "description": "Bits per pixel per channel"
+            },
+            "encoding": { 
+              "type": "string", 
+              "enum": ["raw", "jpeg2000-lossless", "png"],
+              "description": "Image encoding format. Medical data requires lossless encoding only."
+            },
+            "memory_order": {
+              "type": "string",
+              "enum": ["row_major", "column_major"],
+              "description": "Memory layout order for pixel data"
+            },
+            "spatial_orientation": {
+              "type": "object",
+              "required": ["row_direction", "column_direction"],
+              "properties": {
+                "row_direction": {
+                  "type": "string",
+                  "enum": ["top_to_bottom", "bottom_to_top"],
+                  "description": "Direction of row progression in the image"
+                },
+                "column_direction": {
+                  "type": "string", 
+                  "enum": ["left_to_right", "right_to_left"],
+                  "description": "Direction of column progression in the image"
+                }
+              },
+              "description": "Spatial orientation of the image relative to memory layout"
+            },
+            "layout": {
+              "type": "string", 
+              "enum": ["interleaved", "planar"],
+              "description": "Channel layout format. Required for multichannel images (channels > 1)"
+            },
+            "dimensions": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1, "format": "uint16" },
+              "minItems": 2,
+              "maxItems": 10,
+              "description": "Size of each dimension"
+            },
+            "dimension_names": {
+              "type": "array", 
+              "items": { "type": "string", "length": 16 },
+              "minItems": 2,
+              "maxItems": 10,
+              "description": "Names of each dimension (x, y, z, time, channel, etc.)"
+            }
+          }
         },
-        "dimension_names": {
-          "type": "array", 
-          "items": { "type": "string", "length": 16 },
-          "minItems": 2,
-          "maxItems": 10,
-                    "description": "Names of each dimension (x, y, z, time, channel, etc.)"
+        "bodyPart": { 
+          "type": "string", 
+          "description": "Body part examined" 
+        },
+        "institution": { 
+          "type": "string", 
+          "description": "Institution name" 
+        },
+        "acquisitionDate": { 
+          "type": "string", 
+          "description": "Acquisition date" 
+        },
+        "technician": { 
+          "type": "string", 
+          "description": "Technician/operator name" 
+        },
+        "patientName": { 
+          "type": "string", 
+          "description": "Patient name" 
+        },
+        "patientID": { 
+          "type": "string", 
+          "description": "Patient ID" 
         }
       }
     },

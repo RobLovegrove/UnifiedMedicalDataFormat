@@ -25,6 +25,29 @@ enum class ImageEncoding {
     PNG                // PNG lossless compression
 };
 
+// Memory order enum
+enum class MemoryOrder {
+    ROW_MAJOR,         // Row-major memory layout (C-style)
+    COLUMN_MAJOR       // Column-major memory layout (Fortran-style)
+};
+
+// Pixel layout enum
+enum class PixelLayout {
+    INTERLEAVED,       // RGBRGBRGB... format
+    PLANAR            // RRR...GGG...BBB... format
+};
+
+// Spatial orientation enums
+enum class RowDirection {
+    TOP_TO_BOTTOM,    // Row 0 = top of image
+    BOTTOM_TO_TOP     // Row 0 = bottom of image
+};
+
+enum class ColumnDirection {
+    LEFT_TO_RIGHT,    // Column 0 = left of image
+    RIGHT_TO_LEFT     // Column 0 = right of image
+};
+
 // Encoding conversion utilities
 std::optional<ImageEncoding> stringToEncoding(const std::string& str);
 std::string encodingToString(ImageEncoding encoding);
@@ -42,6 +65,14 @@ protected:
     // Image encoding
     ImageEncoding encoding;
     bool needsDecompression = false;
+    
+    // Pixel layout and memory order
+    MemoryOrder memoryOrder = MemoryOrder::ROW_MAJOR;  // Default to row-major
+    PixelLayout pixelLayout = PixelLayout::PLANAR;     // Default to planar
+    
+    // Spatial orientation
+    RowDirection rowDirection = RowDirection::TOP_TO_BOTTOM;      // Default to top-to-bottom
+    ColumnDirection columnDirection = ColumnDirection::LEFT_TO_RIGHT;  // Default to left-to-right
     
     // Frame schema reference
     std::string frameSchemaPath;
@@ -64,9 +95,7 @@ public:
     explicit ImageData(const std::string& schemaPath, UUID uuid);
     virtual ~ImageData() override = default;
     
-    void addData(std::unique_ptr<FrameData> frame);
     void addData(const std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>>& frameDataPairs);
-    // void writeBinary(std::ostream& out, XRefTable& xref) override;
 
     void printData(std::ostream& out) const override;
     
@@ -93,6 +122,14 @@ public:
     // Image format getters
     uint8_t getBitDepth() const { return bitDepth; }
     uint8_t getChannels() const { return channels; }
+    
+    // Pixel layout getters
+    MemoryOrder getMemoryOrder() const { return memoryOrder; }
+    PixelLayout getPixelLayout() const { return pixelLayout; }
+    
+    // Spatial orientation getters
+    RowDirection getRowDirection() const { return rowDirection; }
+    ColumnDirection getColumnDirection() const { return columnDirection; }
     
     // Image encoder for compression/decompression
     std::unique_ptr<ImageEncoder> encoder;
