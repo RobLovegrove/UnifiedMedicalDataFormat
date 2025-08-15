@@ -59,11 +59,6 @@ private:
     static OPJ_SIZE_T memory_write(void* buffer, OPJ_SIZE_T size, void* user_data);
     static OPJ_OFF_T memory_skip(OPJ_OFF_T offset, void* user_data);
     static OPJ_BOOL memory_seek(OPJ_OFF_T offset, void* user_data);
-    
-    // OpenJPEG event handlers
-    static void opj_info_callback(const char* msg, void* client_data);
-    static void opj_warn_callback(const char* msg, void* client_data);
-    static void opj_error_callback(const char* msg, void* client_data);
 };
 
 #endif // IMAGEENCODER_HPP 

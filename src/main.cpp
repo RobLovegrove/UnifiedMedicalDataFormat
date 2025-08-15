@@ -18,8 +18,8 @@ void addWriteOptions(
     string& inputFile, 
     string& outputFile, 
     bool& overwrite, 
-    bool& update, 
-    Writer& writer);
+    bool& update
+    );
 
 /* -------------------------- MOCK DATA -------------------------- */
 
@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
 
     // WRITE subcommand
     CLI::App* writeCmd = app.add_subcommand("write", "Write data to a UMDF file");
-    addWriteOptions(writeCmd, inputFile, outputFile, overwrite, update, writer);
+    addWriteOptions(writeCmd, inputFile, outputFile, overwrite, update);
 
     // READ subcommand
     CLI::App* readCmd = app.add_subcommand("read", "Read data from a UMDF file");
@@ -90,9 +90,8 @@ void addWriteOptions(
     string& inputFile, 
     string& outputFile, 
     bool& overwrite, 
-    bool& update, 
-    Writer& 
-    writer) {
+    bool& update 
+) {
 
     writeCmd->add_option("-i,--input", inputFile, "Input data file")->required();
     writeCmd->add_option("-o,--output", outputFile, "Output UMDF file")->required();
@@ -103,15 +102,6 @@ void addWriteOptions(
     writeCmd->callback([&]() {
         if (overwrite && update) {
             throw CLI::ValidationError("Cannot use both --overwrite and --update together.");
-        }
-
-        // Determine access mode
-        if (overwrite) {
-            writer.setFileAccessMode(FileAccessMode::Overwrite);
-        } else if (update) {
-            writer.setFileAccessMode(FileAccessMode::AllowUpdate);
-        } else {
-            writer.setFileAccessMode(FileAccessMode::FailIfExists);
         }
     });
 }

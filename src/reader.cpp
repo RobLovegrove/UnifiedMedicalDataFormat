@@ -13,12 +13,13 @@
 #include <iostream>
 #include <string>
 #include <sstream> 
+#include <expected>
 
 using namespace std;
 
 bool Reader::readFile(const string& filename) { 
     
-    ifstream inFile(filename, ios::binary);
+    inFile.open(filename, ios::binary);
     if (!inFile) return false;
     
     // Read header and confirm UMDF
@@ -28,144 +29,143 @@ bool Reader::readFile(const string& filename) {
     xrefTable = XRefTable::loadXrefTable(inFile);
 
     cout << "XRefTable successfully read" << endl;
-    cout << xrefTable << endl;
-
-    constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 2 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
+    cout << xrefTable << endl; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
 
     // Clear any previously loaded modules
     loadedModules.clear();
 
     // Iterate through XrefTable reading data
     for (const XrefEntry& entry : xrefTable.getEntries()) {
-        if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader)) {
-            // Skip file header entries
-            continue;
-        }
-        else if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
-            vector<char> buffer(entry.size);
-            inFile.seekg(entry.offset);
-            inFile.read(buffer.data(), entry.size);
-            istringstream stream(string(buffer.begin(), buffer.end()));
-            unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset, entry.type);
-            if (!dm) {
-                cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
-                continue;
-            }
-            
-            // Store the module instead of just printing
-            loadedModules.push_back(std::move(dm));
-            
-            // Print structured data using getModuleData for better output
-            auto moduleData = loadedModules.back()->getDataWithSchema();
-            cout << "Module ID: " << loadedModules.back()->getModuleID().toString() << endl;
-            cout << "Schema: " << loadedModules.back()->getSchema()["$id"] << endl;
-            cout << "Metadata: " << moduleData.metadata.dump(2) << endl;
-            
-            // Handle the variant data
-            std::visit([&](const auto& data) {
-                using T = std::decay_t<decltype(data)>;
-                if constexpr (std::is_same_v<T, nlohmann::json>) {
-                    cout << "Data: " << data.dump(2) << endl;
-                } else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
-                    cout << "Data: " << data.size() << " bytes of pixel data" << endl;
-                } else if constexpr (std::is_same_v<T, std::vector<ModuleData>>) {
-                    cout << "Data: " << data.size() << " frames" << endl;
-                }
-            }, moduleData.data);
-            cout << endl;
-        }
-        else {
-            //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
-            cout << "TODO: Handle a large DataModule" << endl;
-        }
+        cout << "Loading module: " << entry.id.toString() << endl;
+        loadModule(entry);
     }
     return true;
 }
 
-// Methods for Python integration
-nlohmann::json Reader::getFileInfo() const {
-    nlohmann::json info;
-    info["module_count"] = loadedModules.size();
-    info["xref_entries"] = xrefTable.getEntries().size();
-    return info;
-}
+void Reader::loadModule(const XrefEntry& entry) {
 
-nlohmann::json Reader::getModuleList() const {
-    nlohmann::json moduleList = nlohmann::json::array();
-    
-    for (size_t i = 0; i < loadedModules.size(); ++i) {
-        nlohmann::json moduleInfo;
-        moduleInfo["index"] = i;
-        moduleInfo["type"] = static_cast<int>(loadedModules[i]->getModuleType());
-        moduleInfo["uuid"] = loadedModules[i]->getModuleID().toString();
-        moduleList.push_back(moduleInfo);
+    if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader)) {
+        // Skip file header entries
+        cout << "Skipping file header entry" << endl;
+        return; 
     }
+    else if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
+        vector<char> buffer(entry.size);
+        inFile.seekg(entry.offset);
+        inFile.read(buffer.data(), entry.size);
+        istringstream stream(string(buffer.begin(), buffer.end()));
+
+        cout << "Reading module: " << entry.id.toString() << endl;
+        unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset, entry.type);
+
+        if (!dm) {
+            cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
+            return;
+        }
+
+        dm->printMetadata(cout);
+        dm->printData(cout);
+
+        loadedModules.push_back(std::move(dm));
     
-    return moduleList;
+    }
+    else {
+        //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
+        cout << "TODO: Handle a large DataModule" << endl;
+    }
 }
 
-nlohmann::json Reader::getModuleData(const std::string& moduleId) const {
-    // Find module by UUID or index
-    for (const auto& module : loadedModules) {
-        if (module->getModuleID().toString() == moduleId) {
-            // Get the ModuleData structure
-            auto moduleData = module->getDataWithSchema();
-            
-            // Convert ModuleData to JSON for Python compatibility
-            nlohmann::json result;
-            result["module_id"] = module->getModuleID().toString();
-            result["schema_url"] = module->getSchema()["$id"];
-            result["metadata"] = moduleData.metadata;
-            
-            // Convert variant to JSON using explicit type handling
-            std::visit([&result](const auto& data) {
-                using T = std::decay_t<decltype(data)>;
-                if constexpr (std::is_same_v<T, nlohmann::json>) {
-                    result["data"] = data;
-                } else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
-                    result["data"] = data;  // nlohmann::json can handle vectors
-                } else if constexpr (std::is_same_v<T, std::vector<ModuleData>>) {
-                    // Convert ModuleData array to JSON
-                    nlohmann::json dataArray = nlohmann::json::array();
-                    for (const auto& md : data) {
-                        nlohmann::json mdJson;
-                        mdJson["metadata"] = md.metadata;
-                        // Handle the nested variant
-                        std::visit([&mdJson](const auto& d) {
-                            using D = std::decay_t<decltype(d)>;
-                            if constexpr (std::is_same_v<D, nlohmann::json>) {
-                                mdJson["data"] = d;
-                            } else if constexpr (std::is_same_v<D, std::vector<uint8_t>>) {
-                                mdJson["data"] = d;
-                            } else if constexpr (std::is_same_v<D, std::vector<ModuleData>>) {
-                                // Recursive conversion for nested ModuleData arrays
-                                nlohmann::json nestedArray = nlohmann::json::array();
-                                for (const auto& nestedMd : d) {
-                                    nlohmann::json nestedJson;
-                                    nestedJson["metadata"] = nestedMd.metadata;
-                                    // For now, just store the nested data as-is
-                                    nestedJson["data"] = "nested_data";  // Placeholder
-                                    nestedArray.push_back(nestedJson);
-                                }
-                                mdJson["data"] = nestedArray;
-                            }
-                        }, md.data);
-                        dataArray.push_back(mdJson);
-                    }
-                    result["data"] = dataArray;
-                }
-            }, moduleData.data);
-            
-            return result;
+// Methods for Python integration
+bool Reader::openFile(const string& filename) {
+
+    if (inFile.is_open()) {
+        inFile.close();
+    }
+
+    inFile.open(filename, ios::binary);
+    if (!inFile) return false;
+
+    // Read header and confirm UMDF
+    if (!header.readPrimaryHeader(inFile)) { return false; } 
+
+    xrefTable.clear();
+    loadedModules.clear();
+
+    return true;
+}
+
+nlohmann::json Reader::getFileInfo() {
+
+    nlohmann::json result;
+
+    if (!inFile.is_open()) {
+        result["success"] = false;
+        result["error"] = "No file is currently open";
+        return result;
+    }
+
+    if (xrefTable.getEntries().size() == 0) {
+        // load Xref Table
+        xrefTable = XRefTable::loadXrefTable(inFile);
+    }
+    result["success"] = true;
+    result["module_count"] = xrefTable.getEntries().size() - 1; // -1 to exclude the file header entry
+    
+    nlohmann::json moduleList = nlohmann::json::array();
+    for (const auto& entry : xrefTable.getEntries()) {
+        nlohmann::json moduleInfo;
+        if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader)) {
+            continue;
+        }
+        else {
+            ModuleType type = static_cast<ModuleType>(entry.type);
+            moduleInfo["type"] = module_type_to_string(type);
+            moduleInfo["uuid"] = entry.id.toString();
+            moduleList.push_back(moduleInfo);
         }
     }
-    return nlohmann::json();
+    result["modules"] = moduleList;
+    return result;
 }
 
-std::vector<std::string> Reader::getModuleIds() const {
-    std::vector<std::string> ids;
-    for (const auto& module : loadedModules) {
-        ids.push_back(module->getModuleID().toString());
+// Copied over for quick reference
+// struct ModuleData {
+//     nlohmann::json metadata;
+//     std::variant<
+//         nlohmann::json,                    // For tabular data
+//         std::vector<uint8_t>,              // For frame pixel data
+//         std::vector<ModuleData>            // For N-dimensional data
+//     > data;
+// };
+
+std::expected<ModuleData, std::string> Reader::getModuleData(const std::string& moduleId) {
+
+    if (!inFile.is_open()) {
+        return std::unexpected("No file is currently open");  // Error case
     }
-    return ids;
+    
+    // Find the module in the loadedModules vector
+    for (const auto& module : loadedModules) {
+        if (module->getModuleID().toString() == moduleId) {
+            return module->getDataWithSchema();  // Success case
+        }
+    }
+    
+    // If the module is not found, load it from the file
+    for (const auto& entry : xrefTable.getEntries()) {
+        if (entry.id.toString() == moduleId) {
+            loadModule(entry);
+            return loadedModules.back()->getDataWithSchema();
+        }
+    }
+
+    return std::unexpected("Module not found: " + moduleId);
+}
+
+void Reader::closeFile() {
+    if (inFile.is_open()) {
+        inFile.close();
+        xrefTable.clear();
+        loadedModules.clear();
+    }
 }

@@ -8,7 +8,6 @@
 using namespace std;
 
 /* ================== DataField ================== */
-
 ostream& operator<<(ostream& os, const unique_ptr<DataField>& field) {
     os << "Field(name=\"" << field->getName() 
        << "\", type=\"" << field->getType()
@@ -21,13 +20,7 @@ ostream& operator<<(ostream& os, const unique_ptr<DataField>& field) {
 
 void StringField::encodeToBuffer(
     const nlohmann::json& value, vector<uint8_t>& buffer, size_t offset) {
-    
-    if (value.is_null()) {
-        // Fill with nulls for zero-filling
-        memset(&buffer[offset], 0, length);
-        return;
-    }
-    
+
     if (!value.is_string()) {
         throw runtime_error("StringField '" + name + "' expected a string");
     }
@@ -70,12 +63,21 @@ void VarStringField::encodeToBuffer(
     stringStart = stringBuffer->addString(str);
     stringLength = static_cast<uint32_t>(str.length());
 
+    cout << "=== VarStringField ENCODE DEBUG ===" << endl;
+    cout << "Field: " << name << endl;
+    cout << "String: \"" << str << "\"" << endl;
+    cout << "String start: " << stringStart << endl;
+    cout << "String length: " << stringLength << endl;
+    cout << "Writing to buffer at offset: " << offset << endl;
+
     // Write stringStart (8 bytes)
     memcpy(buffer.data() + offset, &stringStart, sizeof(uint64_t));
     offset += sizeof(uint64_t);
 
     // Write stringLength (4 bytes)
     memcpy(buffer.data() + offset, &stringLength, sizeof(uint32_t));
+    
+    cout << "=== END ENCODE DEBUG ===" << endl;
 
 }
 
@@ -86,13 +88,25 @@ nlohmann::json VarStringField::decodeFromBuffer(
         throw runtime_error("StringBuffer pointer is null in VarStringField");
     }
 
+    
+    cout << "=== VarStringField DECODE DEBUG ===" << endl;
+    cout << "Field: " << name << endl;
+    cout << "Reading from buffer at offset: " << offset << endl;
+    cout << "Buffer size: " << buffer.size() << endl;
+    
     std::memcpy(&stringStart, buffer.data() + offset, sizeof(stringStart));
-    offset += sizeof(stringStart);
+    cout << "Read stringStart: " << stringStart << endl;
 
+    offset += sizeof(stringStart);
+    
     std::memcpy(&stringLength, buffer.data() + offset, sizeof(stringLength));
+    cout << "Read stringLength: " << stringLength << endl;
     offset += sizeof(stringLength);
 
     if (stringStart + stringLength > stringBuffer->getSize()) {
+        cout << "stringStart: " << stringStart << endl;
+        cout << "stringLength: " << stringLength << endl;
+        cout << "stringBuffer->getSize(): " << stringBuffer->getSize() << endl; 
         throw std::runtime_error("VarStringField decode error: string offset + length exceeds buffer size");
     }
 
@@ -102,7 +116,6 @@ nlohmann::json VarStringField::decodeFromBuffer(
 
     return nlohmann::json(result);
 }
-
 
 
 /* ================== EnumField ================== */
@@ -314,6 +327,14 @@ nlohmann::json ArrayField::decodeFromBuffer(
 
 
 /* ================== ObjectField ================== */
+
+size_t ObjectField::getLength() const {
+    size_t total = 0;
+    for (const auto& field : subFields) {
+        total += field->getLength();
+    }
+    return total;
+}
 
 void ObjectField::encodeToBuffer(
     const nlohmann::json& value, vector<uint8_t>& buffer, size_t offset) {

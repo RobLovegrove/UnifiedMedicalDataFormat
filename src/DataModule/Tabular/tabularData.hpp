@@ -22,7 +22,7 @@ protected:
 
     virtual void parseDataSchema(const nlohmann::json& schemaJson) override;
 
-    void decodeData(std::istream& in, size_t actualDataSize) override;
+    void readData(std::istream& in) override;
 
     void writeData(std::ostream& out) const override;
 

@@ -1,5 +1,6 @@
 #include "ImageEncoder.hpp"
 #include "imageData.hpp" // For ImageEncoding enum
+
 #include <openjpeg.h>
 #include <png.h>
 #include <iostream>
@@ -7,19 +8,6 @@
 #include <stdexcept>
 #include <iomanip>
 #include <chrono>
-
-// OpenJPEG event handlers for debugging
-void ImageEncoder::opj_info_callback(const char* msg, void* client_data) { 
-    // Debug info suppressed
-}
-
-void ImageEncoder::opj_warn_callback(const char* msg, void* client_data) { 
-    // Debug warnings suppressed
-}
-
-void ImageEncoder::opj_error_callback(const char* msg, void* client_data) { 
-    // Debug errors suppressed
-}
 
 ImageEncoder::ImageEncoder() {
     // Constructor - nothing to initialize
@@ -35,7 +23,6 @@ std::vector<uint8_t> ImageEncoder::compress(const std::vector<uint8_t>& rawData,
             return compressJPEG2000(rawData, width, height, channels, bitDepth);
         case ImageEncoding::PNG:
             return compressPNG(rawData, width, height, channels, bitDepth);
-        case ImageEncoding::RAW:
         default:
             return rawData; // No compression
     }
@@ -278,11 +265,6 @@ std::vector<uint8_t> ImageEncoder::decompressJPEG2000(const std::vector<uint8_t>
             return compressedData;
         }
 
-        // Attach handlers for debugging
-        opj_set_info_handler(codec, opj_info_callback, nullptr);
-        opj_set_warning_handler(codec, opj_warn_callback, nullptr);
-        opj_set_error_handler(codec, opj_error_callback, nullptr);
-
         // Set decoder parameters
         opj_dparameters_t parameters;
         opj_set_default_decoder_parameters(&parameters);
@@ -319,11 +301,6 @@ std::vector<uint8_t> ImageEncoder::decompressJPEG2000(const std::vector<uint8_t>
         int width = image->comps[0].w;
         int height = image->comps[0].h;
         int numComponents = image->numcomps;
-        
-
-        
-        // Validate expected output size
-        size_t expectedOutputSize = static_cast<size_t>(width) * height * numComponents;
         
         // Allocate output buffer
         size_t totalPixels = width * height;

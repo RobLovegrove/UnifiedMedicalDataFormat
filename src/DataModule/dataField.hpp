@@ -17,6 +17,7 @@ class DataField {
 protected:
     std::string name;
     std::string type;
+    bool hasValue = false;
 
 public:
     DataField(std::string name, std::string type) 
@@ -28,20 +29,23 @@ public:
     std::string getType() const { return type; }
     virtual std::size_t getLength() const = 0;
 
+    void setHasValue(bool v) { hasValue = v; }
+    bool getHasValue() const { return hasValue; }
+
     virtual void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) = 0;
     virtual nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) = 0;
+
+    void writeRowBitMap();
 
     // Overload operator<< for Field
     friend std::ostream& operator<<(std::ostream& os, const std::unique_ptr<DataField>& field);
 };
-
 
 /* =============== StringField =============== */
 
 class StringField : public DataField {
 private:
     size_t length = 0;
-    //string encoding = "utf-8";
 
 public:
     StringField(std::string name, std::string type, size_t length = 0) 
@@ -59,7 +63,7 @@ public:
 class VarStringField : public DataField {
 private:
     uint32_t stringLength = 0;
-    uint64_t stringStart;
+    uint64_t stringStart = 0;
     StringBuffer* stringBuffer = nullptr;
 
 public:
@@ -88,21 +92,6 @@ public:
 
     size_t getLength() const override { return storageSize; }
 
-    void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
-    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
-};
-
-/* =============== FloatField =============== */
-
-class FloatField : public DataField {
-private:
-    std::string format; // "float32", "float64", etc.
-
-public:
-    FloatField(std::string name, std::string format) 
-        : DataField(name, "number"), format(format) {}
-
-    size_t getLength() const override;
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
 };
@@ -150,17 +139,31 @@ public:
 
 };
 
+/* =============== FloatField =============== */
+
+class FloatField : public DataField {
+private:
+    std::string format; // "float32", "float64", etc.
+
+public:
+    FloatField(std::string name, std::string format) 
+        : DataField(name, "number"), format(format) {}
+
+    size_t getLength() const override;
+    void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
+    nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
+};
+
 /* =============== ObjectField =============== */
 
 class ObjectField : public DataField {
 private:
     std::vector<std::unique_ptr<DataField>> subFields;
-    size_t length;
 
 public:
     ObjectField(std::string name,
-                std::vector<std::unique_ptr<DataField>> subFields, size_t length)
-      : DataField(std::move(name), "object"), subFields(std::move(subFields)), length(length) {}
+                std::vector<std::unique_ptr<DataField>> subFields/*, size_t length*/)
+      : DataField(std::move(name), "object"), subFields(std::move(subFields))/*, length(length)*/ {}
 
     void encodeToBuffer(
         const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
@@ -168,8 +171,12 @@ public:
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
 
     void addSubField(std::unique_ptr<DataField>);
+        // Add this new method
+    const std::vector<std::unique_ptr<DataField>>& getNestedFields() const {
+        return subFields;
+    }
 
-    size_t getLength() const override { return length; }
+    size_t getLength() const override;
 };
 
 #endif

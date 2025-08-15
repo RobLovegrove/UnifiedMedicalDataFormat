@@ -3,20 +3,13 @@
 
 #include "Header/header.hpp"
 #include "Xref/xref.hpp"
+#include "reader.hpp"
 
 #include <string>
 #include <fstream>
 
-enum class FileAccessMode {
-    FailIfExists,  // Default: safe guard
-    AllowUpdate,   // File may exist; update it
-    Overwrite      // Rewrite entire file
-};
-
-class Writer {
+class Writer : public Reader {
 private:
-    FileAccessMode accessMode = FileAccessMode::FailIfExists;
-    Header header = Header();
     XRefTable xref;
 
     bool writeXref(std::ofstream& outfile);
@@ -25,8 +18,7 @@ public:
 
     // Returns true on success, false on failure.
     bool writeNewFile(const std::string& filename);
-    void setFileAccessMode(FileAccessMode);
-    FileAccessMode getFileAccessMode() const { return accessMode; }
+
 
 };
 

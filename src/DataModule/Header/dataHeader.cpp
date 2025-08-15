@@ -3,6 +3,7 @@
 #include <string>
 #include <stdexcept>
 #include <iostream>
+#include <vector>
 
 /* ================ WRTIE FUNCTIONS ================ */
 
@@ -12,9 +13,9 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     // writeTLVFixed returns the position of the Value in the TLV flag
     headerSizePos = writeTLVFixed(out, HeaderFieldType::HeaderSize, &headerSize, sizeof(headerSize)); // Placeholder until finished writing header
+    stringBufferSizePos = writeTLVFixed(out, HeaderFieldType::StringSize, &stringBufferSize, sizeof(stringBufferSize));// Updated after write
     metadataSizePos = writeTLVFixed(out, HeaderFieldType::MetadataSize, &metaDataSize, sizeof(metaDataSize)); // Updated after write
     dataSizePos = writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); 
-    stringBufferSizePos = writeTLVFixed(out, HeaderFieldType::StringSize, &stringBufferSize, sizeof(stringBufferSize));// Updated after write
 
     writeTLVString(out, HeaderFieldType::ModuleType, module_type_to_string(moduleType));
     writeTLVString(out, HeaderFieldType::SchemaPath, schemaPath);
@@ -26,19 +27,19 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     // Calculate how many bytes we wrote for the header
     std::streampos headerEnd = out.tellp();
-    uint32_t actualHeaderSize = static_cast<uint32_t>(headerEnd - headerStart);
+    headerSize = static_cast<uint32_t>(headerEnd - headerStart); // Will update in updateHeaderSize
 
-    // Seek back and overwrite the value of the header size field
-    out.seekp(headerSizePos);
-    out.write(reinterpret_cast<const char*>(&actualHeaderSize), sizeof(actualHeaderSize));
-
-    // Return write position to end
-    out.seekp(headerEnd);
 }
 
 void DataHeader::updateHeader(std::ostream& out) {
 
-    if (dataSizePos == 0) { throw std::runtime_error("Failed to update dataSize"); }
+    // Update header size
+    out.seekp(headerSizePos);
+    out.write(reinterpret_cast<const char*>(&headerSize), sizeof(headerSize));
+
+    // Update string buffer size
+    out.seekp(stringBufferSizePos);
+    out.write(reinterpret_cast<const char*>(&stringBufferSize), sizeof(stringBufferSize));
     
     // Update metadata size
     out.seekp(metadataSizePos);
@@ -47,10 +48,6 @@ void DataHeader::updateHeader(std::ostream& out) {
     // Update data size
     out.seekp(dataSizePos);
     out.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
-
-    // Update string buffer size
-    out.seekp(stringBufferSizePos);
-    out.write(reinterpret_cast<const char*>(&stringBufferSize), sizeof(stringBufferSize));
 
 }
 
@@ -169,9 +166,9 @@ uint64_t DataHeader::getModuleSize() const {
 std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
     os << "DataHeader {\n"
        << "  headerSize       : " << header.headerSize << "\n"
+       << "  stringBufferSize : " << header.stringBufferSize << "\n"
        << "  metaDataSize     : " << header.metaDataSize << "\n"
        << "  dataSize         : " << header.dataSize << "\n"
-       << "  stringBufferSize : " << header.stringBufferSize << "\n"
        << "  moduleType       : " << header.moduleType << "\n"
        << "  schemaPath       : " << header.schemaPath << "\n"
        << "  compression      : " << std::boolalpha << header.compression << "\n"

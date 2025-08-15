@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <array>
+#include <vector>
 
 struct XrefEntry {
     UUID id;
@@ -29,6 +30,8 @@ private:
 public:
     void addEntry(ModuleType type, UUID uuid, uint64_t offset, uint32_t size);
     bool deleteEntry(UUID entryId);
+    void clear() { entries.clear(); }
+
     const XrefEntry* findEntry(ModuleType);
     const std::vector<XrefEntry>& getEntries() const { return entries; }
 

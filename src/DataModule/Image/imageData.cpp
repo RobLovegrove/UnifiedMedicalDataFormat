@@ -12,9 +12,6 @@
 #include <algorithm>
 #include <iomanip>
 
-
-
-
 using namespace std;
 
 // Encoding conversion utilities implementation
@@ -38,13 +35,9 @@ ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPat
     // Initialize encoding to RAW by default (always safe for medical data)
     encoding = ImageEncoding::RAW;
     
-    // Initialize image format attributes with defaults
-    bitDepth = 8;   // Default 8-bit
-    channels = 1;   // Default grayscale
-    
     // Initialize the image encoder
     encoder = std::make_unique<ImageEncoder>();
-    
+
     initialise();
 }
 
@@ -97,11 +90,16 @@ void ImageData::addMetaData(const nlohmann::json& data) {
     
     dimensions.clear();
     dimensionNames.clear();
-    
-    // Check if we have the new nested image_structure format
+
+    // // Check if we have the new nested image_structure format
     if (data.contains("image_structure") && data["image_structure"].is_object()) {
         const auto& imageStruct = data["image_structure"];
-        
+
+        cout << "ImageStruct: \n";
+        cout << imageStruct.dump(4) << endl;
+
+        //const auto& imageStruct = data;
+          
         // Extract dimensions array first (required field)
         if (!imageStruct.contains("dimensions") || !imageStruct["dimensions"].is_array()) {
             throw std::runtime_error("ImageData: 'dimensions' array is required in image_structure");
@@ -177,143 +175,11 @@ void ImageData::addMetaData(const nlohmann::json& data) {
         if (imageStruct.contains("bit_depth")) {
             bitDepth = imageStruct["bit_depth"].get<uint8_t>();
         }
-        
-        // Extract channels from image_structure (if available)
+
         if (imageStruct.contains("channels")) {
             channels = imageStruct["channels"].get<uint8_t>();
-        } else {
-            // Default to grayscale for medical images
-            channels = 1;
         }
-        
-        // Extract memory order and layout if available
-        if (imageStruct.contains("memory_order")) {
-            std::string order = imageStruct["memory_order"];
-            if (order == "row_major") {
-                memoryOrder = MemoryOrder::ROW_MAJOR;
-            } else if (order == "column_major") {
-                memoryOrder = MemoryOrder::COLUMN_MAJOR;
-            }
-        }
-        
-        if (imageStruct.contains("layout")) {
-            std::string layout = imageStruct["layout"];
-            if (layout == "interleaved") {
-                pixelLayout = PixelLayout::INTERLEAVED;
-            } else if (layout == "planar") {
-                pixelLayout = PixelLayout::PLANAR;
-            }
-        }
-        
-        // Extract spatial orientation if available
-        if (imageStruct.contains("spatial_orientation") && imageStruct["spatial_orientation"].is_object()) {
-            const auto& spatial = imageStruct["spatial_orientation"];
-            
-            if (spatial.contains("row_direction")) {
-                std::string rowDir = spatial["row_direction"];
-                if (rowDir == "top_to_bottom") {
-                    rowDirection = RowDirection::TOP_TO_BOTTOM;
-                } else if (rowDir == "bottom_to_top") {
-                    rowDirection = RowDirection::BOTTOM_TO_TOP;
-                }
-            }
-            
-            if (spatial.contains("column_direction")) {
-                std::string colDir = spatial["column_direction"];
-                if (colDir == "left_to_right") {
-                    columnDirection = ColumnDirection::LEFT_TO_RIGHT;
-                } else if (colDir == "right_to_left") {
-                    columnDirection = ColumnDirection::RIGHT_TO_LEFT;
-                }
-            }
-        }
-        
-    } else {
-        // Fallback to old format for backward compatibility
-        // Extract dimensions array first (required field)
-        if (!data.contains("dimensions") || !data["dimensions"].is_array()) {
-            throw std::runtime_error("ImageData: 'dimensions' array is required in metadata");
-        }
-        
-        const auto& dimsArray = data["dimensions"];
-        if (dimsArray.size() < 2) {
-            throw std::runtime_error("ImageData: 'dimensions' array must have at least 2 elements (width, height)");
-        }
-        
-        // First two elements are width and height
-        if (!dimsArray[0].is_number()) {
-            throw std::runtime_error("ImageData: first dimension must be a number, got: " + dimsArray[0].dump());
-        }
-        if (!dimsArray[1].is_number()) {
-            throw std::runtime_error("ImageData: second dimension must be a number, got: " + dimsArray[1].dump());
-        }
-        
-        // Add all dimensions to our internal array
-        for (size_t i = 0; i < dimsArray.size(); ++i) {
-            if (!dimsArray[i].is_number()) {
-                throw std::runtime_error("ImageData: dimension " + std::to_string(i) + " must be a number, got: " + dimsArray[i].dump());
-            }
-            dimensions.push_back(dimsArray[i].get<uint16_t>());
-        }
-        
-        // Extract dimension names from the dimension_names array if available
-        if (data.contains("dimension_names") && data["dimension_names"].is_array()) {
-            const auto& namesArray = data["dimension_names"];
-            
-            // Ensure we have names for all dimensions
-            if (namesArray.size() >= dimensions.size()) {
-                for (size_t i = 0; i < dimensions.size(); ++i) {
-                    dimensionNames.push_back(namesArray[i].get<std::string>());
-                }
-            } else {
-                // Fallback: use default names for missing ones
-                for (size_t i = 0; i < dimensions.size(); ++i) {
-                    if (i < namesArray.size()) {
-                        dimensionNames.push_back(namesArray[i].get<std::string>());
-                    } else {
-                        // Generate default names for missing dimensions
-                        if (i == 0) dimensionNames.push_back("x");
-                        else if (i == 1) dimensionNames.push_back("y");
-                        else dimensionNames.push_back("dim" + std::to_string(i));
-                    }
-                }
-            }
-        } else {
-            // No dimension names provided, generate defaults
-            for (size_t i = 0; i < dimensions.size(); ++i) {
-                if (i == 0) dimensionNames.push_back("x");
-                else if (i == 1) dimensionNames.push_back("y");
-                else dimensionNames.push_back("dim" + std::to_string(i));
-            }
-        }
-        
-        // Extract encoding from metadata and store in C++ member
-        if (data.contains("encoding")) {
-            std::string enc_str = data["encoding"];
-            auto encoding_opt = stringToEncoding(enc_str);
-            if (encoding_opt.has_value()) {
-                encoding = encoding_opt.value();
-            } else {
-                // Invalid encoding - log warning and use default
-                std::cerr << "Warning: Invalid encoding '" << enc_str 
-                          << "' in metadata, using RAW encoding" << std::endl;
-                encoding = ImageEncoding::RAW;
-            }
-        }
-        
-        // Extract bit depth from metadata
-        if (data.contains("bit_depth")) {
-            bitDepth = data["bit_depth"].get<uint8_t>();
-        }
-        
-        // Extract channels from metadata (if available)
-        if (data.contains("channels")) {
-            channels = data["channels"].get<uint8_t>();
-        } else {
-            // Default to grayscale for medical images
-            channels = 1;
-        }
-    }
+    }   
 }
 
 int ImageData::getFrameCount() const {
@@ -353,82 +219,199 @@ std::vector<std::string> ImageData::getNonZeroDimensionNames() const {
     return nonZeroNames;
 }
 
-void ImageData::decodeMetadataRows(std::istream& in, size_t actualDataSize) {
-    // Call base class to decode metadata normally
-    DataModule::decodeMetadataRows(in, actualDataSize);
+FieldMap buildFieldMap(
+    const std::vector<uint8_t>& rowBuffer,
+    const std::vector<std::unique_ptr<DataField>>& fields
+) {
+    FieldMap map;
     
+    // Build flattened field list including nested fields (same logic as readTableRows)
+    std::vector<std::pair<std::string, DataField*>> flattenedFields;
+    
+    for (const auto& field : fields) {
+        if (auto* objectField = dynamic_cast<ObjectField*>(field.get())) {
+            // Add nested fields with dot notation
+            const auto& nestedFields = objectField->getNestedFields();
+            for (const auto& nestedField : nestedFields) {
+                std::string fieldPath = field->getName() + "." + nestedField->getName();
+                flattenedFields.push_back({fieldPath, nestedField.get()});
+            }
+        } else {
+            // Regular field
+            flattenedFields.push_back({field->getName(), field.get()});
+        }
+    }
+    
+    size_t numFlattenedFields = flattenedFields.size();
+    size_t bitmapSize = (numFlattenedFields + 7) / 8;
+    
+    if (rowBuffer.size() < bitmapSize) {
+        throw std::runtime_error("Row buffer too small to contain bitmap");
+    }
+    
+    const uint8_t* bitmap = rowBuffer.data();
+    size_t offset = bitmapSize;
+    
+    for (size_t i = 0; i < numFlattenedFields; ++i) {
+        bool present = bitmap[i / 8] & (1 << (i % 8));
+        
+        const auto& [fieldPath, fieldPtr] = flattenedFields[i];
+        
+        FieldInfo info;
+        info.present = present;
+        info.offset = offset;
+        info.field = fieldPtr;
+        info.length = present ? fieldPtr->getLength() : 0;
+        
+        if (present) {
+            // Add flattened field to map
+            map[fieldPath] = info;
+            offset += info.length;
+        } else {
+            // Field not present, but still add to map for consistency
+            map[fieldPath] = info;
+        }
+    }
+    
+    return map;
+}
+
+void ImageData::readMetadataRows(std::istream& in) {
+
+    // Call base class to decode metadata normally
+    DataModule::readMetadataRows(in);
+
+    printMetadata(cout);
+
     // Now extract dimensions and encoding from the decoded metadata
     dimensions.clear();
     dimensionNames.clear();
-    
-    // Get the decoded metadata and find the dimensions and encoding fields
-    auto metadata = getMetadataAsJson();
-    
-    if (metadata.is_array() && !metadata.empty()) {
-        // Take the first row (assuming all rows have the same dimensions and encoding)
-        auto firstRow = metadata[0];
-        
-        // Extract dimensions directly from the dimensions array
-        
-        // Extract dimensions directly from the dimensions array
-        if (firstRow.contains("dimensions") && firstRow["dimensions"].is_array()) {
-            const auto& dimsArray = firstRow["dimensions"];
-            for (size_t i = 0; i < dimsArray.size(); ++i) {
-                uint16_t dim = dimsArray[i].get<uint16_t>();
-                if (dim > 0) {  // Only add non-zero dimensions
-                    dimensions.push_back(dim);
+
+    auto fieldMap = buildFieldMap(metaDataRows[0], metaDataFields);     
+    // Get dimensions
+    if (fieldMap["image_structure.dimensions"].present) {
+        auto& f = fieldMap["image_structure.dimensions"];
+
+        // Use the polymorphic decodeFromBuffer method
+        nlohmann::json dimsJson = f.field->decodeFromBuffer(metaDataRows[0], f.offset);
+
+        // Convert JSON array to std::vector<int>
+        if (dimsJson.is_array()) {
+            for (auto& val : dimsJson) {
+                if (val.is_number_unsigned()) {
+                    dimensions.push_back(val.get<uint16_t>());
                 }
             }
         }
-        
-        // Extract dimension names from the dimension_names array if available
-        if (firstRow.contains("dimension_names") && firstRow["dimension_names"].is_array()) {
-            const auto& namesArray = firstRow["dimension_names"];
-            for (size_t i = 0; i < namesArray.size() && i < dimensions.size(); ++i) {
-                dimensionNames.push_back(namesArray[i].get<std::string>());
+    }
+    else {
+        // Essential dimensions field not present
+        throw runtime_error("Essential dimensions field is not present");
+    }
+
+    {
+
+        if (!fieldMap["image_structure.dimension_names"].present) {
+            // Essential dimensions names field not present
+            throw runtime_error("Essential dimension names field is not present");
+        }
+
+        // Get dimension names
+        auto it = fieldMap.find("image_structure.dimension_names");
+        if (it != fieldMap.end() && it->second.present) {
+            FieldInfo& f = it->second;
+            auto& rowBuffer = metaDataRows[0]; // vector<uint8_t> of the first row
+            size_t offset = f.offset;          // start of this field in the buffer
+
+            dimensionNames.clear();
+
+            // Assuming the field stores an array of strings
+            size_t endOffset = f.offset + f.length;
+            while (offset < endOffset) {
+                // decodeFromBuffer reads from 'rowBuffer' starting at 'offset'
+                // and returns a JSON object (string) for this element
+                auto jsonValue = f.field->decodeFromBuffer(rowBuffer, offset);
+                if (jsonValue.is_array()) {
+                    for (auto& j : jsonValue) {
+                        dimensionNames.push_back(j.get<std::string>());
+                    }
+                } else if (jsonValue.is_string()) {
+                    dimensionNames.push_back(jsonValue.get<std::string>());
+                }
+
+                offset += f.length;
             }
         }
-        
+    }
 
-        
+    {
 
-        
-        // Extract encoding from decoded metadata
-        if (firstRow.contains("encoding")) {
-            std::string enc_str = firstRow["encoding"];
+        if (!fieldMap["image_structure.encoding"].present) {
+            // Essential encoding field not present
+            throw runtime_error("Essential encoding field is not present");
+        }
+
+        // Get encoding
+        auto it = fieldMap.find("image_structure.encoding");
+        if (it != fieldMap.end() && it->second.present) {
+            FieldInfo& f = it->second;
+            auto& rowBuffer = metaDataRows[0]; // first metadata row
+            size_t offset = f.offset;
+
+            // Decode the field value from buffer
+            std::string enc_str = f.field->decodeFromBuffer(rowBuffer, offset).get<std::string>();
+
             auto encoding_opt = stringToEncoding(enc_str);
             if (encoding_opt.has_value()) {
                 encoding = encoding_opt.value();
                 needsDecompression = (encoding != ImageEncoding::RAW);
             } else {
-                // Invalid encoding - log warning and use default
-                std::cerr << "Warning: Invalid encoding '" << enc_str 
-                          << "' in decoded metadata, using RAW encoding" << std::endl;
+                std::cerr << "Warning: Invalid encoding '" << enc_str
+                        << "' in metadata, using RAW encoding" << std::endl;
                 encoding = ImageEncoding::RAW;
                 needsDecompression = false;
             }
         } else {
-            // No encoding in metadata, use default
+            // default if field missing
             encoding = ImageEncoding::RAW;
             needsDecompression = false;
         }
-        
-        // Extract bit depth from decoded metadata
-        if (firstRow.contains("bit_depth")) {
-            bitDepth = firstRow["bit_depth"].get<uint8_t>();
+    }
+
+    // Get bit depth
+    {
+
+        if (!fieldMap["image_structure.bit_depth"].present) {
+            // Essential bit_depth field not present
+            throw runtime_error("Essential bit_depth field is not present");
         }
-        
-        // Extract channels from decoded metadata
-        if (firstRow.contains("channels")) {
-            channels = firstRow["channels"].get<uint8_t>();
+        auto it = fieldMap.find("image_structure.bit_depth");
+        if (it != fieldMap.end() && it->second.present) {
+            FieldInfo& f = it->second;
+            auto& rowBuffer = metaDataRows[0]; // vector<uint8_t>
+            size_t offset = f.offset;
+
+            bitDepth = f.field->decodeFromBuffer(rowBuffer, offset).get<uint8_t>();
         } else {
-            // Default to grayscale for medical images
-            channels = 1;
+            bitDepth = 8; // default
         }
-        
-        // Update decompression flags for all frames based on new encoding
-        for (auto& frame : frames) {
-            frame->needsDecompression = (encoding != ImageEncoding::RAW);
+    }
+
+    // Get channels
+    {
+        if (!fieldMap["image_structure.channels"].present) {
+            // Essential channels field not present
+            throw runtime_error("Essential channels field is not present");
+        }    
+        auto it = fieldMap.find("image_structure.channels");
+        if (it != fieldMap.end() && it->second.present) {
+            FieldInfo& f = it->second;
+            auto& rowBuffer = metaDataRows[0]; // vector<uint8_t>
+            size_t offset = f.offset;
+
+            channels = f.field->decodeFromBuffer(rowBuffer, offset).get<uint8_t>();
+        } else {
+            channels = 1; // default
         }
     }
 }
@@ -488,7 +471,8 @@ void ImageData::writeData(std::ostream& out) const {
 
 }
 
-void ImageData::decodeData(std::istream& in, size_t) {
+void ImageData::readData(std::istream& in) {
+
     // Clear any existing frames
     frames.clear();
     
@@ -533,11 +517,6 @@ void ImageData::decodeData(std::istream& in, size_t) {
 
 void ImageData::printData(std::ostream& out) const {
     out << "ImageData with " << frames.size() << " frames:" << std::endl;
-    
-    for (size_t i = 0; i < frames.size(); i++) {
-        out << "Frame " << i << ": ";
-        frames[i]->printData(out);
-    }
 }
 
 // Override the virtual method for image-specific data

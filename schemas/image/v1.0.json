@@ -19,7 +19,7 @@
         },
         "image_structure": {
           "type": "object",
-          "required": ["channels", "bit_depth", "encoding", "memory_order", "spatial_orientation", "dimensions", "dimension_names"],
+          "required": ["channels", "bit_depth", "encoding", "memory_order", "origin", "layout", "dimension", "dimension_names"],
           "properties": {
             "channels": { 
               "type": "integer", 
@@ -41,22 +41,10 @@
               "enum": ["row_major", "column_major"],
               "description": "Memory layout order for pixel data"
             },
-            "spatial_orientation": {
-              "type": "object",
-              "required": ["row_direction", "column_direction"],
-              "properties": {
-                "row_direction": {
-                  "type": "string",
-                  "enum": ["top_to_bottom", "bottom_to_top"],
-                  "description": "Direction of row progression in the image"
-                },
-                "column_direction": {
-                  "type": "string", 
-                  "enum": ["left_to_right", "right_to_left"],
-                  "description": "Direction of column progression in the image"
-                }
-              },
-              "description": "Spatial orientation of the image relative to memory layout"
+            "origin": {
+              "type": "string",
+              "enum": ["top_left", "bottom_left", "top_right", "bottom_right"],
+              "description": "Origin of the image in the coordinate system"
             },
             "layout": {
               "type": "string", 

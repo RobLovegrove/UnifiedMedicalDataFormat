@@ -21,7 +21,7 @@ public:
     // No copy/move operations supported due to DataModule design
 
     virtual void writeData(std::ostream& out) const override;
-    virtual void decodeData(std::istream& in, size_t actualDataSize) override;
+    virtual void readData(std::istream& in) override;
     virtual void printData(std::ostream& out) const override;
     
     // Override the virtual method for frame-specific data
@@ -30,7 +30,6 @@ public:
     
     // Metadata methods
     size_t getMetadataSize() const;
-    void writeMetadata(std::ostream& out);
 };
 
 #endif // FRAMEDATA_HPP

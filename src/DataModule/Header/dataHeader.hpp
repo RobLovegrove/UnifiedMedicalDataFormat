@@ -9,9 +9,9 @@
 
 enum class HeaderFieldType : uint8_t {
     HeaderSize    = 1,
-    MetadataSize = 2,
-    DataSize      = 3,
-    StringSize    = 4,
+    StringSize    = 2,
+    MetadataSize = 3,
+    DataSize      = 4,
     ModuleType    = 5,
     SchemaPath    = 6,
     Compression   = 7,

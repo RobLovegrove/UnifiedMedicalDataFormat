@@ -80,15 +80,12 @@ bool Writer::writeNewFile(const string& filename) {
             {"image_structure", {
                 {"channels", channels},  // RGB image (3 channels)
                 {"bit_depth", 8},
+                {"origin", "top_left"},
                 {"encoding", "jpeg2000-lossless"},
                 {"memory_order", "row_major"},
-                {"spatial_orientation", {
-                    {"row_direction", "top_to_bottom"},
-                    {"column_direction", "left_to_right"}
-                }},
-                {"layout", "interleaved"},  // RGB interleaved format
+                {"layout", "interleaved"},
                 {"dimensions", {width, height, depth, timePoints}},    // 4D: width, height, depth, time
-                {"dimension_names", {"x", "y", "z", "time"}}  // Match schema maxItems: 10
+                {"dimension_names", {"x", "y", "z", "time"}}, 
             }},
             {"bodyPart", "CHEST"},
             {"institution", "Test Hospital"},
@@ -96,7 +93,7 @@ bool Writer::writeNewFile(const string& filename) {
             {"technician", "Dr. Smith"},
             {"patientName", "John Doe"},
             {"patientID", "12345"}
-        });// 12 * 5 = 60 frames
+        });
         
         // Prepare frame data pairs for batch addition
         std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>> frameDataPairs;
@@ -193,10 +190,6 @@ bool Writer::writeNewFile(const string& filename) {
     // CLOSE FILE
     outfile.close();
     return true;
-}
-
-void Writer::setFileAccessMode(FileAccessMode mode) {
-    accessMode = mode;
 }
 
 bool Writer::writeXref(std::ofstream& outfile) { 

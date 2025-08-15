@@ -25,6 +25,15 @@ struct ModuleData {
     > data;
 };
 
+struct FieldInfo {
+    size_t offset;   
+    size_t length;   
+    bool present;
+    DataField* field;    
+};
+
+using FieldMap = std::unordered_map<std::string, FieldInfo>;
+
 class DataModule {
 protected:
     std::unique_ptr<DataHeader> header;
@@ -32,9 +41,8 @@ protected:
     StringBuffer stringBuffer;
     std::vector<std::unique_ptr<DataField>> metaDataFields;
     std::vector<std::vector<uint8_t>> metaDataRows;
+    std::vector<std::vector<std::unique_ptr<DataField>>> decodedMetaDataRows;
 
-    size_t metaDataRowSize = 0;
-    
     // Schema reference resolution
     static std::unordered_map<std::string, nlohmann::json> schemaCache;
     nlohmann::json resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath);
@@ -49,16 +57,42 @@ protected:
     virtual void parseDataSchema(const nlohmann::json&) {};
 
     std::unique_ptr<DataField> parseField(const std::string& name, 
-                                            const nlohmann::json& definition,
-                                            size_t& rowSize);
+                                            const nlohmann::json& definition);
                                             
     std::ifstream openSchemaFile(const std::string& schemaPath);
+
+    // Helper functions to avoid code duplication between Metadata and tabular data
+    void addTableData(
+        const nlohmann::json&, std::vector<std::unique_ptr<DataField>>&, std::vector<std::vector<uint8_t>>&);
+    bool fieldExistsInData(const nlohmann::json& data, const std::string& fieldPath);
+    nlohmann::json getNestedValue(const nlohmann::json& data, const std::string& fieldPath);
+
+
+    size_t writeTableRows(std::ostream& out, const std::vector<std::vector<uint8_t>>& dataRows) const;
+
+    void readTableRows
+        (
+            std::istream& in, 
+            size_t dataSize, 
+            std::vector<std::unique_ptr<DataField>>& fields, 
+            std::vector<std::vector<uint8_t>>& rows
+        );
+    
+    size_t readNestedObject(
+        std::istream& in, 
+        ObjectField* objectField, 
+        std::vector<uint8_t>& row, 
+        size_t writePos);
+
+    void printTableData(
+        std::ostream& out, const std::vector<std::unique_ptr<DataField>>& fields, const std::vector<std::vector<uint8_t>>& rows) const;
+
 
     void writeMetaData(std::ostream& out);
     virtual void writeData(std::ostream& out) const = 0;
     void writeStringBuffer(std::ostream& out);
-    virtual void decodeMetadataRows(std::istream& in, size_t actualDataSize);
-    virtual void decodeData(std::istream& in, size_t actualDataSize) = 0;
+    virtual void readMetadataRows(std::istream& in);
+    virtual void readData(std::istream& in) = 0;
 
     // Helper method to reconstruct metadata from stored fields
     nlohmann::json getMetadataAsJson() const;

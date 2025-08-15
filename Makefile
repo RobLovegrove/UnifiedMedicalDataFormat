@@ -16,7 +16,7 @@
 # ============================================
 
 CXX := g++
-CXXFLAGS := -std=c++20 -Iinclude -Isrc -Wall -Wextra -MMD -MP
+CXXFLAGS := -std=c++23 -Iinclude -Isrc -Wall -Wextra -MMD -MP
 OPENJPEG_CFLAGS := -I/opt/homebrew/include/openjpeg-2.5
 OPENJPEG_LIBS := -L/opt/homebrew/lib -lopenjp2
 PNG_CFLAGS := -I/opt/homebrew/include
