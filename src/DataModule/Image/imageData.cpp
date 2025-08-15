@@ -280,9 +280,6 @@ void ImageData::readMetadataRows(std::istream& in) {
 
     // Call base class to decode metadata normally
     DataModule::readMetadataRows(in);
-
-    printMetadata(cout);
-
     // Now extract dimensions and encoding from the decoded metadata
     dimensions.clear();
     dimensionNames.clear();
@@ -522,6 +519,7 @@ void ImageData::printData(std::ostream& out) const {
 // Override the virtual method for image-specific data
 std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
 ImageData::getModuleSpecificData() const {
+
     // Return the frames as a vector of ModuleData
     std::vector<ModuleData> frameDataArray;
     

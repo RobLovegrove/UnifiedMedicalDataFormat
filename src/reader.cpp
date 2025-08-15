@@ -6,7 +6,6 @@
 #include "DataModule/Tabular/tabularData.hpp"
 #include "DataModule/Image/imageData.hpp"
 
-
 #include <fstream>
 #include <cstdint>
 #include <vector>
@@ -17,116 +16,110 @@
 
 using namespace std;
 
-bool Reader::readFile(const string& filename) { 
+// bool Reader::readFile(const string& filename) { 
     
-    inFile.open(filename, ios::binary);
-    if (!inFile) return false;
+//     inFile.open(filename, ios::binary);
+//     if (!inFile) return false;
     
-    // Read header and confirm UMDF
-    if (!header.readPrimaryHeader(inFile)) { return false; } 
+//     // Read header and confirm UMDF
+//     if (!header.readPrimaryHeader(inFile)) { return false; } 
 
-    // load Xref Table
-    xrefTable = XRefTable::loadXrefTable(inFile);
+//     // load Xref Table
+//     xrefTable = XRefTable::loadXrefTable(inFile);
 
-    cout << "XRefTable successfully read" << endl;
-    cout << xrefTable << endl; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
+//     cout << "XRefTable successfully read" << endl;
+//     cout << xrefTable << endl; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
 
-    // Clear any previously loaded modules
-    loadedModules.clear();
+//     // Clear any previously loaded modules
+//     loadedModules.clear();
 
-    // Iterate through XrefTable reading data
-    for (const XrefEntry& entry : xrefTable.getEntries()) {
-        cout << "Loading module: " << entry.id.toString() << endl;
-        loadModule(entry);
-    }
-    return true;
-}
+//     // Iterate through XrefTable reading data
+//     for (const XrefEntry& entry : xrefTable.getEntries()) {
+//         cout << "Loading module: " << entry.id.toString() << endl;
+//         loadModule(entry);
+//     }
+//     return true;
+// }
 
-void Reader::loadModule(const XrefEntry& entry) {
+// void Reader::loadModule(const XrefEntry& entry) {
 
-    if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader)) {
-        // Skip file header entries
-        cout << "Skipping file header entry" << endl;
-        return; 
-    }
-    else if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
-        vector<char> buffer(entry.size);
-        inFile.seekg(entry.offset);
-        inFile.read(buffer.data(), entry.size);
-        istringstream stream(string(buffer.begin(), buffer.end()));
+//     if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader)) {
+//         // Skip file header entries
+//         cout << "Skipping file header entry" << endl;
+//         return; 
+//     }
+//     else if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
+//         vector<char> buffer(entry.size);
+//         externalStream->seekg(entry.offset);
+//         externalStream->read(buffer.data(), entry.size);
+//         istringstream stream(string(buffer.begin(), buffer.end()));
 
-        cout << "Reading module: " << entry.id.toString() << endl;
-        unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset, entry.type);
+//         cout << "Reading module: " << entry.id.toString() << endl;
+//         unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset, entry.type);
 
-        if (!dm) {
-            cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
-            return;
-        }
+//         if (!dm) {
+//             cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
+//             return;
+//         }
 
-        dm->printMetadata(cout);
-        dm->printData(cout);
+//         dm->printMetadata(cout);
+//         dm->printData(cout);
 
-        loadedModules.push_back(std::move(dm));
+//         loadedModules.push_back(std::move(dm));
     
-    }
-    else {
-        //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
-        cout << "TODO: Handle a large DataModule" << endl;
-    }
-}
+//     }
+//     else {
+//         //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
+//         cout << "TODO: Handle a large DataModule" << endl;
+//     }
+// }
 
-// Methods for Python integration
-bool Reader::openFile(const string& filename) {
 
-    if (inFile.is_open()) {
-        inFile.close();
-    }
-
-    inFile.open(filename, ios::binary);
-    if (!inFile) return false;
-
-    // Read header and confirm UMDF
-    if (!header.readPrimaryHeader(inFile)) { return false; } 
-
-    xrefTable.clear();
-    loadedModules.clear();
-
-    return true;
-}
-
-nlohmann::json Reader::getFileInfo() {
-
-    nlohmann::json result;
-
-    if (!inFile.is_open()) {
-        result["success"] = false;
-        result["error"] = "No file is currently open";
-        return result;
-    }
-
-    if (xrefTable.getEntries().size() == 0) {
-        // load Xref Table
-        xrefTable = XRefTable::loadXrefTable(inFile);
-    }
-    result["success"] = true;
-    result["module_count"] = xrefTable.getEntries().size() - 1; // -1 to exclude the file header entry
+// bool Reader::verifyFile(std::istream& fileStream) {
+//     // Store reference to external stream
+//     externalStream = &fileStream;
     
-    nlohmann::json moduleList = nlohmann::json::array();
-    for (const auto& entry : xrefTable.getEntries()) {
-        nlohmann::json moduleInfo;
-        if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader)) {
-            continue;
-        }
-        else {
-            ModuleType type = static_cast<ModuleType>(entry.type);
-            moduleInfo["type"] = module_type_to_string(type);
-            moduleInfo["uuid"] = entry.id.toString();
-            moduleList.push_back(moduleInfo);
-        }
-    }
-    result["modules"] = moduleList;
-    return result;
-}
+//     // Read header and confirm UMDF
+//     if (!header.readPrimaryHeader(fileStream)) { return false; } 
+
+//     xrefTable.clear();
+//     loadedModules.clear();
+
+//     return true;
+// }
+
+// nlohmann::json Reader::getFileInfo() {
+
+//     nlohmann::json result;
+
+//     if (externalStream == nullptr) {
+//         result["success"] = false;
+//         result["error"] = "No file is currently open";
+//         return result;
+//     }
+
+//     if (xrefTable.getEntries().size() == 0) {
+//         xrefTable = XRefTable::loadXrefTable(*externalStream);
+//     }
+//     result["success"] = true;
+//     result["module_count"] = xrefTable.getEntries().size() - 1; // -1 to exclude the file header entry
+    
+//     nlohmann::json moduleList = nlohmann::json::array();
+//     for (const auto& entry : xrefTable.getEntries()) {
+//         nlohmann::json moduleInfo;
+//         if (entry.type == static_cast<uint8_t>(ModuleType::FileHeader)) {
+//             continue;
+//         }
+//         else {
+//             ModuleType type = static_cast<ModuleType>(entry.type);
+//             moduleInfo["type"] = module_type_to_string(type);
+//             moduleInfo["uuid"] = entry.id.toString();
+//             moduleList.push_back(moduleInfo);
+//         }
+//     }
+//     result["modules"] = moduleList;
+//     return result;
+// }
 
 // Copied over for quick reference
 // struct ModuleData {
@@ -138,34 +131,34 @@ nlohmann::json Reader::getFileInfo() {
 //     > data;
 // };
 
-std::expected<ModuleData, std::string> Reader::getModuleData(const std::string& moduleId) {
+// std::expected<ModuleData, std::string> Reader::getModuleData(const std::string& moduleId) {
 
-    if (!inFile.is_open()) {
-        return std::unexpected("No file is currently open");  // Error case
-    }
+//     if (externalStream == nullptr) {
+//         return std::unexpected("No file is currently open");  // Error case
+//     }
     
-    // Find the module in the loadedModules vector
-    for (const auto& module : loadedModules) {
-        if (module->getModuleID().toString() == moduleId) {
-            return module->getDataWithSchema();  // Success case
-        }
-    }
+//     // Find the module in the loadedModules vector
+//     for (const auto& module : loadedModules) {
+//         if (module->getModuleID().toString() == moduleId) {
+//             return module->getDataWithSchema();  // Success case
+//         }
+//     }
     
-    // If the module is not found, load it from the file
-    for (const auto& entry : xrefTable.getEntries()) {
-        if (entry.id.toString() == moduleId) {
-            loadModule(entry);
-            return loadedModules.back()->getDataWithSchema();
-        }
-    }
+//     // If the module is not found, load it from the file
+//     for (const auto& entry : xrefTable.getEntries()) {
+//         if (entry.id.toString() == moduleId) {
+//             loadModule(entry);
+//             return loadedModules.back()->getDataWithSchema();
+//         }
+//     }
 
-    return std::unexpected("Module not found: " + moduleId);
-}
+//     return std::unexpected("Module not found: " + moduleId);
+// }
 
-void Reader::closeFile() {
-    if (inFile.is_open()) {
-        inFile.close();
-        xrefTable.clear();
-        loadedModules.clear();
-    }
-}
+// void Reader::closeFile() {
+//     if (externalStream != nullptr) {
+//         externalStream->close();
+//         xrefTable.clear();
+//         loadedModules.clear();
+//     }
+// }

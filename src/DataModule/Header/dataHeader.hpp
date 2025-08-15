@@ -99,6 +99,7 @@ public:
     void readDataHeader(std::istream& in);
 
     friend std::ostream& operator<<(std::ostream& os, const DataHeader& header);
+
 };
 
 

@@ -23,13 +23,10 @@ bool Header::writePrimaryHeader(ofstream& outfile, XRefTable& xref) {
     // WRITE MAGIC NUMBER
     outfile.write(MAGIC_NUMBER.data(), size);
 
-    // ADD HEADER TO XREFTABLE 
-    xref.addEntry(ModuleType::FileHeader, UUID(), offset, size);
-
     return outfile.good();
 }
 
-bool Header::readPrimaryHeader(std::ifstream& inFile) {
+bool Header::readPrimaryHeader(std::istream& inFile) {
 
     // Confirm correct magic number and version
     string magicLine;

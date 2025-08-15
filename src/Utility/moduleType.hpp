@@ -4,8 +4,7 @@
 #include <string>
 
 enum class ModuleType : uint8_t {
-    FileHeader = 0,
-    XrefTable,   
+    Unknown = 0,
     Tabular,
     Image,
     Frame

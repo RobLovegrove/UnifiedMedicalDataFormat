@@ -26,7 +26,7 @@ void FrameData::readData(std::istream& in) {
     // Note: needsDecompression flag will be set by ImageData based on encoding
 }
 
-void FrameData::printData(std::ostream& out) const {
+void FrameData::printData(std::ostream&) const {
     
 }
 

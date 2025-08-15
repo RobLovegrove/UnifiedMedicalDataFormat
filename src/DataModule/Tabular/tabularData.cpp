@@ -51,19 +51,5 @@ void TabularData::printData(std::ostream& out) const {
 
 std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
 TabularData::getModuleSpecificData() const {
-    nlohmann::json dataArray = nlohmann::json::array();
-    
-    for (const auto& row : rows) {
-        size_t offset = 0;
-        nlohmann::json rowJson = nlohmann::json::object();
-
-        for (const auto& field : fields) {
-            rowJson[field->getName()] = field->decodeFromBuffer(row, offset);
-            offset += field->getLength();
-        }
-
-        dataArray.push_back(rowJson);
-    }
-    
-    return dataArray;
+    return getTableDataAsJson(rows, fields);
 }

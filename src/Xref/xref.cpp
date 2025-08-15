@@ -73,7 +73,7 @@ bool XRefTable::writeXref(std::ostream& out) const{
     return out.good();
 }
 
-XRefTable XRefTable::loadXrefTable(std::ifstream& in) {
+XRefTable XRefTable::loadXrefTable(std::istream& in) {
 
     constexpr size_t FOOTER_SIZE = sizeof(EOFmarker) + sizeof(xrefOffset) + sizeof(xrefMarker);
 

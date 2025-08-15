@@ -38,7 +38,7 @@ public:
     void setXrefOffset(uint64_t offset) { xrefOffset = offset; }
     bool writeXref(std::ostream& out) const;
 
-    static XRefTable loadXrefTable(std::ifstream& in);
+    static XRefTable loadXrefTable(std::istream& in);
 
     friend std::ostream& operator<<(std::ostream& os, const XRefTable& table);
 

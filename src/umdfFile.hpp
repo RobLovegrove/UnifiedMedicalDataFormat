@@ -1,0 +1,40 @@
+#ifndef UMDF_FILE_HPP
+#define UMDF_FILE_HPP
+
+#include <memory>
+#include <string>
+#include <fstream>
+#include "reader.hpp"
+#include "writer.hpp"
+
+class UMDFFile {
+private:
+    std::fstream fileStream;
+    Header header;
+    XRefTable xrefTable;
+    std::vector<std::unique_ptr<DataModule>> loadedModules;
+
+    static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 2 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
+
+public:
+    UMDFFile() = default;
+    ~UMDFFile() = default;
+    
+    // File management
+    bool openFile(const std::string& filename);
+    void closeFile();
+    bool isOpen() const { return fileStream.is_open(); }
+    
+    // Reading operations 
+    nlohmann::json getFileInfo();
+    std::expected<ModuleData, std::string> getModuleData(const std::string& moduleId);
+
+    void loadModule(const XrefEntry& entry);
+    
+    // Writing operations (delegated to Writer)
+    bool writeNewFile(const std::string& filename);
+    bool addModule(const ModuleData& module);
+    bool updateModule(const std::string& moduleId, const ModuleData& module);
+};
+
+#endif 

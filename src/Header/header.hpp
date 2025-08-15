@@ -5,6 +5,7 @@
 #include <array>
 #include <string>
 #include <string_view>
+#include <istream>
 
 #include "Utility/utils.hpp"
 #include "Xref/xref.hpp"
@@ -18,7 +19,7 @@ private:
 
 public:
     bool writePrimaryHeader(std::ofstream& outfile, XRefTable& xref);
-    bool readPrimaryHeader(std::ifstream& inFile);
+    bool readPrimaryHeader(std::istream& inFile);
 };
 
 #endif

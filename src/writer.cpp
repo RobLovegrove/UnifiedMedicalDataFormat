@@ -21,10 +21,11 @@ using namespace std;
 bool Writer::writeNewFile(const string& filename) {
 
     // OPEN FILE
-    ofstream outfile(filename, ios::binary);
+    std::ofstream outfile(filename, ios::binary);
     if (!outfile) return false;
 
     // CREATE HEADER
+    Header header;
     if (!header.writePrimaryHeader(outfile, xref)) return false;
 
     // CREATE TABULAR MODULE
@@ -192,9 +193,30 @@ bool Writer::writeNewFile(const string& filename) {
     return true;
 }
 
-bool Writer::writeXref(std::ofstream& outfile) { 
-    uint64_t offset = 0;
-    if (!getCurrentFilePosition(outfile, offset)) { return false; };
+void Writer::setStream(std::fstream& stream) {
+    currentStream = &stream;
+}
+
+bool Writer::addModule(std::fstream& fileStream, const ModuleData& module) {  
+    // For now, just a placeholder
+    return true;
+}
+
+bool Writer::updateModule(std::fstream& fileStream, const std::string& moduleId, const ModuleData& module) {
+    // For now, just a placeholder
+    return true;
+}
+
+bool Writer::deleteModule(const std::string& moduleId) {
+    // For now, just a placeholder
+    return true;
+}
+
+bool Writer::writeXref(std::ostream& outfile) { 
+    // Explicitly seek to end of file
+    outfile.seekp(0, std::ios::end);
+    
+    uint64_t offset = outfile.tellp();  // Get position at end
     xref.setXrefOffset(offset);
     return xref.writeXref(outfile);
 }

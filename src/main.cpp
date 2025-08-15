@@ -1,8 +1,11 @@
 #include <iostream>
 #include <string>
 
+#include "umdfFile.hpp"
+#include "DataModule/dataModule.hpp"
 #include "writer.hpp"
-#include "reader.hpp"
+
+
 #include "CLI11/CLI11.hpp"
 #include "Utility/utils.hpp"
 #include "Utility/uuid.hpp"
@@ -33,7 +36,7 @@ int main(int argc, char** argv) {
     CLI::App app{"UMDF - Unified Medical Data Format Tool"};
     
     Writer writer;
-    Reader reader;
+    UMDFFile file;
 
     string inputFile;
     string outputFile;
@@ -67,15 +70,66 @@ int main(int argc, char** argv) {
 
     else if (*readCmd) {
         
-        // Read patient data back
+        // Read file using new API
         cout << "Reading from file: " << inputFile << "\n";
-        //string readData;
-        if (!reader.readFile(inputFile)) {
-            cerr << "Failed to read data\n";
+        
+        if (!file.openFile(inputFile)) {
+            cerr << "Failed to open file: " << inputFile << "\n";
             return 1;
         }
-        //cout << "Read patient data:\n" << readData << "\n";
-        cout << "File read complete" << endl;
+        
+        // Get file info
+        auto fileInfo = file.getFileInfo();
+        if (fileInfo.contains("success") && !fileInfo["success"]) {
+            cerr << "Error reading file: " << fileInfo["error"] << "\n";
+            return 1;
+        }
+        
+        cout << "File opened successfully. Module count: " << fileInfo["module_count"] << "\n";
+        
+        // List all modules
+        if (fileInfo.contains("modules")) {
+            cout << "Modules in file:\n";
+            for (const auto& module : fileInfo["modules"]) {
+                cout << "  - " << module["type"] << " (UUID: " << module["uuid"] << ")\n";
+            }
+        }
+
+        cout << endl;
+
+        // Load all modules
+        for (const auto& module : fileInfo["modules"]) {
+            cout << "Loading module: " << module["uuid"] << endl;
+            auto moduleData = file.getModuleData(module["uuid"]);
+            if (moduleData) {
+                cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
+                cout << "Metadata: " << moduleData.value().metadata.dump(2) << endl;
+                
+                // Handle the data variant based on type
+                const auto& data = moduleData.value().data;
+                if (std::holds_alternative<nlohmann::json>(data)) {
+                    // Tabular data
+                    cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
+                } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
+                    // Binary data (like image pixels)
+                    const auto& binaryData = std::get<std::vector<uint8_t>>(data);
+                    cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
+                } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
+                    // Nested modules (like image frames)
+                    const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
+                    cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
+                    
+                    // // Optionally show details of nested modules
+                    // for (size_t i = 0; i < nestedModules.size(); i++) {
+                    //     cout << "  Sub-module " << i << " metadata: " 
+                    //          << nestedModules[i].metadata.dump(2) << endl;
+                    // }
+                }
+                cout << endl;
+            }
+        }
+        
+        // cout << "File read complete" << endl;
     }
 
     return 0;

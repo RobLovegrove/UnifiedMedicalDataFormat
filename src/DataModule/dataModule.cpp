@@ -22,8 +22,6 @@ DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type) {
 
     ifstream file = openSchemaFile(schemaPath);
     file >> schemaJson;
-
-    if (type == ModuleType::Image) { cout << schemaJson.dump(2) << endl; }
     
 }
 
@@ -99,9 +97,7 @@ unique_ptr<DataModule> DataModule::fromStream(
 
     unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
 
-    cout << "Reading data header" << endl;
     dmHeader->readDataHeader(in);
-    cout << "Done reading data header" << endl;
 
     if (static_cast<ModuleType>(moduleType) != ModuleType::Frame) {
         cout << *dmHeader << endl;
@@ -245,12 +241,7 @@ void DataModule::readTableRows(
 
 
     
-    // Debug: Print flattened field names
 
-    for (size_t i = 0; i < flattenedFields.size(); ++i) {
-        const auto& [fieldPath, fieldPtr] = flattenedFields[i];
-        cout << "  " << i << ": " << fieldPath << " (type: " << fieldPtr->getType() << ")" << endl;
-    }
 
     size_t bytesRemaining = dataSize;
 
@@ -659,14 +650,36 @@ ModuleData DataModule::getDataWithSchema() const {
     };
 }
 
-// Helper method to reconstruct metadata from stored fields
-nlohmann::json DataModule::getMetadataAsJson() const {
-    nlohmann::json metadataArray = nlohmann::json::array();
+nlohmann::json DataModule::getTableDataAsJson(const vector<vector<uint8_t>>& rows, const vector<unique_ptr<DataField>>& fields) const {
 
-    size_t numFields = metaDataFields.size();
-    size_t bitmapSize = (numFields + 7) / 8;
+    nlohmann::json dataArray = nlohmann::json::array();
+
+    // Build flattened field list including nested fields (same logic as readTableRows)
+    std::vector<std::pair<std::string, DataField*>> flattenedFields;
     
-    for (const auto& row : metaDataRows) {
+    // Also keep track of the original field structure for reconstruction
+    std::vector<std::pair<std::string, std::string>> fieldMapping; // parentField, childField
+    
+    for (const auto& field : fields) {
+        if (auto* objectField = dynamic_cast<ObjectField*>(field.get())) {
+            // Add nested fields with dot notation for bitmap calculation
+            const auto& nestedFields = objectField->getNestedFields();
+            for (const auto& nestedField : nestedFields) {
+                std::string fieldPath = field->getName() + "." + nestedField->getName();
+                flattenedFields.push_back({fieldPath, nestedField.get()});
+                fieldMapping.push_back({field->getName(), nestedField->getName()});
+            }
+        } else {
+            // Regular field
+            flattenedFields.push_back({field->getName(), field.get()});
+            fieldMapping.push_back({field->getName(), ""}); // Empty string means no parent
+        }
+    }
+    
+    size_t numFlattenedFields = flattenedFields.size();
+    size_t bitmapSize = (numFlattenedFields + 7) / 8;
+    
+    for (const auto& row : rows) {
         size_t offset = 0;
 
         // Read bitmap from start of row
@@ -676,21 +689,41 @@ nlohmann::json DataModule::getMetadataAsJson() const {
 
         nlohmann::json rowJson = nlohmann::json::object();
 
-        for (size_t i = 0; i < numFields; ++i) {
+        for (size_t i = 0; i < numFlattenedFields; ++i) {
             bool present = bitmap[i / 8] & (1 << (i % 8));
             if (present) {
-                rowJson[metaDataFields[i]->getName()] =
-                    metaDataFields[i]->decodeFromBuffer(row, offset);
-                offset += metaDataFields[i]->getLength();
+                const auto& [fieldPath, fieldPtr] = flattenedFields[i];
+                const auto& [parentField, childField] = fieldMapping[i];
+                
+                if (childField.empty()) {
+                    // Regular field - add directly to row
+                    rowJson[parentField] = fieldPtr->decodeFromBuffer(row, offset);
+                } else {
+                    // Nested field - create parent object if it doesn't exist
+                    if (!rowJson.contains(parentField)) {
+                        rowJson[parentField] = nlohmann::json::object();
+                    }
+                    rowJson[parentField][childField] = fieldPtr->decodeFromBuffer(row, offset);
+                }
+                offset += fieldPtr->getLength();
             } else {
-                rowJson[metaDataFields[i]->getName()] = nullptr; // or skip entirely
+                // Handle missing fields - could set to null or skip entirely
+                // For now, we'll skip missing fields to keep the output clean
             }
         }
 
-        metadataArray.push_back(rowJson);
+        dataArray.push_back(rowJson);
     }
     
-    return metadataArray;
+    return dataArray;
+}
+
+
+// Helper method to reconstruct metadata from stored fields
+nlohmann::json DataModule::getMetadataAsJson() const {
+    nlohmann::json metadataArray = nlohmann::json::array();
+
+    return getTableDataAsJson(metaDataRows, metaDataFields);
 }
 
 // Initialize static member

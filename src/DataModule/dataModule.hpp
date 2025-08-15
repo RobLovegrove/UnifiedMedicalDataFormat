@@ -86,7 +86,8 @@ protected:
 
     void printTableData(
         std::ostream& out, const std::vector<std::unique_ptr<DataField>>& fields, const std::vector<std::vector<uint8_t>>& rows) const;
-
+    
+    nlohmann::json getTableDataAsJson(const std::vector<std::vector<uint8_t>>& rows, const std::vector<std::unique_ptr<DataField>>& fields) const;
 
     void writeMetaData(std::ostream& out);
     virtual void writeData(std::ostream& out) const = 0;
