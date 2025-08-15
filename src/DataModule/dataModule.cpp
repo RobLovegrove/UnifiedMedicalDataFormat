@@ -243,11 +243,10 @@ void DataModule::readTableRows(
     size_t numFlattenedFields = flattenedFields.size();
     size_t bitmapSize = (numFlattenedFields + 7) / 8;
 
-    cout << "The number of fields is: " << numFlattenedFields << endl;
-    cout << "Bitmap size: " << bitmapSize << " bytes" << endl;
+
     
     // Debug: Print flattened field names
-    cout << "Flattened fields:" << endl;
+
     for (size_t i = 0; i < flattenedFields.size(); ++i) {
         const auto& [fieldPath, fieldPtr] = flattenedFields[i];
         cout << "  " << i << ": " << fieldPath << " (type: " << fieldPtr->getType() << ")" << endl;
@@ -263,30 +262,6 @@ void DataModule::readTableRows(
             throw std::runtime_error("Truncated bitmap");
         }
         
-        // Enhanced debug: Print bitmap and field presence (only for main module)
-        if (numFlattenedFields > 10) {  // Main image module has 15 fields, frames have 7
-            cout << "=== READING ROW DEBUG (MAIN MODULE) ===" << endl;
-            cout << "Bitmap bytes: ";
-            for (size_t i = 0; i < bitmapSize; ++i) {
-                cout << std::hex << static_cast<int>(bitmap[i]) << " ";
-            }
-            cout << std::dec << endl;
-            
-            cout << "Bitmap bits: ";
-            for (size_t i = 0; i < numFlattenedFields; ++i) {
-                bool present = (bitmap[i / 8] & (1 << (i % 8))) != 0;
-                cout << (present ? "1" : "0");
-            }
-            cout << endl;
-            
-            cout << "Field presence:" << endl;
-            for (size_t i = 0; i < numFlattenedFields; ++i) {
-                bool present = (bitmap[i / 8] & (1 << (i % 8))) != 0;
-                const auto& [fieldPath, fieldPtr] = flattenedFields[i];
-                cout << "  " << i << ": " << fieldPath << " - " << (present ? "PRESENT" : "MISSING") << " (length: " << fieldPtr->getLength() << ")" << endl;
-            }
-        }
-        
         // Calculate row size based on which fields are present
         size_t rowSize = bitmapSize;
         for (size_t i = 0; i < numFlattenedFields; ++i) {
@@ -297,9 +272,7 @@ void DataModule::readTableRows(
             }
         }
         
-        if (numFlattenedFields > 10) {  // Main module only
-            cout << "Calculated row size: " << rowSize << " bytes (bitmap: " << bitmapSize << " + data: " << (rowSize - bitmapSize) << ")" << endl;
-        }
+
         
         // Start a row with the bitmap
         std::vector<uint8_t> row(rowSize);
@@ -310,19 +283,11 @@ void DataModule::readTableRows(
         writePos += bitmapSize;
 
         // Read each present field (including nested)
-        if (numFlattenedFields > 10) {  // Main module only
-            cout << "Reading fields:" << endl;
-        }
-        
         for (size_t i = 0; i < numFlattenedFields; ++i) {
             bool present = bitmap[i / 8] & (1 << (i % 8));
             if (present) {
                 const auto& [fieldPath, fieldPtr] = flattenedFields[i];
                 size_t fieldLen = fieldPtr->getLength();
-                
-                if (numFlattenedFields > 10) {  // Main module only
-                    cout << "  " << i << ": " << fieldPath << " (offset: " << writePos << ", length: " << fieldLen << ")" << endl;
-                }
                 
                 in.read(reinterpret_cast<char*>(row.data() + writePos), fieldLen);
 
@@ -333,17 +298,12 @@ void DataModule::readTableRows(
                 writePos += fieldLen;
             }
         }
-        
-        if (numFlattenedFields > 10) {  // Main module only
-            cout << "Final write position: " << writePos << " bytes" << endl;
-            cout << "=== END READING ROW DEBUG ===" << endl;
-        }
 
         bytesRemaining -= row.size();
         rows.push_back(std::move(row));
     }
 
-    cout << "=== END READING TABLE ROWS DEBUG ===" << endl;
+    
 }
 
 // Helper method to read nested objects
@@ -559,44 +519,17 @@ void DataModule::addTableData(
     
     size_t numFlattenedFields = flattenedFields.size();
 
-    cout << "The number of fields is: " << numFlattenedFields << endl;
-
     size_t bitmapSize = (numFlattenedFields + 7) / 8;
     
     // Build bitmap for all fields (including nested)
     std::vector<uint8_t> bitmap(bitmapSize, 0);
     
-    // Only show debug for main module metadata, not frame data
-    if (numFlattenedFields > 10) {  // Main image module has 15 fields, frames have 7
-        cout << "=== WRITING DEBUG (MAIN MODULE) ===" << endl;
-        cout << "Building bitmap for " << numFlattenedFields << " fields:" << endl;
-        
-        for (size_t i = 0; i < numFlattenedFields; ++i) {
-            const auto& [fieldPath, fieldPtr] = flattenedFields[i];
-            
-            // Check if field exists in data (handle nested paths)
-            bool present = fieldExistsInData(data, fieldPath);
-            
-            cout << "  " << i << ": " << fieldPath << " (type: " << fieldPtr->getType() << ") - present: " << (present ? "YES" : "NO") << endl;
-            
-            if (present) {
-                bitmap[i / 8] |= (1 << (i % 8));
-            }
-        }
-        
-        cout << "Bitmap: ";
-        for (size_t i = 0; i < bitmapSize; ++i) {
-            cout << std::hex << static_cast<int>(bitmap[i]) << " ";
-        }
-        cout << std::dec << endl;
-    } else {
-        // For frames, just build bitmap silently
-        for (size_t i = 0; i < numFlattenedFields; ++i) {
-            const auto& [fieldPath, fieldPtr] = flattenedFields[i];
-            bool present = fieldExistsInData(data, fieldPath);
-            if (present) {
-                bitmap[i / 8] |= (1 << (i % 8));
-            }
+    // Build bitmap for all fields (including nested)
+    for (size_t i = 0; i < numFlattenedFields; ++i) {
+        const auto& [fieldPath, fieldPtr] = flattenedFields[i];
+        bool present = fieldExistsInData(data, fieldPath);
+        if (present) {
+            bitmap[i / 8] |= (1 << (i % 8));
         }
     }
     
@@ -608,10 +541,6 @@ void DataModule::addTableData(
         }
     }
     
-    if (numFlattenedFields > 10) {  // Main module only
-        cout << "Row size: bitmap(" << bitmapSize << ") + data(" << maxRowSize << ") = " << (bitmapSize + maxRowSize) << " bytes" << endl;
-    }
-    
     vector<uint8_t> row(bitmapSize + maxRowSize, 0);
     
     // Write in the bitmap at the start of the row
@@ -619,25 +548,13 @@ void DataModule::addTableData(
     
     size_t offset = bitmapSize;
     
-    if (numFlattenedFields > 10) {  // Main module only
-        cout << "Encoding fields:" << endl;
-    }
-    
     // Encode all fields (including nested)
     for (const auto& [fieldPath, fieldPtr] : flattenedFields) {
         if (fieldExistsInData(data, fieldPath)) {
             nlohmann::json value = getNestedValue(data, fieldPath);
-            if (numFlattenedFields > 10) {  // Main module only
-                cout << "  " << fieldPath << " -> " << value.dump() << " (offset: " << offset << ", length: " << fieldPtr->getLength() << ")" << endl;
-            }
             fieldPtr->encodeToBuffer(value, row, offset);
             offset += fieldPtr->getLength();
         }
-    }
-    
-    if (numFlattenedFields > 10) {  // Main module only
-        cout << "Final row size: " << offset << " bytes" << endl;
-        cout << "=== END WRITING DEBUG ===" << endl;
     }
     
     row.resize(offset);
@@ -727,7 +644,7 @@ void DataModule::printTableData(
         out << rowJson.dump(2) << "\n";
     }
 
-    cout << "=== END PRINTING TABLE DATA DEBUG ===" << endl;
+
 }
 
 void DataModule::printMetadata(std::ostream& out) const {
@@ -744,50 +661,27 @@ ModuleData DataModule::getDataWithSchema() const {
 
 // Helper method to reconstruct metadata from stored fields
 nlohmann::json DataModule::getMetadataAsJson() const {
-    cout << "=== getMetadataAsJson() DEBUG ===" << endl;
-    
     nlohmann::json metadataArray = nlohmann::json::array();
 
     size_t numFields = metaDataFields.size();
     size_t bitmapSize = (numFields + 7) / 8;
     
-    cout << "Using OLD field structure:" << endl;
-    cout << "  numFields: " << numFields << endl;
-    cout << "  bitmapSize: " << bitmapSize << " bytes" << endl;
-    cout << "  metaDataFields names:" << endl;
-    for (size_t i = 0; i < numFields; ++i) {
-        cout << "    " << i << ": " << metaDataFields[i]->getName() << " (type: " << metaDataFields[i]->getType() << ", length: " << metaDataFields[i]->getLength() << ")" << endl;
-    }
-    
     for (const auto& row : metaDataRows) {
-        cout << "Processing row of size: " << row.size() << " bytes" << endl;
         size_t offset = 0;
 
         // Read bitmap from start of row
         std::vector<uint8_t> bitmap(bitmapSize);
         memcpy(bitmap.data(), row.data(), bitmapSize);
         offset += bitmapSize;
-        
-        cout << "  Read bitmap (" << bitmapSize << " bytes): ";
-        for (size_t i = 0; i < bitmapSize; ++i) {
-            cout << std::hex << static_cast<int>(bitmap[i]) << " ";
-        }
-        cout << std::dec << endl;
-        cout << "  Starting offset after bitmap: " << offset << endl;
 
         nlohmann::json rowJson = nlohmann::json::object();
 
-        cout << "  Decoding fields:" << endl;
         for (size_t i = 0; i < numFields; ++i) {
             bool present = bitmap[i / 8] & (1 << (i % 8));
-            cout << "    " << i << ": " << metaDataFields[i]->getName() << " - present: " << (present ? "YES" : "NO") << " (offset: " << offset << ")" << endl;
-            
             if (present) {
-                cout << "      Calling decodeFromBuffer with offset: " << offset << endl;
                 rowJson[metaDataFields[i]->getName()] =
                     metaDataFields[i]->decodeFromBuffer(row, offset);
                 offset += metaDataFields[i]->getLength();
-                cout << "      New offset after field: " << offset << endl;
             } else {
                 rowJson[metaDataFields[i]->getName()] = nullptr; // or skip entirely
             }
@@ -796,7 +690,6 @@ nlohmann::json DataModule::getMetadataAsJson() const {
         metadataArray.push_back(rowJson);
     }
     
-    cout << "=== END getMetadataAsJson() DEBUG ===" << endl;
     return metadataArray;
 }
 

@@ -63,21 +63,12 @@ void VarStringField::encodeToBuffer(
     stringStart = stringBuffer->addString(str);
     stringLength = static_cast<uint32_t>(str.length());
 
-    cout << "=== VarStringField ENCODE DEBUG ===" << endl;
-    cout << "Field: " << name << endl;
-    cout << "String: \"" << str << "\"" << endl;
-    cout << "String start: " << stringStart << endl;
-    cout << "String length: " << stringLength << endl;
-    cout << "Writing to buffer at offset: " << offset << endl;
-
     // Write stringStart (8 bytes)
     memcpy(buffer.data() + offset, &stringStart, sizeof(uint64_t));
     offset += sizeof(uint64_t);
 
     // Write stringLength (4 bytes)
     memcpy(buffer.data() + offset, &stringLength, sizeof(uint32_t));
-    
-    cout << "=== END ENCODE DEBUG ===" << endl;
 
 }
 
@@ -89,18 +80,10 @@ nlohmann::json VarStringField::decodeFromBuffer(
     }
 
     
-    cout << "=== VarStringField DECODE DEBUG ===" << endl;
-    cout << "Field: " << name << endl;
-    cout << "Reading from buffer at offset: " << offset << endl;
-    cout << "Buffer size: " << buffer.size() << endl;
-    
     std::memcpy(&stringStart, buffer.data() + offset, sizeof(stringStart));
-    cout << "Read stringStart: " << stringStart << endl;
-
     offset += sizeof(stringStart);
     
     std::memcpy(&stringLength, buffer.data() + offset, sizeof(stringLength));
-    cout << "Read stringLength: " << stringLength << endl;
     offset += sizeof(stringLength);
 
     if (stringStart + stringLength > stringBuffer->getSize()) {
