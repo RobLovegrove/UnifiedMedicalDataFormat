@@ -8,6 +8,17 @@ build/
 *.exe
 umdf_tool
 
+# Pybind11 build artifacts
+*.cpython-*.so
+*.cpython-*.pyd
+umdf_reader.cpython-*.so
+umdf_reader.cpython-*.pyd
+
+# Development scripts (keep locally, don't commit)
+*.sh
+*.py
+update_ui.sh
+
 # Test and output files
 test_*.umdf
 *_workflow.umdf
