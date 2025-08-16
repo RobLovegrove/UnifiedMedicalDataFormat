@@ -35,7 +35,7 @@ bool Version::is_compatible_with(const Version& reader_version) const {
     return major == reader_version.major && minor <= reader_version.minor;
 }
 
-bool getCurrentFilePosition(ofstream& outfile, uint64_t& offset) {
+bool getCurrentFilePosition(ostream& outfile, uint64_t& offset) {
     auto pos = outfile.tellp();
     if (pos == std::ofstream::pos_type(-1)) {
         // Error: tellp() failed

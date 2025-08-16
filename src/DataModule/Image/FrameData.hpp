@@ -2,6 +2,7 @@
 #define FRAMEDATA_HPP
 
 #include "../dataModule.hpp"
+
 #include <vector>
 #include <cstdint>
 #include <string>
@@ -20,6 +21,8 @@ public:
     
     // No copy/move operations supported due to DataModule design
 
+    virtual void addData(
+        const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) override;
     virtual void writeData(std::ostream& out) const override;
     virtual void readData(std::istream& in) override;
     virtual void printData(std::ostream& out) const override;

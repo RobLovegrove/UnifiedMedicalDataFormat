@@ -18,7 +18,7 @@ private:
     inline static constexpr std::string_view MAGIC_NUMBER = "#UMDFv1.0\n";
 
 public:
-    bool writePrimaryHeader(std::ofstream& outfile, XRefTable& xref);
+    bool writePrimaryHeader(std::ostream& outfile);
     bool readPrimaryHeader(std::istream& inFile);
 };
 

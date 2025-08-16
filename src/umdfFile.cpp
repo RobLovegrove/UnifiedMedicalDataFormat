@@ -1,6 +1,9 @@
 #include "umdfFile.hpp"
 #include "Xref/xref.hpp"
 #include "DataModule/dataModule.hpp"
+#include "DataModule/Image/ImageData.hpp"
+#include "DataModule/Tabular/tabularData.hpp"
+
 #include "Utility/utils.hpp"
 #include "Utility/uuid.hpp"
 
@@ -120,12 +123,6 @@ void UMDFFile::loadModule(const XrefEntry& entry) {
             cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
             return;
         }
-
-        cout << "Module loaded" << endl;
-
-        // dm->printMetadata(cout);
-        // dm->printData(cout);
-
         loadedModules.push_back(std::move(dm));
     
     }
@@ -139,14 +136,112 @@ void UMDFFile::loadModule(const XrefEntry& entry) {
 /* =============== WRITING OPERATIONS =============== */
 /* ================================================== */
 
-bool UMDFFile::writeNewFile(const std::string& filename) {
-    //return writer->writeNewFile(filename);
+// struct ModuleData {
+//     nlohmann::json metadata;
+//    std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> data;
+// };
+
+std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string& filename, 
+    std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
+
+    std::expected<std::vector<UUID>, std::string> result;
+
+    std::vector<UUID> moduleIds;
+
+    cout << "Writing new file: " << filename << endl;
+    
+    // OPEN FILE
+    fileStream.open(filename, std::ios::out | std::ios::binary);
+    if (!fileStream.is_open()) return std::unexpected("Failed to open file");
+
+    cout << "File opened" << endl;
+
+    // CREATE HEADER
+    Header header;
+    if (!header.writePrimaryHeader(fileStream)) return std::unexpected("Failed to write header");
+
+    cout << "Header written" << endl;
+
+    // CREATE MODULES 
+    for (const auto& [schemaPath, moduleData] : modulesWithSchemas) {
+
+        // Load schema from file
+        std::ifstream schemaFile(schemaPath);
+        if (!schemaFile.is_open()) {
+            cerr << "Failed to open schema file: " << schemaPath << endl;
+            return std::unexpected("Failed to open schema file");
+        }
+        
+        nlohmann::json schemaJson;
+        schemaFile >> schemaJson;
+        
+        string moduleType = schemaJson["module_type"];
+        ModuleType type = module_type_from_string(moduleType);
+
+        UUID uuid = UUID();
+
+        unique_ptr<DataModule> dm;
+
+        cout << "Creating module: " << moduleType << endl;
+        
+        // CREATE MODULE
+        switch (type) {
+            case ModuleType::Image: {
+                dm = make_unique<ImageData>(schemaPath, schemaJson, uuid);
+                break;
+            }
+            case ModuleType::Tabular: {
+                dm = make_unique<TabularData>(schemaPath, schemaJson, uuid);
+                break;
+            }
+            default:
+                cout << "Unknown module type: " << moduleType << endl;
+                return std::unexpected("Unknown module type: " + moduleType);
+        }
+
+        // ADD DATA TO MODULE
+        dm->addMetaData(moduleData.metadata);
+
+        cout << "Adding data to module" << endl;
+        dm->addData(moduleData.data);
+
+        cout << "Writing module to file" << endl;
+
+        // WRITE MODULE TO FILE
+        dm->writeBinary(fileStream, xrefTable);
+
+        moduleIds.push_back(dm->getModuleID());
+    }
+
+    cout << "Modules written" << endl;
+    
+    // WRITE XREF TABLE at the end
+    if (!writeXref(fileStream)) return std::unexpected("Failed to write xref table");
+
+    // CLOSE FILE
+    closeFile();
+    return moduleIds;
 }
 
-bool UMDFFile::addModule(const ModuleData& module) {
-    //return writer->addModule(fileStream, module);
+
+
+std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
+
+
+
 }
 
-bool UMDFFile::updateModule(const std::string& moduleId, const ModuleData& module) {
-    //return writer->updateModule(fileStream, moduleId, module);
+std::expected<std::vector<UUID>, std::string> UMDFFile::updateModules(std::vector<std::string>& moduleId, std::vector<ModuleData>& modules) {
+
+
+}
+
+
+bool UMDFFile::writeXref(std::ostream& outfile) { 
+    // Explicitly seek to end of file
+    outfile.seekp(0, std::ios::end);
+    
+    uint64_t offset = outfile.tellp();  // Get position at end
+    xrefTable.setXrefOffset(offset);
+    return xrefTable.writeXref(outfile);
 }

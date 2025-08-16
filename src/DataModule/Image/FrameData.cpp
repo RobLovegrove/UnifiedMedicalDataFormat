@@ -27,7 +27,15 @@ void FrameData::readData(std::istream& in) {
 }
 
 void FrameData::printData(std::ostream&) const {
-    
+    std::cout << "No implementation should be needed for FrameData::printData" << std::endl;
+}
+
+void FrameData::addData(
+    const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>& data) {
+
+    if (std::holds_alternative<std::vector<uint8_t>>(data)) {
+        pixelData = std::get<std::vector<uint8_t>>(data);
+    }
 }
 
 // Override the virtual method for frame-specific data

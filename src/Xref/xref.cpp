@@ -44,19 +44,23 @@ bool XRefTable::writeXref(std::ostream& out) const{
     // 1. Write Header Signature
     out.write("XREF", 4);
 
-    // 2. Write Entry Count
+    // 2. Write Current Table Flag
+    uint8_t isCurrent = 1;  // 1 = current, 0 = obsolete
+    out.write(reinterpret_cast<const char*>(&isCurrent), sizeof(isCurrent));
+
+    // 3. Write Entry Count
     uint32_t count = static_cast<uint32_t>(entries.size());
     out.write(reinterpret_cast<const char*>(&count), sizeof(count));
 
-    // 3. Write field widths: [id=16, type=1, size=4, offset=8]
+    // 4. Write field widths: [id=16, type=1, size=4, offset=8]
     uint8_t widths[4] = {16, 1, 8, 8};
     out.write(reinterpret_cast<const char*>(widths), sizeof(widths));
 
-    // 4. Write Reserved (zeroed)
+    // 5. Write Reserved (zeroed)
     uint8_t reserved[32] = {};
     out.write(reinterpret_cast<const char*>(reserved), sizeof(reserved));
 
-    // 5. Write Each Entry as binary row
+    // 6. Write Each Entry as binary row
     for (const auto& entry : entries) {
         out.write(reinterpret_cast<const char*>(&entry.id), sizeof(entry.id));
         out.write(reinterpret_cast<const char*>(&entry.type), sizeof(entry.type));
@@ -64,7 +68,7 @@ bool XRefTable::writeXref(std::ostream& out) const{
         out.write(reinterpret_cast<const char*>(&entry.offset), sizeof(entry.offset));
     }
 
-    // 6. Write footer
+    // 7. Write footer
     out.write(xrefMarker, sizeof(xrefMarker));
     out.write(reinterpret_cast<const char*>(&xrefOffset), sizeof(xrefOffset));
 
@@ -115,11 +119,18 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
         throw std::runtime_error("Missing XREF signature.");
     }
 
-    // 5. Read entry count
+    // 5. Read Current Table Flag
+    uint8_t isCurrent = 0;
+    in.read(reinterpret_cast<char*>(&isCurrent), sizeof(isCurrent));
+    if (isCurrent == 0) {
+        throw std::runtime_error("Obsolete Xref table.");
+    }
+
+    // 6. Read entry count
     uint32_t count = 0;
     in.read(reinterpret_cast<char*>(&count), sizeof(count));
 
-    // 6. Read widths
+    // 7. Read widths
     uint8_t widths[4];
     in.read(reinterpret_cast<char*>(widths), sizeof(widths));
 
@@ -127,11 +138,11 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
         throw std::runtime_error("Unexpected field widths.");
     }
 
-    // 7. Skip reserved
+    // 8. Skip reserved
     uint8_t reserved[32];
     in.read(reinterpret_cast<char*>(reserved), sizeof(reserved));
 
-    // 8. Read entries
+    // 9. Read entries
     for (uint32_t i = 0; i < count; ++i) {
         XrefEntry entry{};
         in.read(reinterpret_cast<char*>(&entry.id), sizeof(entry.id));

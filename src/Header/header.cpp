@@ -13,7 +13,7 @@
 
 using namespace std;
 
-bool Header::writePrimaryHeader(ofstream& outfile, XRefTable& xref) {
+bool Header::writePrimaryHeader(ostream& outfile) {
 
     uint64_t offset = 0;
     if (!getCurrentFilePosition(outfile, offset)) { return false; };

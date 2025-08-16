@@ -9,6 +9,7 @@
 #include "../dataField.hpp"
 #include "../../Xref/xref.hpp"
 #include "../../Utility/uuid.hpp"
+#include "../ModuleData.hpp"
 
 class TabularData : public DataModule { 
 
@@ -32,9 +33,13 @@ protected:
 
 public:
     explicit TabularData(const std::string& schemaPath, UUID uuid);
+    explicit TabularData(
+        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid);
+        
     virtual ~TabularData() override = default;
     
-    void addData(const nlohmann::json& rowData);
+    virtual void addData(
+        const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) override;
     // void writeBinary(std::ostream& out, XRefTable& xref) override;
 
     void printData(std::ostream& out) const override;

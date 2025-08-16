@@ -17,6 +17,12 @@ TabularData::TabularData(const string& schemaPath, UUID uuid) : DataModule(schem
     initialise();
 }
 
+TabularData::TabularData(
+    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid) 
+    : DataModule(schemaPath, schemaJson, uuid, ModuleType::Tabular) {
+    initialise();
+}
+
 void TabularData::parseDataSchema(const nlohmann::json& schemaJson) {
 
     if (!schemaJson.contains("properties")) {
@@ -30,8 +36,20 @@ void TabularData::parseDataSchema(const nlohmann::json& schemaJson) {
     }
 }
 
-void TabularData::addData(const nlohmann::json& data) {
-    addTableData(data, fields, rows);
+void TabularData::addData(const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>& data) {
+    if (std::holds_alternative<nlohmann::json>(data)) {
+        const auto& jsonData = std::get<nlohmann::json>(data);
+        
+        if (jsonData.is_array()) {
+            // Handle array of metadata rows
+            for (const auto& row : jsonData) {
+                addTableData(row, fields, rows);
+            }
+        } else {
+            // Handle single metadata row (backward compatibility)
+            addTableData(jsonData, fields, rows);
+        }
+    }
 }
 
 void TabularData::writeData(ostream& out) const {

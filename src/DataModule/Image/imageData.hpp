@@ -62,9 +62,13 @@ protected:
 
 public:
     explicit ImageData(const std::string& schemaPath, UUID uuid);
+    explicit ImageData(
+        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid);
+
     virtual ~ImageData() override = default;
     
-    void addData(const std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>>& frameDataPairs);
+    virtual void addData(
+        const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) override;
 
     void printData(std::ostream& out) const override;
     

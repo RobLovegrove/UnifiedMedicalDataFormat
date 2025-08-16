@@ -13,13 +13,11 @@
       "required": ["position", "orientation"],
       "properties": {
         "position": {
-          "type": "object",
-          "description": "3D position of the frame",
-          "properties": {
-            "x": { "type": "number", "format": "float32" },
-            "y": { "type": "number", "format": "float32" },
-            "z": { "type": "number", "format": "float32" }
-          }
+          "type": "array",
+          "description": "Position in n-dimensional space, matching the dimensions array",
+          "items": { "type": "number", "format": "float32" },
+          "minItems": 2,
+          "maxItems": 10
         },
         "orientation": {
           "type": "object",

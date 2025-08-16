@@ -16,6 +16,8 @@ private:
 
     static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 2 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
 
+    bool writeXref(std::ostream& outfile);
+
 public:
     UMDFFile() = default;
     ~UMDFFile() = default;
@@ -32,9 +34,11 @@ public:
     void loadModule(const XrefEntry& entry);
     
     // Writing operations (delegated to Writer)
-    bool writeNewFile(const std::string& filename);
-    bool addModule(const ModuleData& module);
-    bool updateModule(const std::string& moduleId, const ModuleData& module);
+    std::expected<std::vector<UUID>, std::string> writeNewFile(std::string& filename, 
+        std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
+    std::expected<std::vector<UUID>, std::string> addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
+    std::expected<std::vector<UUID>, std::string> updateModules(std::vector<std::string>& moduleId, std::vector<ModuleData>& modules);
+
 };
 
 #endif 

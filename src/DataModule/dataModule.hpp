@@ -5,6 +5,7 @@
 #include "Header/dataHeader.hpp"
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
+#include "ModuleData.hpp"
 
 #include <vector>
 #include <unordered_map>
@@ -12,18 +13,6 @@
 #include <memory>
 #include <fstream>
 #include <variant>
-
-// Forward declaration for recursive structure
-struct ModuleData;
-
-struct ModuleData {
-    nlohmann::json metadata;
-    std::variant<
-        nlohmann::json,                    // For tabular data
-        std::vector<uint8_t>,              // For frame pixel data
-        std::vector<ModuleData>            // For N-dimensional data
-    > data;
-};
 
 struct FieldInfo {
     size_t offset;   
@@ -49,6 +38,8 @@ protected:
 
     explicit DataModule() {};
     DataModule(const std::string& schemaPath, UUID uuid, ModuleType type);
+    DataModule(
+        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type);
 
     void initialise();
 
@@ -60,6 +51,7 @@ protected:
                                             const nlohmann::json& definition);
                                             
     std::ifstream openSchemaFile(const std::string& schemaPath);
+
 
     // Helper functions to avoid code duplication between Metadata and tabular data
     void addTableData(
@@ -116,9 +108,11 @@ public:
     //     const std::string& schemaPath, UUID uuid, ModuleType type);
 
     const nlohmann::json& getSchema() const;
-    //virtual void addMetaData(const nlohmann::json& rowData);
+
+
+    virtual void addData(const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) = 0;
     virtual void addMetaData(const nlohmann::json& rowData);
-    // virtual void addData(const nlohmann::json& rowData) = 0;
+
     void writeBinary(std::ostream& out, XRefTable& xref);
 
     void printMetadata(std::ostream& out) const;

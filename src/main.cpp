@@ -3,8 +3,6 @@
 
 #include "umdfFile.hpp"
 #include "DataModule/dataModule.hpp"
-#include "writer.hpp"
-
 
 #include "CLI11/CLI11.hpp"
 #include "Utility/utils.hpp"
@@ -16,13 +14,7 @@ using namespace std;
 /* -------------------------- CONSTANTS -------------------------- */
 
 /* -------------------------- DECLARATIONS -------------------------- */
-void addWriteOptions(
-    CLI::App* writeCmd, 
-    string& inputFile, 
-    string& outputFile, 
-    bool& overwrite, 
-    bool& update
-    );
+void addWriteOptions(CLI::App* writeCmd, string& outputFile, bool& overwrite, bool& update);
 
 /* -------------------------- MOCK DATA -------------------------- */
 
@@ -35,8 +27,7 @@ int main(int argc, char** argv) {
 
     CLI::App app{"UMDF - Unified Medical Data Format Tool"};
     
-    Writer writer;
-    UMDFFile file;
+    UMDFFile file; // Single UMDFFile instance for both read and write
 
     string inputFile;
     string outputFile;
@@ -46,7 +37,7 @@ int main(int argc, char** argv) {
 
     // WRITE subcommand
     CLI::App* writeCmd = app.add_subcommand("write", "Write data to a UMDF file");
-    addWriteOptions(writeCmd, inputFile, outputFile, overwrite, update);
+    addWriteOptions(writeCmd, outputFile, overwrite, update);
 
     // READ subcommand
     CLI::App* readCmd = app.add_subcommand("read", "Read data from a UMDF file");
@@ -58,14 +49,163 @@ int main(int argc, char** argv) {
     CLI11_PARSE(app, argc, argv);
 
     if (*writeCmd) {
-
         cout << "Writing to file: " << outputFile << "\n";
-        if (!writer.writeNewFile(outputFile)) {
+        
+        // Create modules data for the new file
+        std::vector<std::pair<std::string, ModuleData>> modulesWithSchemas;
+        
+        // Create a patient module
+        ModuleData patientModule;
+        patientModule.metadata = nlohmann::json::array();
+        patientModule.metadata.push_back({
+            {"clinician", "Dr. Jane Doe"},
+            {"encounter_time", "2025-07-28"}
+        });
+        
+        // Add patient data
+        nlohmann::json patientData = nlohmann::json::array();
+        patientData.push_back({
+            {"patient_id", "123e4567-e89b-12d3-a456-426614174000"},
+            {"gender", "male"},
+            {"birth_sex", "female"},
+            {"birth_date", "1990-01-01"},
+            {"name", {
+                {"family", "Smith"},
+                {"given", "Alice"}
+            }},
+            {"age", 29}
+        });
+        patientData.push_back({
+            {"patient_id", "f49900f3-8dc7-47b9-b6f5-34939e4b42dc"},
+            {"gender", "male"},
+            {"birth_sex", "male"},
+            {"birth_date", "1994-12-29"},
+            {"name", {
+                {"family", "Lovegrove"},
+                {"given", "This is a long sentence that will be too long to store in a fixed length string"}
+            }},
+            {"age", 30}
+        });
+        
+        patientModule.data = patientData;
+        modulesWithSchemas.push_back({"./schemas/patient/v1.0.json", patientModule});
+        
+        // Create an image module with sophisticated pattern generation
+        ModuleData imageModule;
+        imageModule.metadata = {
+            {"acquisitionDate", "2024-01-01"},
+            {"bodyPart", "CHEST"},
+            {"image_structure", {
+                {"bit_depth", 8},
+                {"channels", 3},
+                {"dimension_names", {"x", "y", "z", "time"}},
+                {"dimensions", {256, 256, 12, 5}},
+                {"encoding", "jpeg2000-lossless"},
+                {"layout", "interleaved"},
+                {"memory_order", "row_major"},
+                {"origin", "top_left"}
+            }},
+            {"institution", "Test Hospital"},
+            {"modality", "CT"},
+            {"patientID", "12345"},
+            {"patientName", "John Doe"},
+            {"technician", "Dr. Smith"}
+        };
+        
+        // Create sophisticated frame data with patterns
+        std::vector<ModuleData> frameModules;
+        int width = 256;
+        int height = 256;
+        int depth = 12;  // z dimension
+        int timePoints = 5;  // time dimension
+        
+        // Create frames for each slice and time point
+        for (int time = 0; time < timePoints; time++) {
+            for (int slice = 0; slice < depth; slice++) {
+                std::vector<uint8_t> sliceData(width * height * 3);  // RGB data
+                
+                // Fill with RGB pattern - create high contrast patterns that change with slice and time
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        size_t pixel_index = static_cast<size_t>(y * width + x);
+                        
+                        // Z dimension (slice) affects brightness - creates a clear light-to-dark gradient
+                        // First slice (z=0) is brightest, last slice (z=depth-1) is darkest
+                        double zBrightness = 1.0 - (static_cast<double>(slice) / (depth - 1)) * 0.7;
+                        zBrightness = std::max(0.3, std::min(1.0, zBrightness));
+                        
+                        // Time dimension affects color dominance - each time point gets a distinct color
+                        uint8_t r, g, b;
+                        
+                        if (time == 0) {
+                            // Time 0: Red dominant
+                            r = static_cast<uint8_t>(255 * zBrightness);
+                            g = static_cast<uint8_t>(80 * zBrightness);
+                            b = static_cast<uint8_t>(80 * zBrightness);
+                        } else if (time == 1) {
+                            // Time 1: Green dominant
+                            r = static_cast<uint8_t>(80 * zBrightness);
+                            g = static_cast<uint8_t>(255 * zBrightness);
+                            b = static_cast<uint8_t>(80 * zBrightness);
+                        } else if (time == 2) {
+                            // Time 2: Blue dominant
+                            r = static_cast<uint8_t>(80 * zBrightness);
+                            g = static_cast<uint8_t>(80 * zBrightness);
+                            b = static_cast<uint8_t>(255 * zBrightness);
+                        } else if (time == 3) {
+                            // Time 3: Yellow dominant (Red + Green)
+                            r = static_cast<uint8_t>(255 * zBrightness);
+                            g = static_cast<uint8_t>(255 * zBrightness);
+                            b = static_cast<uint8_t>(80 * zBrightness);
+                        } else {
+                            // Time 4: Magenta dominant (Red + Blue)
+                            r = static_cast<uint8_t>(255 * zBrightness);
+                            g = static_cast<uint8_t>(80 * zBrightness);
+                            b = static_cast<uint8_t>(255 * zBrightness);
+                        }
+                        
+                        // Interleaved RGB format: RGBRGBRGB...
+                        sliceData[pixel_index * 3 + 0] = r;  // Red
+                        sliceData[pixel_index * 3 + 1] = g;  // Green
+                        sliceData[pixel_index * 3 + 2] = b;  // Blue
+                    }
+                }
+                
+                // Create frame metadata with 4D positioning
+                ModuleData frameModule;
+                frameModule.metadata = {
+                    {"position", {0.0, 0.0, static_cast<double>(slice), static_cast<double>(time)}},
+                    {"orientation", {
+                        {"row_cosine", {1.0, 0.0, 0.0}},
+                        {"column_cosine", {0.0, 1.0, 0.0}}
+                    }},
+                    {"timestamp", "2024-01-01T12:00:00Z"},
+                    {"frame_number", slice + time * depth},
+                    {"time_point", time},
+                    {"slice_number", slice}
+                };
+                
+                frameModule.data = sliceData;
+                frameModules.push_back(frameModule);
+            }
+        }
+        
+        imageModule.data = frameModules;
+        modulesWithSchemas.push_back({"./schemas/image/v1.0.json", imageModule});
+        
+        // Write the new file using UMDFFile
+
+        auto result = file.writeNewFile(outputFile, modulesWithSchemas);
+        if (!result) {
             cerr << "Failed to write data\n";
             return 1;
         }
 
-         cout << "Data written successfully.\n";
+        for (const auto& uuid : result.value()) {
+            cout << "Module UUID: " << uuid.toString() << endl;
+        }
+
+        cout << "Data written successfully.\n";
     }
 
     else if (*readCmd) {
@@ -119,17 +259,20 @@ int main(int argc, char** argv) {
                     const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
                     cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
                     
-                    // // Optionally show details of nested modules
-                    // for (size_t i = 0; i < nestedModules.size(); i++) {
-                    //     cout << "  Sub-module " << i << " metadata: " 
-                    //          << nestedModules[i].metadata.dump(2) << endl;
-                    // }
+                    // Show details of nested modules
+                    for (size_t i = 0; i < nestedModules.size() && i < 3; i++) { // Limit to first 3 for readability
+                        cout << "  Sub-module " << i << " metadata: " 
+                             << nestedModules[i].metadata.dump(2) << endl;
+                    }
+                    if (nestedModules.size() > 3) {
+                        cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;
+                    }
                 }
                 cout << endl;
             }
         }
         
-        // cout << "File read complete" << endl;
+        cout << "File read complete" << endl;
     }
 
     return 0;
@@ -139,15 +282,8 @@ int main(int argc, char** argv) {
 
 /* -------------------------- HELPER FUNCTIONS -------------------------- */
 
-void addWriteOptions(
-    CLI::App* writeCmd, 
-    string& inputFile, 
-    string& outputFile, 
-    bool& overwrite, 
-    bool& update 
-) {
+void addWriteOptions(CLI::App* writeCmd, string& outputFile, bool& overwrite, bool& update) {
 
-    writeCmd->add_option("-i,--input", inputFile, "Input data file")->required();
     writeCmd->add_option("-o,--output", outputFile, "Output UMDF file")->required();
 
     writeCmd->add_flag("--overwrite", overwrite, "Overwrite existing UMDF file if it exists");

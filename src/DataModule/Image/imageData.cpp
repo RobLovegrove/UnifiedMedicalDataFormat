@@ -4,6 +4,7 @@
 #include "../Header/dataHeader.hpp"
 #include "../dataModule.hpp"
 #include "../../Xref/xref.hpp"
+#include "../ModuleData.hpp"
 
 #include "string"
 #include <fstream>
@@ -41,6 +42,19 @@ ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPat
     initialise();
 }
 
+ImageData::ImageData(
+    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid) 
+    : DataModule(schemaPath, schemaJson, uuid, ModuleType::Image) {
+
+    // Initialize encoding to RAW by default (always safe for medical data)
+    encoding = ImageEncoding::RAW;
+    
+    // Initialize the image encoder
+    encoder = std::make_unique<ImageEncoder>();
+
+    initialise();
+}
+
 void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
     // Extract frame schema reference from data section
     if (schemaJson.contains("$frame_schema")) {
@@ -50,41 +64,117 @@ void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
     }
 }
 
-void ImageData::addData(const std::vector<std::pair<nlohmann::json, std::vector<uint8_t>>>& frameDataPairs) {
+// struct ModuleData {
+//     nlohmann::json metadata;
+//     std::variant<
+//         nlohmann::json,                    // For tabular data
+//         std::vector<uint8_t>,              // For frame pixel data
+//         std::vector<ModuleData>            // For N-dimensional data
+//     > data;
+// };
+
+void ImageData::addData(
+    const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>& moduleData) {
+
     // Load the frame schema if not already loaded
     if (frameSchemaPath.empty()) {
         throw std::runtime_error("Frame schema path not set. Call parseDataSchema first.");
     }
-    
+
+    // Validate that we're receiving frame data (nested modules)
+    if (!std::holds_alternative<std::vector<ModuleData>>(moduleData)) {
+        throw std::runtime_error("ImageData::addData expects frame data (vector<ModuleData>), but received different data type");
+    }
+
+    // Extract the frame data
+    const auto& data = std::get<std::vector<ModuleData>>(moduleData);
+
+    // Validate frame count
+    if (data.empty()) {
+        throw std::runtime_error("ImageData::addData received empty frame data");
+    }
+
     // Start timing for total compression
     auto compressionStart = std::chrono::high_resolution_clock::now();
-    
-    // Create FrameData objects for each pair
-    for (const auto& [metadata, pixelData] : frameDataPairs) {
 
-        auto frame = std::make_unique<FrameData>(frameSchemaPath, UUID());
+
+    if (static_cast<int>(data.size()) != getFrameCount()) {
+        throw std::runtime_error("ImageData::addData: Number of frames does not match frame count");
+    }
+
+    cout << "Constructing " << data.size() << " frames" << endl;
+
+
+    for (size_t i = 0; i < data.size(); ++i) {
+        const auto& frame = data[i];
+        auto frameModule = std::make_unique<FrameData>(frameSchemaPath, UUID());
+
+        // Validate frame structure
+        if (!frame.metadata.contains("position") || !frame.metadata.contains("orientation")) {
+            throw std::runtime_error("Frame " + std::to_string(i) + " missing required metadata (position/orientation)");
+        }
+
+        // Extract frame-specific data (assuming it's binary pixel data)
+        if (!std::holds_alternative<std::vector<uint8_t>>(frame.data)) {
+            throw std::runtime_error("Frame " + std::to_string(i) + " data is not binary pixel data");
+        }
+        
+        const auto& pixelData = std::get<std::vector<uint8_t>>(frame.data);
+
+        cout << "pixelData size: " << pixelData.size() << endl;
+
+        for (const uint16_t& dim : dimensions) {
+            cout << dim << endl;
+        }
+
+
+        size_t expectedSize = dimensions[0] * dimensions[1] * channels * bitDepth/8;
+
+        cout << "expectedSize: " << expectedSize << endl;
+        if (pixelData.size() != expectedSize) {
+            throw std::runtime_error("Frame " + std::to_string(i) + 
+            " pixel data size mismatch. Expected: " + std::to_string(expectedSize) + 
+            ", Got: " + std::to_string(pixelData.size()));
+        }
+
+        cout << "frames constructed" << endl;
 
         // Set the frame metadata
-        frame->addMetaData(metadata);
+        frameModule->addMetaData(frame.metadata);
+
         // Set the pixel data
-        frame->pixelData = pixelData;
+        frameModule->addData(frame.data);
+        
         // Set decompression flag based on current encoding
-        frame->needsDecompression = (encoding != ImageEncoding::RAW);
+        frameModule->needsDecompression = (encoding != ImageEncoding::RAW);
+        
         // Add to frames collection
-        frames.push_back(std::move(frame));
+        frames.push_back(std::move(frameModule));
     }
-    
+
     // End timing and output total compression time
     auto compressionEnd = std::chrono::high_resolution_clock::now();
     auto compressionDuration = std::chrono::duration_cast<std::chrono::microseconds>(compressionEnd - compressionStart);
     
-    std::cout << "Total compression time for " << frameDataPairs.size() << " frames (" 
+    std::cout << "Total compression time for " << data.size() << " frames (" 
               << (encoding == ImageEncoding::JPEG2000_LOSSLESS ? "JPEG2000" : 
                   encoding == ImageEncoding::PNG ? "PNG" : "RAW") << "): " 
               << compressionDuration.count() << " microseconds" << std::endl;
+
 }
 
 void ImageData::addMetaData(const nlohmann::json& data) {
+    
+    if (data.is_array()) {
+        // ImageData only supports single metadata row
+        throw std::runtime_error("ImageData::addMetaData: Only single metadata row supported. Received array with " + 
+                                std::to_string(data.size()) + " rows. Image modules should have one metadata row per module.");
+    }
+    
+    if (!data.is_object()) {
+        throw std::runtime_error("ImageData::addMetaData: Invalid metadata format. Metadata must be a JSON object.");
+    }
+
     // Call base class implementation first to populate the fields vector
     DataModule::addMetaData(data);
     
@@ -94,9 +184,6 @@ void ImageData::addMetaData(const nlohmann::json& data) {
     // // Check if we have the new nested image_structure format
     if (data.contains("image_structure") && data["image_structure"].is_object()) {
         const auto& imageStruct = data["image_structure"];
-
-        cout << "ImageStruct: \n";
-        cout << imageStruct.dump(4) << endl;
 
         //const auto& imageStruct = data;
           

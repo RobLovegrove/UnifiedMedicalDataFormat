@@ -26,7 +26,7 @@ bool Writer::writeNewFile(const string& filename) {
 
     // CREATE HEADER
     Header header;
-    if (!header.writePrimaryHeader(outfile, xref)) return false;
+    if (!header.writePrimaryHeader(outfile)) return false;
 
     // CREATE TABULAR MODULE
     try {
@@ -35,7 +35,9 @@ bool Writer::writeNewFile(const string& filename) {
             {"clinician", "Dr. Jane Doe"},
             {"encounter_time", "2025-07-28"}
         });
-        dm.addData({
+        
+        // Create JSON data and wrap it in the variant
+        nlohmann::json patientData1 = {
             {"patient_id", "123e4567-e89b-12d3-a456-426614174000"},
             {"gender", "male"},
             {"birth_sex", "female"},
@@ -45,8 +47,10 @@ bool Writer::writeNewFile(const string& filename) {
                 {"given", "Alice"}
             }},
             {"age", 29}
-        });
-        dm.addData({
+        };
+        dm.addData(patientData1);
+        
+        nlohmann::json patientData2 = {
             {"patient_id", "f49900f3-8dc7-47b9-b6f5-34939e4b42dc"},
             {"gender", "male"},
             {"birth_sex", "male"},
@@ -56,7 +60,9 @@ bool Writer::writeNewFile(const string& filename) {
                 {"given", "This is a long sentence that will be too long to store in a fixed length string"}
             }},
             {"age", 30}
-        });
+        };
+        dm.addData(patientData2);
+        
         dm.writeBinary(outfile, xref);
 
     }
@@ -159,8 +165,8 @@ bool Writer::writeNewFile(const string& filename) {
                 }
                 
                 // Create frame metadata with 4D positioning
-                nlohmann::json frameMetadata = {
-                    {"position", {{"x", 0.0}, {"y", 0.0}, {"z", static_cast<double>(slice)}, {"t", static_cast<double>(time)}}},
+                nlohmann::json frameMetadata = { 
+                    {"position", {0.0, 0.0, static_cast<double>(slice), static_cast<double>(time)}},
                     {"orientation", {
                         {"row_cosine", {1.0, 0.0, 0.0}},
                         {"column_cosine", {0.0, 1.0, 0.0}}
@@ -190,25 +196,6 @@ bool Writer::writeNewFile(const string& filename) {
 
     // CLOSE FILE
     outfile.close();
-    return true;
-}
-
-void Writer::setStream(std::fstream& stream) {
-    currentStream = &stream;
-}
-
-bool Writer::addModule(std::fstream& fileStream, const ModuleData& module) {  
-    // For now, just a placeholder
-    return true;
-}
-
-bool Writer::updateModule(std::fstream& fileStream, const std::string& moduleId, const ModuleData& module) {
-    // For now, just a placeholder
-    return true;
-}
-
-bool Writer::deleteModule(const std::string& moduleId) {
-    // For now, just a placeholder
     return true;
 }
 

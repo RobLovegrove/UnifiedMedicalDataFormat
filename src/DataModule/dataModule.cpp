@@ -25,6 +25,16 @@ DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type) {
     
 }
 
+DataModule::DataModule(
+    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type) 
+    : schemaJson(schemaJson) {
+
+    header = make_unique<DataHeader>();
+    header->setModuleType(type);
+    header->setSchemaPath(schemaPath);
+    header->setModuleID(uuid);
+}
+
 void DataModule::initialise() {
     try {
         parseSchemaHeader(schemaJson);
@@ -62,7 +72,6 @@ void DataModule::parseSchema(const nlohmann::json& schemaJson) {
 }
 
 void DataModule::parseSchemaHeader(const nlohmann::json& schemaJson) {
-    vector<unique_ptr<DataField>> fields;
 
     if (!schemaJson.contains("properties")) {
         throw runtime_error("Schema missing essential 'properties' field.");
@@ -583,7 +592,16 @@ nlohmann::json DataModule::getNestedValue(const nlohmann::json& data, const std:
 
 
 void DataModule::addMetaData(const nlohmann::json& data) {
-    addTableData(data, metaDataFields, metaDataRows);
+
+    if (data.is_array()) {
+        // Handle array of metadata rows
+        for (const auto& row : data) {
+            addTableData(row, metaDataFields, metaDataRows);
+        }
+    } else {
+        // Handle single metadata row (backward compatibility)
+        addTableData(data, metaDataFields, metaDataRows);
+    }
 }
 
 void DataModule::printTableData(
