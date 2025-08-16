@@ -1,35 +1,94 @@
-# Ignore build artifacts
-/build/
-/build/*
-
-# Ignore object files
+# Build artifacts
+build/
 *.o
-*.obj
-
-# Ignore executable files
-umdf
+*.d
+*.a
+*.so
+*.dylib
 *.exe
-*.out
-*.app
+umdf_tool
 
-# Ignore temporary files
-*.log
-*.tmp
+# Test and output files
+test_*.umdf
+*_workflow.umdf
+*.umdf
+test_output.umdf
+dummy_input.txt
+
+# IDE and editor files
+.vscode/
+.idea/
 *.swp
+*.swo
 *~
-
-# Ignore OS-specific files
 .DS_Store
 Thumbs.db
 
-# Ignore editor/IDE folders
-.vscode/
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.out
 
-# Ignore Makefile
+# Dependencies (if you add any package managers later)
+node_modules/
+vendor/
+.env
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python (if you add Python bindings later)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# CMake (if you add CMake later)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
 Makefile
 
-# Ignore any compiled static or shared libraries
-*.a
-*.so
-*.dll
-*.dylib
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+coverage/
+
+# Valgrind output
+valgrind-out.txt
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Backup files
+*.bak
+*.backup
+*.orig
