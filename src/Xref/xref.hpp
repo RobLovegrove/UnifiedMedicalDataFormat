@@ -42,6 +42,8 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, const XRefTable& table);
 
+    void setObsolete(std::ostream& out);
+
 };
 
 #endif

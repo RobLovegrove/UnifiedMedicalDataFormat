@@ -1,7 +1,7 @@
 #include "umdfFile.hpp"
 #include "Xref/xref.hpp"
 #include "DataModule/dataModule.hpp"
-#include "DataModule/Image/ImageData.hpp"
+#include "DataModule/Image/imageData.hpp"
 #include "DataModule/Tabular/tabularData.hpp"
 
 #include "Utility/utils.hpp"
@@ -162,6 +162,75 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string
 
     cout << "Header written" << endl;
 
+    // Write Modules to file
+    result = writeModule(modulesWithSchemas);
+    if (!result) return std::unexpected(result.error());
+    moduleIds = result.value();
+
+    cout << "Modules written" << endl;
+    
+    // WRITE XREF TABLE at the end
+    if (!writeXref(fileStream)) return std::unexpected("Failed to write xref table");
+
+    // CLOSE FILE
+    closeFile();
+    return moduleIds;
+}
+
+
+
+std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
+
+    std::expected<std::vector<UUID>, std::string> result;
+
+    // Check if file is open
+    if (!fileStream.is_open()) return std::unexpected("No file is currently open");
+
+    // Check if XREF table is loaded
+    if (xrefTable.getEntries().size() == 0) {
+        xrefTable = XRefTable::loadXrefTable(fileStream);
+    }
+
+    // Write Modules to file
+    result = writeModule(modulesWithSchemas);
+    if (!result) return std::unexpected(result.error());
+    std::vector<UUID> moduleIds = result.value();
+
+    // Make old XREF table obsolete
+    xrefTable.setObsolete(fileStream);
+
+    // WRITE new XREF TABLE at the end
+    if (!writeXref(fileStream)) return std::unexpected("Failed to write xref table");
+
+    // CLOSE FILE
+    closeFile();
+    return moduleIds;
+}
+
+std::expected<std::vector<UUID>, std::string> UMDFFile::updateModules(std::vector<std::string>& moduleIds, std::vector<ModuleData>& modules) {
+    // TODO: Implement module updating logic
+    // For now, return empty result
+    (void)moduleIds;  // Suppress unused parameter warning
+    (void)modules;    // Suppress unused parameter warning
+    return std::vector<UUID>();
+}
+
+
+// Helper functions
+bool UMDFFile::writeXref(std::ostream& outfile) { 
+    // Explicitly seek to end of file
+    outfile.seekp(0, std::ios::end);
+    
+    uint64_t offset = outfile.tellp();  // Get position at end
+    xrefTable.setXrefOffset(offset);
+    return xrefTable.writeXref(outfile);
+}
+
+std::expected<std::vector<UUID>, std::string> UMDFFile::writeModule(
+    const std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
+        
+    std::vector<UUID> moduleIds;  // Declare the variable here
+        
     // CREATE MODULES 
     for (const auto& [schemaPath, moduleData] : modulesWithSchemas) {
 
@@ -213,35 +282,5 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string
         moduleIds.push_back(dm->getModuleID());
     }
 
-    cout << "Modules written" << endl;
-    
-    // WRITE XREF TABLE at the end
-    if (!writeXref(fileStream)) return std::unexpected("Failed to write xref table");
-
-    // CLOSE FILE
-    closeFile();
     return moduleIds;
-}
-
-
-
-std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
-
-
-
-}
-
-std::expected<std::vector<UUID>, std::string> UMDFFile::updateModules(std::vector<std::string>& moduleId, std::vector<ModuleData>& modules) {
-
-
-}
-
-
-bool UMDFFile::writeXref(std::ostream& outfile) { 
-    // Explicitly seek to end of file
-    outfile.seekp(0, std::ios::end);
-    
-    uint64_t offset = outfile.tellp();  // Get position at end
-    xrefTable.setXrefOffset(offset);
-    return xrefTable.writeXref(outfile);
 }

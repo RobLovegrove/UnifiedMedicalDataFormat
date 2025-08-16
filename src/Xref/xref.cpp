@@ -110,6 +110,7 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
     }
 
     // 3. Seek to xref offset
+    table.setXrefOffset(inXrefOffset);
     in.seekg(inXrefOffset);
 
     // 4. Read "XREF" signature
@@ -168,4 +169,21 @@ ostream& operator<<(ostream& os, const XRefTable& table) {
 
     os << "  Xref Offset: 0x" << std::hex << table.xrefOffset << std::dec << '\n';
     return os;
+}
+
+void XRefTable::setObsolete(std::ostream& out) {
+
+    // Get current position
+    std::streampos currentPos = out.tellp();
+    
+    // Seek to current table flag
+    out.seekp(xrefOffset - 8);
+
+    // Set current table flag to 0
+    uint8_t isCurrent = 0;
+    out.write(reinterpret_cast<const char*>(&isCurrent), sizeof(isCurrent));
+
+    // Seek back to original position
+    out.seekp(currentPos);
+    
 }

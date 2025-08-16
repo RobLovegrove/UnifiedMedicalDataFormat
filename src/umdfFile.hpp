@@ -4,8 +4,15 @@
 #include <memory>
 #include <string>
 #include <fstream>
+#include <expected>
+#include <vector>
 #include "reader.hpp"
 #include "writer.hpp"
+#include "Header/header.hpp"
+#include "Xref/xref.hpp"
+#include "DataModule/dataModule.hpp"
+#include "DataModule/ModuleData.hpp"
+#include "Utility/uuid.hpp"
 
 class UMDFFile {
 private:
@@ -17,6 +24,9 @@ private:
     static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 2 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
 
     bool writeXref(std::ostream& outfile);
+
+    std::expected<std::vector<UUID>, std::string> writeModule(
+        const std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
 
 public:
     UMDFFile() = default;
@@ -38,6 +48,7 @@ public:
         std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
     std::expected<std::vector<UUID>, std::string> addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
     std::expected<std::vector<UUID>, std::string> updateModules(std::vector<std::string>& moduleId, std::vector<ModuleData>& modules);
+    std::expected<std::vector<UUID>, std::string> deleteModules(const std::string& moduleId);
 
 };
 

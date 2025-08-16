@@ -49,12 +49,13 @@ int main(int argc, char** argv) {
     CLI11_PARSE(app, argc, argv);
 
     if (*writeCmd) {
+        cout << "=== STEP 1: Writing new file with tabular data ===\n";
         cout << "Writing to file: " << outputFile << "\n";
         
-        // Create modules data for the new file
+        // Create modules data for the new file - ONLY tabular data initially
         std::vector<std::pair<std::string, ModuleData>> modulesWithSchemas;
         
-        // Create a patient module
+        // Create a patient module (tabular data only)
         ModuleData patientModule;
         patientModule.metadata = nlohmann::json::array();
         patientModule.metadata.push_back({
@@ -90,7 +91,45 @@ int main(int argc, char** argv) {
         patientModule.data = patientData;
         modulesWithSchemas.push_back({"./schemas/patient/v1.0.json", patientModule});
         
-        // Create an image module with sophisticated pattern generation
+        // Write the new file using UMDFFile (tabular data only)
+        auto result = file.writeNewFile(outputFile, modulesWithSchemas);
+        if (!result) {
+            cerr << "Failed to write data\n";
+            return 1;
+        }
+
+        cout << "Initial file written with tabular data. Module UUIDs:\n";
+        for (const auto& uuid : result.value()) {
+            cout << "  - " << uuid.toString() << endl;
+        }
+
+        cout << "\n=== STEP 2: Reading the file to verify tabular data ===\n";
+        
+        // Read the file to verify tabular data
+        if (!file.openFile(outputFile)) {
+            cerr << "Failed to open file for reading: " << outputFile << "\n";
+            return 1;
+        }
+        
+        auto fileInfo = file.getFileInfo();
+        if (fileInfo.contains("success") && !fileInfo["success"]) {
+            cerr << "Error reading file: " << fileInfo["error"] << "\n";
+            return 1;
+        }
+        
+        cout << "File opened successfully. Module count: " << fileInfo["module_count"] << "\n";
+        
+        // List all modules
+        if (fileInfo.contains("modules")) {
+            cout << "Modules in file:\n";
+            for (const auto& module : fileInfo["modules"]) {
+                cout << "  - " << module["type"] << " (UUID: " << module["uuid"] << ")\n";
+            }
+        }
+
+        cout << "\n=== STEP 3: Adding image data using update API ===\n";
+        
+        // Create image module data
         ModuleData imageModule;
         imageModule.metadata = {
             {"acquisitionDate", "2024-01-01"},
@@ -191,21 +230,86 @@ int main(int argc, char** argv) {
         }
         
         imageModule.data = frameModules;
-        modulesWithSchemas.push_back({"./schemas/image/v1.0.json", imageModule});
         
-        // Write the new file using UMDFFile
-
-        auto result = file.writeNewFile(outputFile, modulesWithSchemas);
-        if (!result) {
-            cerr << "Failed to write data\n";
+        // Add image data using the addModules API
+        std::vector<std::pair<std::string, ModuleData>> imageModulesWithSchemas;
+        imageModulesWithSchemas.push_back({"./schemas/image/v1.0.json", imageModule});
+        
+        auto addResult = file.addModules(imageModulesWithSchemas);
+        if (!addResult) {
+            cerr << "Failed to add image data: " << addResult.error() << "\n";
             return 1;
         }
-
-        for (const auto& uuid : result.value()) {
-            cout << "Module UUID: " << uuid.toString() << endl;
+        
+        cout << "Image data added successfully. New module UUIDs:\n";
+        for (const auto& uuid : addResult.value()) {
+            cout << "  - " << uuid.toString() << endl;
         }
 
-        cout << "Data written successfully.\n";
+        cout << "\n=== STEP 4: Rereading the file to show all data ===\n";
+        
+        // Close and reopen to get fresh file info
+        file.closeFile();
+        if (!file.openFile(outputFile)) {
+            cerr << "Failed to reopen file for final reading: " << outputFile << "\n";
+            return 1;
+        }
+        
+        auto finalFileInfo = file.getFileInfo();
+        if (finalFileInfo.contains("success") && !finalFileInfo["success"]) {
+            cerr << "Error reading final file: " << finalFileInfo["error"] << "\n";
+            return 1;
+        }
+        
+        cout << "Final file opened successfully. Module count: " << finalFileInfo["module_count"] << "\n";
+        
+        // List all modules
+        if (finalFileInfo.contains("modules")) {
+            cout << "All modules in file:\n";
+            for (const auto& module : finalFileInfo["modules"]) {
+                cout << "  - " << module["type"] << " (UUID: " << module["uuid"] << ")\n";
+            }
+        }
+
+        cout << "\n=== Final data verification ===\n";
+        
+        // Load all modules to show final state
+        for (const auto& module : finalFileInfo["modules"]) {
+            cout << "Loading module: " << module["uuid"] << endl;
+            auto moduleData = file.getModuleData(module["uuid"]);
+            if (moduleData) {
+                cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
+                cout << "Metadata: " << moduleData.value().metadata.dump(2) << endl;
+                
+                // Handle the data variant based on type
+                const auto& data = moduleData.value().data;
+                if (std::holds_alternative<nlohmann::json>(data)) {
+                    // Tabular data
+                    cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
+                } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
+                    // Binary data (like image pixels)
+                    const auto& binaryData = std::get<std::vector<uint8_t>>(data);
+                    cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
+                } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
+                    // Nested modules (like image frames)
+                    const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
+                    cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
+                    
+                    // Show details of nested modules
+                    for (size_t i = 0; i < nestedModules.size() && i < 3; i++) { // Limit to first 3 for readability
+                        cout << "  Sub-module " << i << " metadata: " 
+                             << nestedModules[i].metadata.dump(2) << endl;
+                    }
+                    if (nestedModules.size() > 3) {
+                        cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;
+                    }
+                }
+                cout << endl;
+            }
+        }
+        
+        cout << "=== Full workflow demonstration complete! ===\n";
+        cout << "File: " << outputFile << " now contains both tabular and image data.\n";
     }
 
     else if (*readCmd) {

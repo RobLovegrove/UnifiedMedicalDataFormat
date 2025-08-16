@@ -121,23 +121,14 @@ void ImageData::addData(
         
         const auto& pixelData = std::get<std::vector<uint8_t>>(frame.data);
 
-        cout << "pixelData size: " << pixelData.size() << endl;
-
-        for (const uint16_t& dim : dimensions) {
-            cout << dim << endl;
-        }
-
-
         size_t expectedSize = dimensions[0] * dimensions[1] * channels * bitDepth/8;
 
-        cout << "expectedSize: " << expectedSize << endl;
         if (pixelData.size() != expectedSize) {
             throw std::runtime_error("Frame " + std::to_string(i) + 
             " pixel data size mismatch. Expected: " + std::to_string(expectedSize) + 
             ", Got: " + std::to_string(pixelData.size()));
         }
 
-        cout << "frames constructed" << endl;
 
         // Set the frame metadata
         frameModule->addMetaData(frame.metadata);
