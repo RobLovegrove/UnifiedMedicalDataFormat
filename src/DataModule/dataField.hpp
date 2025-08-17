@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp> 
 
 
+
 /* =============== DataField =============== */
 
 class DataField {
@@ -35,6 +36,8 @@ public:
     virtual void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) = 0;
     virtual nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) = 0;
 
+    virtual bool validateValue(const nlohmann::json& value) const = 0;
+
     void writeRowBitMap();
 
     // Overload operator<< for Field
@@ -55,7 +58,8 @@ public:
 
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
-    
+
+    bool validateValue(const nlohmann::json& value) const override;
 };
 
 /* =============== VarStringField =============== */
@@ -74,7 +78,8 @@ public:
 
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
-    
+
+    bool validateValue(const nlohmann::json& value) const override;
 };
 
 /* =============== EnumField =============== */
@@ -94,6 +99,8 @@ public:
 
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
+
+    bool validateValue(const nlohmann::json& value) const override;
 };
 
 /* =============== ArrayField =============== */
@@ -110,6 +117,8 @@ public:
     size_t getLength() const override;
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
+
+    bool validateValue(const nlohmann::json& value) const override;
 };
 
 /* =============== IntegerField =============== */
@@ -122,10 +131,12 @@ struct IntegerFormatInfo {
 class IntegerField : public DataField {
 private:
     IntegerFormatInfo integerFormat;
+    std::optional<int64_t> minValue;
+    std::optional<int64_t> maxValue;
 
 public:
-    IntegerField(std::string name, IntegerFormatInfo formatInfo) 
-        : DataField(name, "integer"), integerFormat(formatInfo) {}
+    IntegerField(std::string name, IntegerFormatInfo formatInfo, std::optional<int64_t> minValue, std::optional<int64_t> maxValue) 
+        : DataField(name, "integer"), integerFormat(formatInfo), minValue(minValue), maxValue(maxValue) {}
 
 
     static IntegerFormatInfo parseIntegerFormat(const std::string& format);
@@ -137,6 +148,8 @@ public:
 
     size_t getLength() const override { return integerFormat.byteLength; }
 
+    bool validateValue(const nlohmann::json& value) const override;
+
 };
 
 /* =============== FloatField =============== */
@@ -144,14 +157,19 @@ public:
 class FloatField : public DataField {
 private:
     std::string format; // "float32", "float64", etc.
+    std::optional<int64_t> minValue;
+    std::optional<int64_t> maxValue;
 
 public:
-    FloatField(std::string name, std::string format) 
-        : DataField(name, "number"), format(format) {}
+    FloatField(std::string name, std::string format, std::optional<int64_t> minValue, std::optional<int64_t> maxValue) 
+        : DataField(name, "number"), format(format), minValue(minValue), maxValue(maxValue) {}
 
     size_t getLength() const override;
     void encodeToBuffer(const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;
     nlohmann::json decodeFromBuffer(const std::vector<uint8_t>& buffer, size_t offset) override;
+
+    bool validateValue(const nlohmann::json& value) const override;
+
 };
 
 /* =============== ObjectField =============== */
@@ -177,6 +195,8 @@ public:
     }
 
     size_t getLength() const override;
+
+    bool validateValue(const nlohmann::json& value) const override;
 };
 
 #endif

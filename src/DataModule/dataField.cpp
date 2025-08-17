@@ -45,6 +45,13 @@ nlohmann::json StringField::decodeFromBuffer(
     return result;
 }
 
+bool StringField::validateValue(const nlohmann::json& value) const {
+    if (!value.is_string()) return false;
+
+    return true;
+}
+
+
 /* =============== VarStringField =============== */
 
 void VarStringField::encodeToBuffer(
@@ -100,6 +107,11 @@ nlohmann::json VarStringField::decodeFromBuffer(
     return nlohmann::json(result);
 }
 
+bool VarStringField::validateValue(const nlohmann::json& value) const {
+    if (!value.is_string()) return false;
+
+    return true;
+}
 
 /* ================== EnumField ================== */
 
@@ -139,6 +151,13 @@ nlohmann::json EnumField::decodeFromBuffer(
     }
     return enumValues[enumValue];
 }
+
+bool EnumField::validateValue(const nlohmann::json& value) const {
+    if (!value.is_string()) return false;
+
+    return find(enumValues.begin(), enumValues.end(), value.get<string>()) != enumValues.end();
+}
+
 
 /* =============== FloatField =============== */
 
@@ -185,6 +204,25 @@ nlohmann::json FloatField::decodeFromBuffer(
     }
 }
 
+bool FloatField::validateValue(const nlohmann::json& value) const {
+    if (!value.is_number()) {
+        return false;
+    }
+    
+    double floatValue = value.get<double>();
+
+    
+    if (minValue.has_value() && floatValue < minValue.value()) {
+        return false;
+    }
+    
+    if (maxValue.has_value() && floatValue > maxValue.value()) {
+        return false;
+    }
+    
+    return true;
+}
+
 /* =============== ArrayField =============== */
 
 ArrayField::ArrayField(std::string name, const nlohmann::json& itemDef, 
@@ -197,11 +235,37 @@ ArrayField::ArrayField(std::string name, const nlohmann::json& itemDef,
     
     if (itemType == "number" && itemDef.contains("format")) {
         std::string format = itemDef["format"];
-        itemField = std::make_unique<FloatField>(itemName, format);
+
+        std::optional<int64_t> minValue = std::nullopt;
+        std::optional<int64_t> maxValue = std::nullopt;
+
+        if (itemDef.contains("minimum")) {
+            minValue = itemDef["minimum"];
+        }
+
+        if (itemDef.contains("maximum")) {
+            maxValue = itemDef["maximum"];
+        }
+
+        itemField = std::make_unique<FloatField>(itemName, format, minValue, maxValue);
     } else if (itemType == "integer" && itemDef.contains("format")) {
         std::string format = itemDef["format"];
         IntegerFormatInfo integerFormat = IntegerField::parseIntegerFormat(format);
-        itemField = std::make_unique<IntegerField>(itemName, integerFormat);
+
+        std::optional<int64_t> minValue = std::nullopt;
+        std::optional<int64_t> maxValue = std::nullopt;
+        
+        if (itemDef.contains("minimum")) {
+            minValue = itemDef["minimum"];
+        }
+
+        if (itemDef.contains("maximum")) {
+            maxValue = itemDef["maximum"];
+        }
+
+        itemField = std::make_unique<IntegerField>(itemName, integerFormat, minValue, maxValue);
+
+
     } else if (itemType == "string") {
         // For string arrays, we'll use StringField with a fixed length
         size_t length = itemDef.value("length", 32); // Default to 32 bytes
@@ -263,6 +327,23 @@ nlohmann::json ArrayField::decodeFromBuffer(
     return array;
 }
 
+bool ArrayField::validateValue(const nlohmann::json& value) const {
+
+    if (!value.is_array()) return false;
+
+    const auto& array = value.get<std::vector<nlohmann::json>>();
+
+    if (array.size() < minItems || array.size() > maxItems) return false;
+
+    for (const auto& item : array) {
+        if (!itemField->validateValue(item)) return false;
+    }
+
+    return true;
+}
+
+
+
 /* =============== IntegerField =============== */
 
     IntegerFormatInfo IntegerField::parseIntegerFormat(const std::string& format) {
@@ -307,6 +388,30 @@ nlohmann::json ArrayField::decodeFromBuffer(
 
             return rawVal; // return as unsigned
         }
+
+    bool IntegerField::validateValue(const nlohmann::json& value) const {
+        if (!value.is_number_integer()) {
+            return false;
+        }
+        
+        // Use the existing isSigned flag!
+        if (!integerFormat.isSigned && value.get<int64_t>() < 0) {
+            return false;  // Unsigned field can't have negative values
+        }
+        
+        int64_t intValue = value.get<int64_t>();
+        
+        // Apply min/max constraints
+        if (minValue.has_value() && intValue < minValue.value()) {
+            return false;
+        }
+        
+        if (maxValue.has_value() && intValue > maxValue.value()) {
+            return false;
+        }
+        
+        return true;
+    }
 
 
 /* ================== ObjectField ================== */
@@ -358,5 +463,16 @@ nlohmann::json ObjectField::decodeFromBuffer(
 void ObjectField::addSubField(unique_ptr<DataField> field) {
 
     subFields.push_back(std::move(field));
+}
+
+bool ObjectField::validateValue(const nlohmann::json& value) const {
+
+    if (!value.is_object()) return false;
+
+    for (const auto& field : subFields) {
+        if (!field->validateValue(value[field->getName()])) return false;
+    }
+
+    return true;
 }
 

@@ -365,7 +365,18 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 
         IntegerFormatInfo integerFormat = IntegerField::parseIntegerFormat(format);
 
-        return make_unique<IntegerField>(name, integerFormat);
+        std::optional<int64_t> minValue = std::nullopt;
+        std::optional<int64_t> maxValue = std::nullopt;
+
+        if (definition.contains("minimum")) {
+            minValue = definition["minimum"];
+        }
+
+        if (definition.contains("maximum")) {
+            maxValue = definition["maximum"];
+        }
+
+        return make_unique<IntegerField>(name, integerFormat, minValue, maxValue);
     }
 
     // Handle numbers/floats
@@ -375,9 +386,18 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
         }
 
         std::string format = definition["format"];
-        
+
+        std::optional<int64_t> minValue = std::nullopt; 
+        std::optional<int64_t> maxValue = std::nullopt;
+
         if (format == "float32" || format == "float64") {
-            return make_unique<FloatField>(name, format);
+            if (definition.contains("minimum")) {
+                minValue = definition["minimum"];
+            }
+            if (definition.contains("maximum")) {
+                maxValue = definition["maximum"];
+            }
+            return make_unique<FloatField>(name, format, minValue, maxValue);
         } else {
             throw runtime_error("Unsupported number format: " + format);
         }
