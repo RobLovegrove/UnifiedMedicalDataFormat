@@ -163,7 +163,7 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string
     cout << "Header written" << endl;
 
     // Write Modules to file
-    result = writeModule(modulesWithSchemas);
+    result = writeModules(modulesWithSchemas);
     if (!result) return std::unexpected(result.error());
     moduleIds = result.value();
 
@@ -192,11 +192,11 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<s
     }
 
     // Write Modules to file
-    result = writeModule(modulesWithSchemas);
+    result = writeModules(modulesWithSchemas);
     if (!result) return std::unexpected(result.error());
     std::vector<UUID> moduleIds = result.value();
 
-    // Make old XREF table obsolete
+    // Make old XREF table obsolete (now with improved stream handling)
     xrefTable.setObsolete(fileStream);
 
     // WRITE new XREF TABLE at the end
@@ -207,12 +207,102 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<s
     return moduleIds;
 }
 
-std::expected<std::vector<UUID>, std::string> UMDFFile::updateModules(std::vector<std::string>& moduleIds, std::vector<ModuleData>& modules) {
-    // TODO: Implement module updating logic
-    // For now, return empty result
-    (void)moduleIds;  // Suppress unused parameter warning
-    (void)modules;    // Suppress unused parameter warning
-    return std::vector<UUID>();
+bool UMDFFile::updateModules(
+    std::vector<std::pair<std::string, ModuleData>>& moduleUpdates) {
+
+    // Check if file is open
+    if (!fileStream.is_open()) return false;
+
+    // Check if XREF table is loaded
+    if (xrefTable.getEntries().size() == 0) {
+        xrefTable = XRefTable::loadXrefTable(fileStream);
+    }
+
+    for (const auto& [moduleId, moduleData] : moduleUpdates) {
+
+        // For testing purposes print the metadata of the current module
+
+        auto data = getModuleData(moduleId);
+        cout << "Metadata of the current module: " << data.value().metadata << endl;
+
+
+        auto& entries = xrefTable.getEntries();  // Get reference to avoid copying
+        for (auto it = entries.begin(); it != entries.end(); ) {
+            if (it->id.toString() == moduleId) {
+                // Go to module offset in file
+                fileStream.seekg(it->offset);
+        
+                // Read the DataHeader
+                DataHeader dataHeader;
+                dataHeader.readDataHeader(fileStream);
+        
+                // Return to the start of the module
+                fileStream.seekg(it->offset);
+        
+                // Update the module's isCurrent flag to false
+                dataHeader.updateIsCurrent(false, fileStream);
+        
+                // Write the new module data
+                unique_ptr<DataModule> dm;
+        
+                switch (dataHeader.getModuleType()) {
+                    case ModuleType::Image: {
+                        dm = make_unique<ImageData>(dataHeader.getSchemaPath(), dataHeader.getModuleID());
+                        break;
+                    }
+                    case ModuleType::Tabular: {
+                        dm = make_unique<TabularData>(dataHeader.getSchemaPath(), dataHeader.getModuleID());
+                        break;
+                    }
+                    default:
+                        cout << "Unknown module type: " << dataHeader.getModuleType() << endl;
+                        return false;
+                }
+        
+                // Set the previous offset as the offset of the old module 
+                dm->setPrevious(it->offset);
+        
+                // SAFELY delete the old module from the xref table
+                it = entries.erase(it);
+        
+                dm->addMetaData(moduleData.metadata);
+                dm->addData(moduleData.data);
+        
+                // Ensure at end of file
+                fileStream.seekp(0, std::ios::end);
+        
+                dm->writeBinary(fileStream, xrefTable);
+
+                // Update loadedModules with the new module
+                for (auto moduleIt = loadedModules.begin(); moduleIt != loadedModules.end(); ) {
+                    if ((*moduleIt)->getModuleID().toString() == moduleId) {
+                        moduleIt = loadedModules.erase(moduleIt);
+                        loadedModules.push_back(std::move(dm));
+                        break;
+                    }
+                    ++moduleIt;
+                }
+                
+                // Since we found and processed the module, we can break
+                break;
+            } else {
+                ++it;  // Move to next element
+            }
+        }
+
+        data = getModuleData(moduleId);
+        cout << "Metadata of the current module: " << data.value().metadata << endl;
+    }
+
+    // Make old XREF table obsolete (now with improved stream handling)
+    xrefTable.setObsolete(fileStream);
+
+    // WRITE new XREF TABLE at the end
+    if (!writeXref(fileStream)) return false;
+
+    // CLOSE FILE
+    closeFile();
+    return true;
 }
 
 
@@ -226,7 +316,7 @@ bool UMDFFile::writeXref(std::ostream& outfile) {
     return xrefTable.writeXref(outfile);
 }
 
-std::expected<std::vector<UUID>, std::string> UMDFFile::writeModule(
+std::expected<std::vector<UUID>, std::string> UMDFFile::writeModules(
     const std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
         
     std::vector<UUID> moduleIds;  // Declare the variable here
@@ -275,6 +365,9 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::writeModule(
         dm->addData(moduleData.data);
 
         cout << "Writing module to file" << endl;
+
+        // Ensure at end of file
+        fileStream.seekp(0, std::ios::end);
 
         // WRITE MODULE TO FILE
         dm->writeBinary(fileStream, xrefTable);

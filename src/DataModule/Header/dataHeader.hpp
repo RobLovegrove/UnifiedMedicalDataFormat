@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include <expected>
 
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
@@ -12,11 +13,13 @@ enum class HeaderFieldType : uint8_t {
     StringSize    = 2,
     MetadataSize = 3,
     DataSize      = 4,
-    ModuleType    = 5,
-    SchemaPath    = 6,
-    Compression   = 7,
-    Endianness    = 8,
-    ModuleID      = 9
+    IsCurrent     = 5,
+    PreviousVersion = 6,
+    ModuleType    = 7,
+    SchemaPath    = 8,
+    Compression   = 9,
+    Endianness    = 10,
+    ModuleID      = 11
 };
 
 struct DataHeader {
@@ -29,6 +32,9 @@ protected:
 
     uint64_t moduleStartOffset;
     uint64_t totalModuleSize = 0;
+
+    bool isCurrent = true; // 1 = current, 0 = previous
+    uint64_t previousVersion = 0;
     
     std::streampos headerSizePos = 0;
     std::streampos metadataSizePos = 0;
@@ -48,6 +54,7 @@ protected:
     void writeTLVBool(std::ostream& out, HeaderFieldType type, bool value) const;
     std::streampos writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const;
     
+    std::expected<std::streampos, std::string> findTLVOffset(std::fstream& fileStream, HeaderFieldType type);
     // virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) = 0;
 
 public:
@@ -89,6 +96,9 @@ public:
     virtual uint64_t getAdditionalOffset() const { return 0; }
     virtual void seAdditionalOffset(uint64_t) {}
 
+    uint64_t getPrevious() const { return previousVersion; }
+    void setPrevious(uint64_t offset) { previousVersion = offset; }
+
 // METHODS
     virtual ~DataHeader() = default;
 
@@ -96,7 +106,10 @@ public:
 
     virtual void updateHeader(std::ostream& out);
 
+    void readHeaderSize(std::istream& in);
     void readDataHeader(std::istream& in);
+
+    bool updateIsCurrent(bool newIsCurrent, std::fstream& fileStream);
 
     friend std::ostream& operator<<(std::ostream& os, const DataHeader& header);
 

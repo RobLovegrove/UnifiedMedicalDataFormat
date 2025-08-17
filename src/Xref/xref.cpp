@@ -123,6 +123,7 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
     // 5. Read Current Table Flag
     uint8_t isCurrent = 0;
     in.read(reinterpret_cast<char*>(&isCurrent), sizeof(isCurrent));
+    cout << "Current Table Flag: " << isCurrent << endl;
     if (isCurrent == 0) {
         throw std::runtime_error("Obsolete Xref table.");
     }
@@ -176,14 +177,37 @@ void XRefTable::setObsolete(std::ostream& out) {
     // Get current position
     std::streampos currentPos = out.tellp();
     
-    // Seek to current table flag
-    out.seekp(xrefOffset - 8);
+    // Flush any pending output to ensure clean state
+    out.flush();
+    
+    // Seek to current table flag position
+    // Flag is at: "XREF" (4 bytes) + flag (1 byte) = position 5 from start of XRefTable
+    out.seekp(xrefOffset + 4, std::ios::beg);
+    
+    // Verify we're at the right position
+    if (static_cast<uint64_t>(out.tellp()) != xrefOffset + 4) {
+        // If seek failed, restore position and return
+        out.seekp(currentPos);
+        return;
+    }
 
-    // Set current table flag to 0
+    // Set current table flag to 0 (obsolete)
     uint8_t isCurrent = 0;
     out.write(reinterpret_cast<const char*>(&isCurrent), sizeof(isCurrent));
+    
+    // Flush the change
+    out.flush();
 
     // Seek back to original position
     out.seekp(currentPos);
     
+}
+
+void XRefTable::updateEntryOffset(UUID id, uint64_t offset) {
+    for (auto& entry : entries) {
+        if (entry.id == id) {
+            entry.offset = offset;
+            break;
+        }
+    }
 }

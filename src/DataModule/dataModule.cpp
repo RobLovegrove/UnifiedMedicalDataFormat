@@ -107,10 +107,6 @@ unique_ptr<DataModule> DataModule::fromStream(
     unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
 
     dmHeader->readDataHeader(in);
-
-    if (static_cast<ModuleType>(moduleType) != ModuleType::Frame) {
-        cout << *dmHeader << endl;
-    }
     
     unique_ptr<DataModule> dm;
 

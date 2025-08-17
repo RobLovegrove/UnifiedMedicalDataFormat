@@ -125,6 +125,7 @@ public:
     UUID getModuleID() const { return header->getModuleID(); }
     ModuleType getModuleType() const { return header->getModuleType(); }
     std::string getSchemaPath() const { return header->getSchemaPath(); }
+    void setPrevious(uint64_t offset) { header->setPrevious(offset); }
 };
 
 

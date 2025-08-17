@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <vector>
+#include <expected>
 
 /* ================ WRTIE FUNCTIONS ================ */
 
@@ -16,6 +17,9 @@ void DataHeader::writeToFile(std::ostream& out) {
     stringBufferSizePos = writeTLVFixed(out, HeaderFieldType::StringSize, &stringBufferSize, sizeof(stringBufferSize));// Updated after write
     metadataSizePos = writeTLVFixed(out, HeaderFieldType::MetadataSize, &metaDataSize, sizeof(metaDataSize)); // Updated after write
     dataSizePos = writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); 
+
+    writeTLVBool(out, HeaderFieldType::IsCurrent, isCurrent);
+    writeTLVFixed(out, HeaderFieldType::PreviousVersion, &previousVersion, sizeof(previousVersion));
 
     writeTLVString(out, HeaderFieldType::ModuleType, module_type_to_string(moduleType));
     writeTLVString(out, HeaderFieldType::SchemaPath, schemaPath);
@@ -30,6 +34,61 @@ void DataHeader::writeToFile(std::ostream& out) {
     headerSize = static_cast<uint32_t>(headerEnd - headerStart); // Will update in updateHeaderSize
 
 }
+
+std::expected<std::streampos, std::string> DataHeader::findTLVOffset(std::fstream& fileStream, HeaderFieldType type) {
+    // Read through the header to find the CurrentFlag TLV
+    size_t bytesRead = 0;
+    uint8_t typeId;
+    uint32_t length;
+
+    while (bytesRead < headerSize) {
+        fileStream.read(reinterpret_cast<char*>(&typeId), sizeof(typeId));
+        fileStream.read(reinterpret_cast<char*>(&length), sizeof(length));
+        bytesRead += sizeof(typeId) + sizeof(length);
+
+        if (typeId == static_cast<uint8_t>(type)) {
+            return fileStream.tellg();
+        }
+        else {
+            // Skip the TLV
+            fileStream.seekg(length, std::ios::cur);
+            bytesRead += length;
+        }
+    }
+
+    return std::unexpected("TLV field not found");
+}
+
+bool DataHeader::updateIsCurrent(bool newIsCurrent, std::fstream& fileStream) {
+
+    // Save current put position
+    std::streampos currentPos = fileStream.tellp();
+    
+    // Flush any pending operations
+    fileStream.flush();
+    
+    // Find TLV position (read-only operation)
+    auto offset = findTLVOffset(fileStream, HeaderFieldType::IsCurrent);
+    if (!offset) return false;
+    
+    // Flush again before writing
+    fileStream.flush();
+    
+    // Seek to exact position and write
+    fileStream.seekp(offset.value(), std::ios::beg);
+    fileStream.write(reinterpret_cast<const char*>(&newIsCurrent), sizeof(newIsCurrent));
+    
+    // Flush the write immediately
+    fileStream.flush();
+    
+    // Restore put position
+    fileStream.seekp(currentPos);
+    
+    return fileStream.good();
+}
+
+
+
 
 void DataHeader::updateHeader(std::ostream& out) {
 
@@ -78,8 +137,8 @@ std::streampos DataHeader::writeTLVFixed(std::ostream& out, HeaderFieldType type
 
 /* ================ READ FUNCTIONS ================ */
 
-void DataHeader::readDataHeader(std::istream& in) {
 
+void DataHeader::readHeaderSize(std::istream& in) {
     // Read header size
     uint8_t typeId;
     uint32_t length;
@@ -91,6 +150,14 @@ void DataHeader::readDataHeader(std::istream& in) {
     }
 
     in.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
+}
+
+void DataHeader::readDataHeader(std::istream& in) {
+
+    uint8_t typeId;
+    uint32_t length;
+
+    readHeaderSize(in);
 
     size_t bytesRead = sizeof(typeId) + sizeof(length) + sizeof(headerSize);    
     while (bytesRead < headerSize) {
@@ -117,6 +184,16 @@ void DataHeader::readDataHeader(std::istream& in) {
             case HeaderFieldType::StringSize:
                 if (length != sizeof(stringBufferSize)) throw std::runtime_error("Invalid StringSize length.");
                 std::memcpy(&stringBufferSize, buffer.data(), sizeof(stringBufferSize));
+                break;
+
+            case HeaderFieldType::IsCurrent:
+                if (length != sizeof(isCurrent)) throw std::runtime_error("Invalid IsCurrent length.");
+                std::memcpy(&isCurrent, buffer.data(), sizeof(isCurrent));
+                break;
+
+            case HeaderFieldType::PreviousVersion:
+                if (length != sizeof(previousVersion)) throw std::runtime_error("Invalid PreviousVersion length.");
+                std::memcpy(&previousVersion, buffer.data(), sizeof(previousVersion));
                 break;
 
             case HeaderFieldType::ModuleType:
@@ -169,6 +246,8 @@ std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
        << "  stringBufferSize : " << header.stringBufferSize << "\n"
        << "  metaDataSize     : " << header.metaDataSize << "\n"
        << "  dataSize         : " << header.dataSize << "\n"
+       << "  isCurrent        : " << header.isCurrent << "\n"
+       << "  previousVersion  : " << header.previousVersion << "\n"
        << "  moduleType       : " << header.moduleType << "\n"
        << "  schemaPath       : " << header.schemaPath << "\n"
        << "  compression      : " << std::boolalpha << header.compression << "\n"

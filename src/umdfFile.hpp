@@ -25,7 +25,7 @@ private:
 
     bool writeXref(std::ostream& outfile);
 
-    std::expected<std::vector<UUID>, std::string> writeModule(
+    std::expected<std::vector<UUID>, std::string> writeModules(
         const std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
 
 public:
@@ -46,9 +46,13 @@ public:
     // Writing operations (delegated to Writer)
     std::expected<std::vector<UUID>, std::string> writeNewFile(std::string& filename, 
         std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
-    std::expected<std::vector<UUID>, std::string> addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
-    std::expected<std::vector<UUID>, std::string> updateModules(std::vector<std::string>& moduleId, std::vector<ModuleData>& modules);
-    std::expected<std::vector<UUID>, std::string> deleteModules(const std::string& moduleId);
+    std::expected<std::vector<UUID>, std::string> addModules(
+        std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
+
+    bool updateModules(
+        std::vector<std::pair<std::string, ModuleData>>& moduleUpdates);
+    
+    //std::expected<std::vector<UUID>, std::string> deleteModules(const std::string& moduleId);
 
 };
 

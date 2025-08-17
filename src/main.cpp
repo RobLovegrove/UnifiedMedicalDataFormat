@@ -23,6 +23,8 @@ void addWriteOptions(CLI::App* writeCmd, string& outputFile, bool& overwrite, bo
 
 int main(int argc, char** argv) {
 
+    string tabularUUID;
+
     UUID uuid;
 
     CLI::App app{"UMDF - Unified Medical Data Format Tool"};
@@ -123,6 +125,9 @@ int main(int argc, char** argv) {
         if (fileInfo.contains("modules")) {
             cout << "Modules in file:\n";
             for (const auto& module : fileInfo["modules"]) {
+                if (module["type"] == "tabular") {
+                    tabularUUID = module["uuid"];
+                }
                 cout << "  - " << module["type"] << " (UUID: " << module["uuid"] << ")\n";
             }
         }
@@ -258,6 +263,27 @@ int main(int argc, char** argv) {
         auto finalFileInfo = file.getFileInfo();
         if (finalFileInfo.contains("success") && !finalFileInfo["success"]) {
             cerr << "Error reading final file: " << finalFileInfo["error"] << "\n";
+            return 1;
+        }
+
+        cout << "\n=== STEP 5: Update the Tabular Data ===\n";
+
+        // Get the patient module data
+        auto patientModuleData = file.getModuleData(tabularUUID);
+
+        // Update the patient module data
+        patientModuleData.value().metadata.push_back({
+            {"clinician", "Dr. John Doe"},
+            {"encounter_time", "2025-07-29"}
+        });
+
+        // Update the patient module data in the file
+        std::vector<std::pair<std::string, ModuleData>> updates = {
+            {tabularUUID, patientModuleData.value()}
+        };
+
+        if (!file.updateModules(updates)) {
+            cerr << "Failed to update tabular data" << "\n";
             return 1;
         }
         

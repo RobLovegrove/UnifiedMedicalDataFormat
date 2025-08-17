@@ -33,9 +33,11 @@ public:
     void clear() { entries.clear(); }
 
     const XrefEntry* findEntry(ModuleType);
-    const std::vector<XrefEntry>& getEntries() const { return entries; }
+    std::vector<XrefEntry>& getEntries() { return entries; }
 
     void setXrefOffset(uint64_t offset) { xrefOffset = offset; }
+    uint64_t getXrefOffset() const { return xrefOffset; }
+
     bool writeXref(std::ostream& out) const;
 
     static XRefTable loadXrefTable(std::istream& in);
@@ -43,6 +45,8 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const XRefTable& table);
 
     void setObsolete(std::ostream& out);
+
+    void updateEntryOffset(UUID id, uint64_t offset);
 
 };
 
