@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "age": {
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 100,
+      "maximum": 50  // min > max (invalid)
+    },
+    "height": {
+      "type": "float",
+      "format": "float32",
+      "minimum": 200.0,
+      "maximum": 100.0  // min > max (invalid)
+    }
+  },
+  "required": ["age", "height"]
+}

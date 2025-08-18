@@ -1,0 +1,9 @@
+{
+  "patient_id": "P12345",
+  "name": "John Doe",
+  "gender": "male",
+  "birth_date": "1990-05-15",
+  "age": 33,
+  "height": 175.5,
+  "weight": 70.2
+}

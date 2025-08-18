@@ -20,6 +20,7 @@ umdf_reader.cpython-*.pyd
 update_ui.sh
 
 # Test and output files
+./tests
 test_*.umdf
 *_workflow.umdf
 *.umdf

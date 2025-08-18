@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "properties": {
+    "patient_id": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "Unique patient identifier"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Patient's full name"
+    },
+    "gender": {
+      "type": "string",
+      "enum": ["male", "female", "other", "prefer_not_to_say"],
+      "description": "Patient's gender"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Patient's date of birth"
+    },
+    "age": {
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0,
+      "maximum": 150,
+      "description": "Patient's age in years"
+    },
+    "height": {
+      "type": "float",
+      "format": "float32",
+      "minimum": 0.0,
+      "maximum": 300.0,
+      "description": "Patient's height in centimeters"
+    },
+    "weight": {
+      "type": "float",
+      "format": "float32",
+      "minimum": 0.0,
+      "maximum": 1000.0,
+      "description": "Patient's weight in kilograms"
+    }
+  },
+  "required": ["patient_id", "name", "gender", "birth_date"]
+}

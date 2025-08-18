@@ -1,0 +1,9 @@
+{
+  "patient_id": "P12345",
+  "name": "John Doe",
+  "gender": "invalid_gender",  // Not in enum
+  "birth_date": "1990-05-15",
+  "age": 200,  // Exceeds maximum (150)
+  "height": -10.0,  // Below minimum (0)
+  "weight": 1500.0  // Exceeds maximum (1000)
+}
