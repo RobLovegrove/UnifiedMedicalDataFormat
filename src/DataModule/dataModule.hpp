@@ -13,6 +13,7 @@
 #include <memory>
 #include <fstream>
 #include <variant>
+#include "../SchemaResolver.hpp"
 
 struct FieldInfo {
     size_t offset;   
@@ -35,8 +36,8 @@ protected:
     std::vector<std::string> metadataRequired;
     std::vector<std::string> dataRequired;
 
-    // Schema reference resolution
-    static std::unordered_map<std::string, nlohmann::json> schemaCache;
+    // Schema reference resolution (now handled by SchemaResolver)
+    // Note: resolveSchemaReference method is kept for backward compatibility
     nlohmann::json resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath);
 
     explicit DataModule() {};

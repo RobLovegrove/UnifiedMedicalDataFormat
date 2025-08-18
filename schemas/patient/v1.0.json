@@ -42,9 +42,10 @@
         "name": {
           "type": "object",
           "properties": {
-            "given": { "type": "string" },
-            "family": { "type": "string" }
-          }
+            "given": { "type": "string", "length": 50 },
+            "family": { "type": "string", "length": 50 }
+          },
+          "required": ["given", "family"]
         },
         "age": {
           "type": "integer",

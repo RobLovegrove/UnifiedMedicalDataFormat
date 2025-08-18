@@ -469,8 +469,21 @@ bool ObjectField::validateValue(const nlohmann::json& value) const {
 
     if (!value.is_object()) return false;
 
+    // First check if all required fields are present
+    for (const auto& requiredField : requiredFields) {
+        if (!value.contains(requiredField)) {
+            return false;  // Missing required field
+        }
+    }
+
+    // Then validate all subfields that are present
     for (const auto& field : subFields) {
-        if (!field->validateValue(value[field->getName()])) return false;
+        const std::string& fieldName = field->getName();
+        if (value.contains(fieldName)) {
+            if (!field->validateValue(value[fieldName])) {
+                return false;  // Subfield validation failed
+            }
+        }
     }
 
     return true;

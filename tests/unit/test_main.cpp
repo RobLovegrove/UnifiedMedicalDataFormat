@@ -5,3 +5,5 @@
 #include "test_dataModule.cpp"
 #include "test_schema.cpp"
 #include "test_schemaValidation.cpp"
+#include "test_schemaResolver.cpp"
+#include "test_circularReference.cpp"

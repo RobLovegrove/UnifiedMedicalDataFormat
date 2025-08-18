@@ -56,11 +56,23 @@ ImageData::ImageData(
 }
 
 void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
-    // Extract frame schema reference from data section
-    if (schemaJson.contains("$frame_schema")) {
-        frameSchemaPath = schemaJson["$frame_schema"];
+    // Debug: Print the schema being parsed
+    std::cout << "ImageData::parseDataSchema called with schema:" << std::endl;
+    std::cout << schemaJson.dump(2) << std::endl;
+    
+    // Parse the data section using standard JSON Schema $ref
+    if (schemaJson.contains("properties") && schemaJson["properties"].contains("frames")) {
+        const auto& framesProp = schemaJson["properties"]["frames"];
+        
+        if (framesProp.contains("$ref")) {
+            // Extract the frame schema reference path directly
+            frameSchemaPath = framesProp["$ref"];
+            std::cout << "Frame schema path extracted: " << frameSchemaPath << std::endl;
+        } else {
+            throw runtime_error("Image schema data section missing valid $ref to frame schema");
+        }
     } else {
-        throw runtime_error("Image schema missing required '$frame_schema' field in data section");
+        throw runtime_error("Image schema missing required 'frames' property in data section");
     }
 }
 

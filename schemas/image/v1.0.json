@@ -94,7 +94,13 @@
       }
     },
     "data": {
-      "$frame_schema": "./schemas/frame/v1.0.json"
+      "type": "object",
+      "properties": {
+        "frames": {
+          "$ref": "./schemas/frame/v1.0.json"
+        }
+      },
+      "required": ["frames"]
     }
   }
 }

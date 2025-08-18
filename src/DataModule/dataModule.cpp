@@ -4,6 +4,7 @@
 #include "../Utility/uuid.hpp"
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
+#include "../SchemaResolver.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -37,7 +38,6 @@ DataModule::DataModule(
 
 void DataModule::initialise() {
     try {
-        parseSchemaHeader(schemaJson);
         parseSchema(schemaJson);
     } catch (const std::exception& e) {
         throw std::runtime_error("Failed to parse schema: " + std::string(e.what()));
@@ -49,6 +49,8 @@ const nlohmann::json& DataModule::getSchema() const {
 }
 
 void DataModule::parseSchema(const nlohmann::json& schemaJson) {
+
+    parseSchemaHeader(schemaJson);
 
     if (schemaJson.contains("required")) {
         const auto& required = schemaJson["required"];
@@ -354,6 +356,18 @@ void DataModule::readMetadataRows(istream& in) {
 unique_ptr<DataField> DataModule::parseField(const string& name,
                                                 const nlohmann::json& definition) {
 
+    // Handle schema references ($ref) first - before type checking
+    if (definition.contains("$ref")) {
+        std::string refPath = definition["$ref"];
+        
+        // Keep the resolved path on the resolver's stack while we parse the referenced schema
+        std::string fullPath = SchemaResolver::beginReference(refPath, header->getSchemaPath());
+        nlohmann::json resolvedDef = SchemaResolver::getSchemaByResolvedPath(fullPath);
+        auto field = parseField(name, resolvedDef);
+        SchemaResolver::endReference();
+        return field;
+    }
+
     string type = definition.contains("type") ? definition["type"] : "string";
 
     // Handle enums
@@ -370,7 +384,6 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 
         return make_unique<EnumField>(name, enumValues, length);
     }
-
 
     // Handle integers
     else if (type == "integer") {
@@ -443,10 +456,6 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
         }
 
         if (definition.contains("required")) {
-
-            cout << "Required fields: " << definition["required"].dump() << endl;
-            cout << "Properties: " << definition["properties"].dump(2) << endl;
-
             requiredFields = definition["required"];
             for (const auto& field : requiredFields) {
                 if (!definition["properties"].contains(field)) {
@@ -484,27 +493,15 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
         return make_unique<ArrayField>(name, itemDef, minItems, maxItems);
     }
 
-    // Handle schema references ($ref)
-    else if (definition.contains("$ref")) {
-        std::string refPath = definition["$ref"];
-        nlohmann::json resolvedDef = resolveSchemaReference(refPath, header->getSchemaPath());
-        
-        // Recursively parse the resolved definition
-        return parseField(name, resolvedDef);
-    }
-
     // Handle bools
     // else if (type == "bool") {
     //     size_t length = 1;
-    //     rowSize += length;
-    //     fields.emplace_back(std::make_unique<BoolField>(name));
+    //     return make_unique<IntegerField>(name, IntegerField::parseIntegerFormat("uint8"), std::nullopt, std::nullopt);
     // }
 
-    // Handle other types later (e.g., bool, arrays)
     else {
-        throw runtime_error("Unsupported type for field: " + name);
+        throw runtime_error("Unsupported field type: " + type);
     }
-    
 }
 
 void DataModule::writeBinary(std::ostream& out, XRefTable& xref) {
@@ -553,6 +550,19 @@ void DataModule::addTableData(
     for (const auto& field : requiredFields) {
         if (!data.contains(field)) {
             throw std::runtime_error("Data missing required field: " + field);
+        }
+    }
+    
+    // Validate object fields' required subfields before flattening
+    for (const auto& fieldPtrTop : fields) {
+        if (auto* objectField = dynamic_cast<ObjectField*>(fieldPtrTop.get())) {
+            const std::string& objName = objectField->getName();
+            if (!data.contains(objName) || !data.at(objName).is_object()) {
+                throw std::runtime_error("Invalid value for field: " + objName);
+            }
+            if (!objectField->validateValue(data.at(objName))) {
+                throw std::runtime_error("Invalid value for field: " + objName);
+            }
         }
     }
     
@@ -802,37 +812,9 @@ nlohmann::json DataModule::getMetadataAsJson() const {
     return getTableDataAsJson(metaDataRows, metaDataFields);
 }
 
-// Initialize static member
-std::unordered_map<std::string, nlohmann::json> DataModule::schemaCache;
+// Note: Schema caching is now handled by SchemaResolver class
 
 nlohmann::json DataModule::resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath) {
-    // Check if schema is already cached
-    if (schemaCache.find(refPath) != schemaCache.end()) {
-        return schemaCache[refPath];
-    }
-    
-    // Resolve relative path
-    std::string fullPath = refPath;
-    if (refPath.substr(0, 2) == "./") {
-        // Get directory of base schema
-        size_t lastSlash = baseSchemaPath.find_last_of('/');
-        if (lastSlash != std::string::npos) {
-            std::string baseDir = baseSchemaPath.substr(0, lastSlash + 1);
-            fullPath = baseDir + refPath.substr(2); // Remove "./" and prepend base directory
-        }
-    }
-    
-    // Load the referenced schema
-    std::ifstream file(fullPath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open referenced schema file: " + fullPath);
-    }
-    
-    nlohmann::json referencedSchema;
-    file >> referencedSchema;
-    
-    // Cache the loaded schema
-    schemaCache[refPath] = referencedSchema;
-    
-    return referencedSchema;
+    // Delegate to SchemaResolver for circular reference detection and caching
+    return SchemaResolver::resolveReference(refPath, baseSchemaPath);
 }
