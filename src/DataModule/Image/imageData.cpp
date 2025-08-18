@@ -12,6 +12,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
+#include <filesystem> // Required for filesystem::exists
 
 using namespace std;
 
@@ -93,6 +94,11 @@ void ImageData::addData(
         throw std::runtime_error("Frame schema path not set. Call parseDataSchema first.");
     }
 
+    // Validate schema path exists
+    if (!std::filesystem::exists(frameSchemaPath)) {
+        throw std::runtime_error("Frame schema file not found: " + frameSchemaPath);
+    }
+
     // Validate that we're receiving frame data (nested modules)
     if (!std::holds_alternative<std::vector<ModuleData>>(moduleData)) {
         throw std::runtime_error("ImageData::addData expects frame data (vector<ModuleData>), but received different data type");
@@ -106,24 +112,62 @@ void ImageData::addData(
         throw std::runtime_error("ImageData::addData received empty frame data");
     }
 
-    // Start timing for total compression
-    auto compressionStart = std::chrono::high_resolution_clock::now();
-
-
     if (static_cast<int>(data.size()) != getFrameCount()) {
         throw std::runtime_error("ImageData::addData: Number of frames does not match frame count");
     }
 
-    cout << "Constructing " << data.size() << " frames" << endl;
+    // Start timing for total compression
+    auto compressionStart = std::chrono::high_resolution_clock::now();
 
+    cout << "Constructing " << data.size() << " frames" << endl;
 
     for (size_t i = 0; i < data.size(); ++i) {
         const auto& frame = data[i];
         auto frameModule = std::make_unique<FrameData>(frameSchemaPath, UUID());
 
-        // Validate frame structure
+        // Validate frame structure against schema
         if (!frame.metadata.contains("position") || !frame.metadata.contains("orientation")) {
             throw std::runtime_error("Frame " + std::to_string(i) + " missing required metadata (position/orientation)");
+        }
+
+        // Validate position array dimensions match image dimensions
+        const auto& position = frame.metadata["position"];
+        if (position.size() != dimensions.size()) {
+            throw std::runtime_error("Frame " + std::to_string(i) + 
+                " position dimensions (" + std::to_string(position.size()) + 
+                ") don't match image dimensions (" + std::to_string(dimensions.size()) + ")");
+        }
+
+        // Validate orientation vectors are 3D for 2D images
+        if (dimensions.size() == 2) {
+            if (!frame.metadata["orientation"].contains("row_cosine") || 
+                !frame.metadata["orientation"].contains("column_cosine")) {
+                throw std::runtime_error("Frame " + std::to_string(i) + " missing required orientation vectors");
+            }
+            
+            const auto& rowCos = frame.metadata["orientation"]["row_cosine"];
+            const auto& colCos = frame.metadata["orientation"]["column_cosine"];
+            
+            if (rowCos.size() != 3 || colCos.size() != 3) {
+                throw std::runtime_error("Frame " + std::to_string(i) + " orientation vectors must be 3D");
+            }
+        }
+
+        // Validate timestamp format (basic ISO 8601 check)
+        if (frame.metadata.contains("timestamp")) {
+            const std::string& timestamp = frame.metadata["timestamp"];
+            if (timestamp.length() != 20) {
+                throw std::runtime_error("Frame " + std::to_string(i) + " timestamp must be 20 characters (ISO 8601)");
+            }
+        }
+
+        // Validate frame number is sequential
+        if (frame.metadata.contains("frame_number")) {
+            int frameNum = frame.metadata["frame_number"];
+            if (frameNum < 0 || frameNum >= static_cast<int>(data.size())) {
+                throw std::runtime_error("Frame " + std::to_string(i) + 
+                    " frame_number out of range: " + std::to_string(frameNum));
+            }
         }
 
         // Extract frame-specific data (assuming it's binary pixel data)
@@ -133,14 +177,28 @@ void ImageData::addData(
         
         const auto& pixelData = std::get<std::vector<uint8_t>>(frame.data);
 
-        size_t expectedSize = dimensions[0] * dimensions[1] * channels * bitDepth/8;
+        // Calculate expected size for this frame (2D slice)
+        // Each frame is a 2D slice, so we only use the first 2 dimensions
+        size_t bytesPerPixel = (bitDepth + 7) / 8; // Round up for non-byte-aligned bit depths
+        size_t expectedSize = dimensions[0] * dimensions[1] * channels * bytesPerPixel;
 
         if (pixelData.size() != expectedSize) {
             throw std::runtime_error("Frame " + std::to_string(i) + 
-            " pixel data size mismatch. Expected: " + std::to_string(expectedSize) + 
-            ", Got: " + std::to_string(pixelData.size()));
+                " pixel data size mismatch. Expected: " + std::to_string(expectedSize) + 
+                ", Got: " + std::to_string(pixelData.size()) + 
+                " (dimensions: " + std::to_string(dimensions[0]) + "x" + std::to_string(dimensions[1]) + 
+                ", channels: " + std::to_string(channels) + ", bitDepth: " + std::to_string(bitDepth) + ")");
         }
 
+        // Validate bit depth is reasonable
+        if (bitDepth < 1 || bitDepth > 64) {
+            throw std::runtime_error("Frame " + std::to_string(i) + " invalid bit depth: " + std::to_string(bitDepth));
+        }
+
+        // Validate channel count is reasonable
+        if (channels < 1 || channels > 16) {
+            throw std::runtime_error("Frame " + std::to_string(i) + " invalid channel count: " + std::to_string(channels));
+        }
 
         // Set the frame metadata
         frameModule->addMetaData(frame.metadata);
@@ -153,6 +211,18 @@ void ImageData::addData(
         
         // Add to frames collection
         frames.push_back(std::move(frameModule));
+    }
+
+    // Post-processing validation: ensure frame consistency
+    if (frames.size() > 1) {
+        // Check that all frames have consistent metadata structure
+        const auto& firstFrame = frames[0];
+        for (size_t i = 1; i < frames.size(); ++i) {
+            // Validate that all frames have the same required fields
+            if (frames[i]->getMetadataAsJson().size() != firstFrame->getMetadataAsJson().size()) {
+                throw std::runtime_error("Inconsistent metadata structure across frames");
+            }
+        }
     }
 
     // End timing and output total compression time
