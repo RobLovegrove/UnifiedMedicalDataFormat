@@ -6,7 +6,6 @@
   "type": "object",
   "module_type": "tabular",
   "endianness": "little",
-  "required": ["patient_id", "name", "gender", "birth_date"],
   "properties": {
     "metadata": {
       "type": "object",

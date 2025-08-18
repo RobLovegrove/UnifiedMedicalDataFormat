@@ -25,6 +25,17 @@ TabularData::TabularData(
 
 void TabularData::parseDataSchema(const nlohmann::json& schemaJson) {
 
+    if (schemaJson.contains("required")) {
+        cout << "Required fields: " << schemaJson["required"].dump() << endl;
+        dataRequired = schemaJson["required"];
+    }
+
+    for (const auto& field : dataRequired) {
+        if (!schemaJson["properties"].contains(field)) {
+            throw runtime_error("Schema must contain 'required' field: " + field);
+        }
+    }
+
     if (!schemaJson.contains("properties")) {
         throw runtime_error("Schema missing essential 'properties' field.");
     }
@@ -41,13 +52,13 @@ void TabularData::addData(const std::variant<nlohmann::json, std::vector<uint8_t
         const auto& jsonData = std::get<nlohmann::json>(data);
         
         if (jsonData.is_array()) {
-            // Handle array of metadata rows
+            // Handle array of data rows
             for (const auto& row : jsonData) {
-                addTableData(row, fields, rows);
+                addTableData(row, fields, rows, dataRequired);
             }
         } else {
-            // Handle single metadata row (backward compatibility)
-            addTableData(jsonData, fields, rows);
+            // Handle single data row
+            addTableData(jsonData, fields, rows, dataRequired);
         }
     }
 }

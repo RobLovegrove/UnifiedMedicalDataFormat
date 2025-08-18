@@ -50,14 +50,30 @@ const nlohmann::json& DataModule::getSchema() const {
 
 void DataModule::parseSchema(const nlohmann::json& schemaJson) {
 
-    const auto& props = schemaJson["properties"];
-
-    if (!props.contains("metadata")) {
-        throw std::runtime_error("Schema must contain 'metadata' in 'properties'");
+    if (schemaJson.contains("required")) {
+        const auto& required = schemaJson["required"];
+        for (const auto& field : required) {
+            if (!schemaJson["properties"].contains(field)) {
+                throw std::runtime_error("Schema must contain 'required' field: " + field.dump());
+            }
+        }
     }
+
+    const auto& props = schemaJson["properties"];
 
     // Parse metadata
     if (props.contains("metadata")) {
+
+        if (props.at("metadata").contains("required")) {
+            metadataRequired = props.at("metadata").at("required");
+        }
+
+        for (const auto& field : metadataRequired) {
+            if (!props.at("metadata").at("properties").contains(field)) {
+                throw std::runtime_error("Schema must contain 'required' field: " + field);
+            }
+        }
+
         const auto& metadataProps = props.at("metadata").at("properties");
         for (const auto& [name, definition] : metadataProps.items()) {
             metaDataFields.emplace_back(parseField(name, definition));
@@ -66,6 +82,7 @@ void DataModule::parseSchema(const nlohmann::json& schemaJson) {
 
     // Parse data
     if (props.contains("data")) {
+
         parseDataSchema(props.at("data"));
     }
 
@@ -418,8 +435,24 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
 
     // Handle objects recursively
     else if (type == "object") {
+
+        std::vector<std::string> requiredFields;
+
         if (!definition.contains("properties")) {
             throw runtime_error("Object field missing 'properties': " + name);
+        }
+
+        if (definition.contains("required")) {
+
+            cout << "Required fields: " << definition["required"].dump() << endl;
+            cout << "Properties: " << definition["properties"].dump(2) << endl;
+
+            requiredFields = definition["required"];
+            for (const auto& field : requiredFields) {
+                if (!definition["properties"].contains(field)) {
+                    throw std::runtime_error("ObjectField '" + name + "' missing required field: " + field);
+                }
+            }
         }
 
         vector<unique_ptr<DataField>> subfields;
@@ -429,7 +462,7 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
             subfields.emplace_back(parseField(fullSubName, subdef));
         }
 
-        return make_unique<ObjectField>(name, std::move(subfields));
+        return make_unique<ObjectField>(name, std::move(subfields), std::move(requiredFields));
     }
 
     // Handle arrays
@@ -514,7 +547,14 @@ void DataModule::writeBinary(std::ostream& out, XRefTable& xref) {
 }
 
 void DataModule::addTableData(
-    const nlohmann::json& data, vector<unique_ptr<DataField>>& fields, vector<vector<uint8_t>>& rows) {
+    const nlohmann::json& data, vector<unique_ptr<DataField>>& fields, 
+    vector<vector<uint8_t>>& rows, vector<std::string>& requiredFields) {
+
+    for (const auto& field : requiredFields) {
+        if (!data.contains(field)) {
+            throw std::runtime_error("Data missing required field: " + field);
+        }
+    }
     
     // Build flattened field list including nested fields
     std::vector<std::pair<std::string, DataField*>> flattenedFields;
@@ -614,11 +654,11 @@ void DataModule::addMetaData(const nlohmann::json& data) {
     if (data.is_array()) {
         // Handle array of metadata rows
         for (const auto& row : data) {
-            addTableData(row, metaDataFields, metaDataRows);
+            addTableData(row, metaDataFields, metaDataRows, metadataRequired);
         }
     } else {
         // Handle single metadata row (backward compatibility)
-        addTableData(data, metaDataFields, metaDataRows);
+        addTableData(data, metaDataFields, metaDataRows, metadataRequired);
     }
 }
 

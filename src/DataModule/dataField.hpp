@@ -177,11 +177,13 @@ public:
 class ObjectField : public DataField {
 private:
     std::vector<std::unique_ptr<DataField>> subFields;
+    std::vector<std::string> requiredFields;
 
 public:
     ObjectField(std::string name,
-                std::vector<std::unique_ptr<DataField>> subFields/*, size_t length*/)
-      : DataField(std::move(name), "object"), subFields(std::move(subFields))/*, length(length)*/ {}
+                std::vector<std::unique_ptr<DataField>> subFields,
+                std::vector<std::string> requiredFields)
+      : DataField(std::move(name), "object"), subFields(std::move(subFields)), requiredFields(std::move(requiredFields)) {}
 
     void encodeToBuffer(
         const nlohmann::json& value, std::vector<uint8_t>& buffer, size_t offset) override;

@@ -172,11 +172,10 @@ void ImageData::addMetaData(const nlohmann::json& data) {
     dimensions.clear();
     dimensionNames.clear();
 
-    // // Check if we have the new nested image_structure format
+    // // Check if contains image_structure format
     if (data.contains("image_structure") && data["image_structure"].is_object()) {
         const auto& imageStruct = data["image_structure"];
 
-        //const auto& imageStruct = data;
           
         // Extract dimensions array first (required field)
         if (!imageStruct.contains("dimensions") || !imageStruct["dimensions"].is_array()) {
@@ -188,16 +187,25 @@ void ImageData::addMetaData(const nlohmann::json& data) {
             throw std::runtime_error("ImageData: 'dimensions' array must have at least 2 elements (width, height)");
         }
         
-        // First two elements are width and height
+        // Must have first dimension
         if (!dimsArray[0].is_number()) {
             throw std::runtime_error("ImageData: first dimension must be a number, got: " + dimsArray[0].dump());
         }
+        dimensions.push_back(dimsArray[0].get<uint16_t>());
+
         if (!dimsArray[1].is_number()) {
-            throw std::runtime_error("ImageData: second dimension must be a number, got: " + dimsArray[1].dump());
+            // If no second dimension, set it to 1
+            // Ensure no other dimensions are set
+            if (dimsArray.size() > 2) {
+                throw std::runtime_error("ImageData: second dimension must be a number, got: " + dimsArray[1].dump());
+            }
+            dimensions.push_back(1);
+        } else {
+            dimensions.push_back(dimsArray[1].get<uint16_t>());
         }
         
         // Add all dimensions to our internal array
-        for (size_t i = 0; i < dimsArray.size(); ++i) {
+        for (size_t i = 2; i < dimsArray.size(); ++i) {
             if (!dimsArray[i].is_number()) {
                 throw std::runtime_error("ImageData: dimension " + std::to_string(i) + " must be a number, got: " + dimsArray[i].dump());
             }

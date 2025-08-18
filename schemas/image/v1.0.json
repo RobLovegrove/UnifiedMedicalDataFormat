@@ -19,7 +19,7 @@
         },
         "image_structure": {
           "type": "object",
-          "required": ["channels", "bit_depth", "encoding", "memory_order", "origin", "layout", "dimension", "dimension_names"],
+          "required": ["channels", "bit_depth", "encoding", "memory_order", "origin", "layout", "dimensions", "dimension_names"],
           "properties": {
             "channels": { 
               "type": "integer", 

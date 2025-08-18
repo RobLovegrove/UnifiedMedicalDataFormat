@@ -32,6 +32,9 @@ protected:
     std::vector<std::vector<uint8_t>> metaDataRows;
     std::vector<std::vector<std::unique_ptr<DataField>>> decodedMetaDataRows;
 
+    std::vector<std::string> metadataRequired;
+    std::vector<std::string> dataRequired;
+
     // Schema reference resolution
     static std::unordered_map<std::string, nlohmann::json> schemaCache;
     nlohmann::json resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath);
@@ -55,7 +58,10 @@ protected:
 
     // Helper functions to avoid code duplication between Metadata and tabular data
     void addTableData(
-        const nlohmann::json&, std::vector<std::unique_ptr<DataField>>&, std::vector<std::vector<uint8_t>>&);
+        const nlohmann::json&, std::vector<std::unique_ptr<DataField>>&, 
+        std::vector<std::vector<uint8_t>>&, std::vector<std::string>&);
+
+
     bool fieldExistsInData(const nlohmann::json& data, const std::string& fieldPath);
     nlohmann::json getNestedValue(const nlohmann::json& data, const std::string& fieldPath);
 

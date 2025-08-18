@@ -254,7 +254,7 @@ ArrayField::ArrayField(std::string name, const nlohmann::json& itemDef,
 
         std::optional<int64_t> minValue = std::nullopt;
         std::optional<int64_t> maxValue = std::nullopt;
-        
+
         if (itemDef.contains("minimum")) {
             minValue = itemDef["minimum"];
         }
