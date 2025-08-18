@@ -540,7 +540,6 @@ void DataModule::addTableData(
     // Build bitmap for all fields (including nested)
     std::vector<uint8_t> bitmap(bitmapSize, 0);
     
-    // Build bitmap for all fields (including nested)
     for (size_t i = 0; i < numFlattenedFields; ++i) {
         const auto& [fieldPath, fieldPtr] = flattenedFields[i];
         bool present = fieldExistsInData(data, fieldPath);
@@ -568,6 +567,9 @@ void DataModule::addTableData(
     for (const auto& [fieldPath, fieldPtr] : flattenedFields) {
         if (fieldExistsInData(data, fieldPath)) {
             nlohmann::json value = getNestedValue(data, fieldPath);
+            if (!fieldPtr->validateValue(value)) {
+                throw std::runtime_error("Invalid value for field: " + fieldPath);
+            }
             fieldPtr->encodeToBuffer(value, row, offset);
             offset += fieldPtr->getLength();
         }
