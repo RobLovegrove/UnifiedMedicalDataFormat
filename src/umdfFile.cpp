@@ -272,13 +272,12 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(
         return std::unexpected("File does not exist or is empty");
     }
 
-    // 3. Copy original file to temp file
+    // Copy original file to temp file
     try {
         // Remove temp file if it exists
         if (std::filesystem::exists(tempFilePath)) {
             std::filesystem::remove(tempFilePath);
         }
-        
         // Copy original to temp
         std::filesystem::copy_file(filename, tempFilePath);
     } catch (const std::exception& e) {
@@ -299,7 +298,6 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(
         std::filesystem::remove(tempFilePath);
         return std::unexpected("Exception opening temp file: " + std::string(e.what()));
     }
-
     
     // Load XRef table from temp file
     xrefTable.clear();
@@ -377,39 +375,78 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(
 }
 
 bool UMDFFile::updateModules(
+    std::string& filename,
     std::vector<std::pair<std::string, ModuleData>>& moduleUpdates) {
+
+    tempFilePath = filename + ".tmp";
+
+    // Check if file exists and is not empty or currently open
+    if (!std::filesystem::exists(filename) || std::filesystem::is_empty(filename)) {
+        return false;
+    }
+
+    // Copy original file to temp file
+    try {
+        // Remove temp file if it exists
+        if (std::filesystem::exists(tempFilePath)) {
+            std::filesystem::remove(tempFilePath);
+        }
+        // Copy original to temp
+        std::filesystem::copy_file(filename, tempFilePath);
+    } catch (const std::exception& e) {
+        return false;
+    }
+
+    cout << "Opening tmp file: " << tempFilePath << endl;
 
     // Check if file is open
     if (!fileStream.is_open()) return false;
 
-    // Check if XREF table is loaded
-    if (xrefTable.getEntries().size() == 0) {
-        xrefTable = XRefTable::loadXrefTable(fileStream);
+    // Open temp file for writing
+    std::fstream tempFile;
+    try {
+        tempFile.open(tempFilePath, std::ios::in | std::ios::out | std::ios::binary);
+        if (!tempFile) {
+            std::filesystem::remove(tempFilePath);
+            return false;
+        }
+    } catch (const std::exception& e) {
+        std::filesystem::remove(tempFilePath);
+        return false;
+    }
+    
+    // Load XRef table from temp file
+    xrefTable.clear();
+    try {
+        xrefTable = XRefTable::loadXrefTable(tempFile);
+    } catch (const std::exception& e) {
+        tempFile.close();
+        std::filesystem::remove(tempFilePath);
+        return false;
     }
 
+    // Update modules in temp file
     for (const auto& [moduleId, moduleData] : moduleUpdates) {
 
         // For testing purposes print the metadata of the current module
-
         auto data = getModuleData(moduleId);
         cout << "Metadata of the current module: " << data.value().metadata << endl;
-
 
         auto& entries = xrefTable.getEntries();  // Get reference to avoid copying
         for (auto it = entries.begin(); it != entries.end(); ) {
             if (it->id.toString() == moduleId) {
                 // Go to module offset in file
-                fileStream.seekg(it->offset);
+                tempFile.seekg(it->offset);
         
                 // Read the DataHeader
                 DataHeader dataHeader;
-                dataHeader.readDataHeader(fileStream);
+                dataHeader.readDataHeader(tempFile);
         
                 // Return to the start of the module
-                fileStream.seekg(it->offset);
+                tempFile.seekg(it->offset);
         
                 // Update the module's isCurrent flag to false
-                dataHeader.updateIsCurrent(false, fileStream);
+                dataHeader.updateIsCurrent(false, tempFile);
         
                 // Write the new module data
                 unique_ptr<DataModule> dm;
@@ -431,33 +468,23 @@ bool UMDFFile::updateModules(
                 // Set the previous offset as the offset of the old module 
                 dm->setPrevious(it->offset);
         
-                // SAFELY delete the old module from the xref table
+                // Delete the old module from the xref table
                 it = entries.erase(it);
         
                 dm->addMetaData(moduleData.metadata);
                 dm->addData(moduleData.data);
         
                 // Ensure at end of file
-                fileStream.seekp(0, std::ios::end);
+                tempFile.seekp(0, std::ios::end);
 
-                streampos moduleStart = fileStream.tellp();
+                streampos moduleStart = tempFile.tellp();
         
                 std::stringstream moduleBuffer;
                 dm->writeBinary(moduleStart, moduleBuffer, xrefTable);
 
                 string bufferData = moduleBuffer.str();
-                fileStream.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());
+                tempFile.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());
 
-                // Update loadedModules with the new module
-                for (auto moduleIt = loadedModules.begin(); moduleIt != loadedModules.end(); ) {
-                    if ((*moduleIt)->getModuleID().toString() == moduleId) {
-                        moduleIt = loadedModules.erase(moduleIt);
-                        loadedModules.push_back(std::move(dm));
-                        break;
-                    }
-                    ++moduleIt;
-                }
-                
                 // Since we found and processed the module, we can break
                 break;
             } else {
@@ -469,14 +496,43 @@ bool UMDFFile::updateModules(
         cout << "Metadata of the current module: " << data.value().metadata << endl;
     }
 
-    // Make old XREF table obsolete (now with improved stream handling)
-    xrefTable.setObsolete(fileStream);
+    // Make old XREF table obsolete and write new one
+    try {
+        xrefTable.setObsolete(tempFile);
+        
+        if (!writeXref(tempFile)) {
+            throw std::runtime_error("Failed to write new XRef table");
+        }
+    } catch (const std::exception& e) {
+        tempFile.close();
+        std::filesystem::remove(tempFilePath);
+        return false;
+    }
 
-    // WRITE new XREF TABLE at the end
-    if (!writeXref(fileStream)) return false;
+    // Close temp file
+    tempFile.close();
 
-    // CLOSE FILE
-    closeFile();
+    // Validate temp file
+    try {
+        if (!validateTempFile()) {
+            std::filesystem::remove(tempFilePath);
+            return false;
+        }
+    } catch (const std::exception& e) {
+        std::filesystem::remove(tempFilePath);
+        return false;
+    }
+
+    // Atomic replace (rename temp to original)
+    try {
+        std::filesystem::rename(tempFilePath, filename);
+    } catch (const std::exception& e) {
+        std::filesystem::remove(tempFilePath);
+        return false;
+    }
+
+    cout << "File updated successfully: " << filename << endl;
+
     return true;
 }
 

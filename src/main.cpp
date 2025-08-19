@@ -282,7 +282,7 @@ int main(int argc, char** argv) {
             {tabularUUID, patientModuleData.value()}
         };
 
-        if (!file.updateModules(updates)) {
+        if (!file.updateModules(outputFile, updates)) {
             cerr << "Failed to update tabular data" << "\n";
             return 1;
         }

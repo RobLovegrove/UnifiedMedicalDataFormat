@@ -54,6 +54,7 @@ public:
         std::string& filename, std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
 
     bool updateModules(
+        std::string& filename,
         std::vector<std::pair<std::string, ModuleData>>& moduleUpdates);
     
     //std::expected<std::vector<UUID>, std::string> deleteModules(const std::string& moduleId);
