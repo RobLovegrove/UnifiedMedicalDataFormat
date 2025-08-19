@@ -26,6 +26,7 @@ test_*.umdf
 *.umdf
 test_output.umdf
 dummy_input.txt
+umdf_test
 
 # IDE and editor files
 .vscode/
