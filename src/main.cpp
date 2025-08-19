@@ -1,7 +1,8 @@
 #include <iostream>
 #include <string>
 
-#include "umdfFile.hpp"
+#include "reader.hpp"
+#include "writer.hpp"
 #include "DataModule/dataModule.hpp"
 
 #include "CLI11/CLI11.hpp"
@@ -29,7 +30,8 @@ int main(int argc, char** argv) {
 
     CLI::App app{"UMDF - Unified Medical Data Format Tool"};
     
-    UMDFFile file; // Single UMDFFile instance for both read and write
+    Reader reader;
+    Writer writer;
 
     string inputFile;
     string outputFile;
@@ -94,7 +96,7 @@ int main(int argc, char** argv) {
         modulesWithSchemas.push_back({"./schemas/patient/v1.0.json", patientModule});
         
         // Write the new file using UMDFFile (tabular data only)
-        auto result = file.writeNewFile(outputFile, modulesWithSchemas);
+        auto result = writer.writeNewFile(outputFile, modulesWithSchemas);
         if (!result) {
             cerr << "Failed to write data\n";
             return 1;
@@ -108,12 +110,12 @@ int main(int argc, char** argv) {
         cout << "\n=== STEP 2: Reading the file to verify tabular data ===\n";
         
         // Read the file to verify tabular data
-        if (!file.openFile(outputFile)) {
+        if (!reader.openFile(outputFile)) {
             cerr << "Failed to open file for reading: " << outputFile << "\n";
             return 1;
         }
         
-        auto fileInfo = file.getFileInfo();
+        auto fileInfo = reader.getFileInfo();
         if (fileInfo.contains("success") && !fileInfo["success"]) {
             cerr << "Error reading file: " << fileInfo["error"] << "\n";
             return 1;
@@ -240,7 +242,7 @@ int main(int argc, char** argv) {
         std::vector<std::pair<std::string, ModuleData>> imageModulesWithSchemas;
         imageModulesWithSchemas.push_back({"./schemas/image/v1.0.json", imageModule});
         
-        auto addResult = file.addModules(outputFile, imageModulesWithSchemas);
+        auto addResult = writer.addModules(outputFile, imageModulesWithSchemas);
         if (!addResult) {
             cerr << "Failed to add image data: " << addResult.error() << "\n";
             return 1;
@@ -254,13 +256,13 @@ int main(int argc, char** argv) {
         cout << "\n=== STEP 4: Rereading the file to show all data ===\n";
         
         // Close and reopen to get fresh file info
-        file.closeFile();
-        if (!file.openFile(outputFile)) {
+        reader.closeFile();
+        if (!reader.openFile(outputFile)) {
             cerr << "Failed to reopen file for final reading: " << outputFile << "\n";
             return 1;
         }
         
-        auto finalFileInfo = file.getFileInfo();
+        auto finalFileInfo = reader.getFileInfo();
         if (finalFileInfo.contains("success") && !finalFileInfo["success"]) {
             cerr << "Error reading final file: " << finalFileInfo["error"] << "\n";
             return 1;
@@ -269,7 +271,7 @@ int main(int argc, char** argv) {
         cout << "\n=== STEP 5: Update the Tabular Data ===\n";
 
         // Get the patient module data
-        auto patientModuleData = file.getModuleData(tabularUUID);
+        auto patientModuleData = reader.getModuleData(tabularUUID);
 
         // Update the patient module data
         patientModuleData.value().metadata.push_back({
@@ -282,7 +284,7 @@ int main(int argc, char** argv) {
             {tabularUUID, patientModuleData.value()}
         };
 
-        if (!file.updateModules(outputFile, updates)) {
+        if (!writer.updateModules(outputFile, updates)) {
             cerr << "Failed to update tabular data" << "\n";
             return 1;
         }
@@ -302,7 +304,7 @@ int main(int argc, char** argv) {
         // Load all modules to show final state
         for (const auto& module : finalFileInfo["modules"]) {
             cout << "Loading module: " << module["uuid"] << endl;
-            auto moduleData = file.getModuleData(module["uuid"]);
+            auto moduleData = reader.getModuleData(module["uuid"]);
             if (moduleData) {
                 cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
                 cout << "Metadata: " << moduleData.value().metadata.dump(2) << endl;
@@ -343,13 +345,13 @@ int main(int argc, char** argv) {
         // Read file using new API
         cout << "Reading from file: " << inputFile << "\n";
         
-        if (!file.openFile(inputFile)) {
+        if (!reader.openFile(inputFile)) {
             cerr << "Failed to open file: " << inputFile << "\n";
             return 1;
         }
         
         // Get file info
-        auto fileInfo = file.getFileInfo();
+        auto fileInfo = reader.getFileInfo();
         if (fileInfo.contains("success") && !fileInfo["success"]) {
             cerr << "Error reading file: " << fileInfo["error"] << "\n";
             return 1;
@@ -370,7 +372,7 @@ int main(int argc, char** argv) {
         // Load all modules
         for (const auto& module : fileInfo["modules"]) {
             cout << "Loading module: " << module["uuid"] << endl;
-            auto moduleData = file.getModuleData(module["uuid"]);
+            auto moduleData = reader.getModuleData(module["uuid"]);
             if (moduleData) {
                 cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
                 cout << "Metadata: " << moduleData.value().metadata.dump(2) << endl;
