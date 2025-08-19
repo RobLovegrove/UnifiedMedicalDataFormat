@@ -6,8 +6,6 @@
 #include <fstream>
 #include <expected>
 #include <vector>
-#include "reader.hpp"
-#include "writer.hpp"
 #include "Header/header.hpp"
 #include "Xref/xref.hpp"
 #include "DataModule/dataModule.hpp"
@@ -21,12 +19,18 @@ private:
     XRefTable xrefTable;
     std::vector<std::unique_ptr<DataModule>> loadedModules;
 
+    std::string tempFilePath;
+
     static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 2 << 20; // 1 << 20 is bitwise 1 * 2^20 = 1,048,576 (1 megabyte) 
 
     bool writeXref(std::ostream& outfile);
 
-    std::expected<std::vector<UUID>, std::string> writeModules(
-        const std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
+    std::expected<UUID, std::string> writeModule(
+        std::ostream& outfile, const std::string& schemaPath, const ModuleData& moduleData);
+
+    void cleanupTempFile();
+    bool renameTempFile(const std::string& newFilename);
+    bool validateTempFile(size_t moduleCount);
 
 public:
     UMDFFile() = default;

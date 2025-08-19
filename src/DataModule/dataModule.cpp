@@ -4,7 +4,7 @@
 #include "../Utility/uuid.hpp"
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
-#include "../SchemaResolver.hpp"
+#include "SchemaResolver.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -504,8 +504,10 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
     }
 }
 
-void DataModule::writeBinary(std::ostream& out, XRefTable& xref) {
+void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& out, XRefTable& xref) {
     
+    this->absoluteModuleStart = absoluteModuleStart;
+
     streampos moduleStart = out.tellp();
     header->setModuleStartOffset(static_cast<uint64_t>(moduleStart));
 
@@ -525,6 +527,7 @@ void DataModule::writeBinary(std::ostream& out, XRefTable& xref) {
 
     header->setModuleSize(static_cast<uint64_t>(moduleEnd - moduleStart));
 
+
     if (header->getModuleSize() != (
         header->getHeaderSize() + 
         header->getStringBufferSize() + 
@@ -540,7 +543,9 @@ void DataModule::writeBinary(std::ostream& out, XRefTable& xref) {
     // Update XrefTable
     xref.addEntry(
         header->getModuleType(), 
-        header->getModuleID(), moduleStart, header->getModuleSize());
+        header->getModuleID(), absoluteModuleStart, header->getModuleSize());
+
+    cout << *header << endl;
 }
 
 void DataModule::addTableData(

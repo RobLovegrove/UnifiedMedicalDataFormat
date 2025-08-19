@@ -602,7 +602,7 @@ void ImageData::writeData(std::ostream& out) const {
         }
         
         XRefTable tempXref;
-        frames[i]->writeBinary(out, tempXref);
+        frames[i]->writeBinary(absoluteModuleStart, out, tempXref);
     }
     
     streampos endPos = out.tellp();

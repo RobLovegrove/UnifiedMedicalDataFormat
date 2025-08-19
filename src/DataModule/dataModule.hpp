@@ -13,7 +13,7 @@
 #include <memory>
 #include <fstream>
 #include <variant>
-#include "../SchemaResolver.hpp"
+#include "SchemaResolver.hpp"
 
 struct FieldInfo {
     size_t offset;   
@@ -26,6 +26,8 @@ using FieldMap = std::unordered_map<std::string, FieldInfo>;
 
 class DataModule {
 protected:
+    std::streampos absoluteModuleStart;
+
     std::unique_ptr<DataHeader> header;
     nlohmann::json schemaJson;
     StringBuffer stringBuffer;
@@ -120,7 +122,7 @@ public:
     virtual void addData(const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) = 0;
     virtual void addMetaData(const nlohmann::json& rowData);
 
-    void writeBinary(std::ostream& out, XRefTable& xref);
+    void writeBinary(std::streampos absoluteModuleStart, std::ostream& out, XRefTable& xref);
 
     void printMetadata(std::ostream& out) const;
     virtual void printData(std::ostream& out) const = 0;

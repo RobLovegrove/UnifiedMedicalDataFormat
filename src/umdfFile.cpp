@@ -144,36 +144,123 @@ void UMDFFile::loadModule(const XrefEntry& entry) {
 std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string& filename, 
     std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
 
-    std::expected<std::vector<UUID>, std::string> result;
-
+    std::expected<UUID, std::string> result;
     std::vector<UUID> moduleIds;
 
-    cout << "Writing new file: " << filename << endl;
-    
-    // OPEN FILE
-    fileStream.open(filename, std::ios::out | std::ios::binary);
-    if (!fileStream.is_open()) return std::unexpected("Failed to open file");
+    // Set up file paths
+    tempFilePath = filename + ".tmp";
 
-    cout << "File opened" << endl;
+    cout << "Opening tmp file: " << tempFilePath << endl;
+    
+    // Open temp file for writing
+    std::ofstream tempFile;
+    try {
+        tempFile.open(tempFilePath, std::ios::binary);
+        if (!tempFile) {
+            return std::unexpected("Failed to create temp file: " + tempFilePath);
+        }
+    } catch (const std::exception& e) {
+        return std::unexpected("Exception opening temp file: " + std::string(e.what()));
+    }
+
+    cout << "Writing new file: " << filename << endl;
+    cout << "Using temp file: " << tempFilePath << endl;
 
     // CREATE HEADER
     Header header;
-    if (!header.writePrimaryHeader(fileStream)) return std::unexpected("Failed to write header");
+    try {
+        if (!header.writePrimaryHeader(tempFile)) {
+            tempFile.close();
+            cleanupTempFile();
+            return std::unexpected("Failed to write header to temp file");
+        }
+    } catch (const std::exception& e) {
+        tempFile.close();
+        cleanupTempFile();
+        return std::unexpected("Exception writing header: " + std::string(e.what()));
+    }
 
-    cout << "Header written" << endl;
+    cout << "Header written to temp file" << endl;
 
     // Write Modules to file
-    result = writeModules(modulesWithSchemas);
-    if (!result) return std::unexpected(result.error());
-    moduleIds = result.value();
+    try {
+        // CREATE MODULES 
+        for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
+            const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
 
-    cout << "Modules written" << endl;
-    
-    // WRITE XREF TABLE at the end
-    if (!writeXref(fileStream)) return std::unexpected("Failed to write xref table");
+            cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
 
-    // CLOSE FILE
-    closeFile();
+            // Write module to temp file
+            result = writeModule(tempFile, schemaPath, moduleData);
+            if (!result) {
+                tempFile.close();
+                cleanupTempFile();
+                return std::unexpected(result.error());
+            }
+            moduleIds.push_back(result.value());
+
+        }
+
+    } catch (const std::exception& e) {
+        tempFile.close();
+        cleanupTempFile();
+        return std::unexpected("Exception writing modules: " + std::string(e.what()));
+    }
+
+    cout << "All modules written to temp file" << endl;
+
+    // Write XREF table to temp file
+    try {
+        if (!writeXref(tempFile)) {
+            tempFile.close();
+            cleanupTempFile();
+            return std::unexpected("Failed to write xref table to temp file");
+        }
+    } catch (const std::exception& e) {
+        tempFile.close();
+        cleanupTempFile();
+        return std::unexpected("Exception writing xref table: " + std::string(e.what()));
+    }
+
+    cout << "XREF table written to temp file" << endl;
+
+    // Close temp file
+    try {
+        tempFile.close();
+    } catch (const std::exception& e) {
+        cleanupTempFile();
+        return std::unexpected("Exception closing temp file: " + std::string(e.what()));
+    }
+
+    cout << "Temp file closed" << endl;
+
+
+    try {
+        if (!validateTempFile(modulesWithSchemas.size())) {
+            cleanupTempFile();
+            return std::unexpected("Temp file validation failed");
+        }
+    } catch (const std::exception& e) {
+        cleanupTempFile();
+        return std::unexpected("Exception during temp file validation: " + std::string(e.what()));
+    }
+
+    cout << "Temp file validated" << endl;
+
+    // Rename temp file to new file
+
+    try {
+        if (!renameTempFile(filename)) {
+            cleanupTempFile();
+            return std::unexpected("Failed to rename temp file");
+        }
+    } catch (const std::exception& e) {
+        cleanupTempFile();
+        return std::unexpected("Exception renaming temp file: " + std::string(e.what()));
+    }
+
+    cout << "File committed successfilly: " << filename << endl;
+
     return moduleIds;
 }
 
@@ -181,7 +268,8 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string
 
 std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
 
-    std::expected<std::vector<UUID>, std::string> result;
+    std::expected<UUID, std::string> result;
+    std::vector<UUID> moduleIds;
 
     // Check if file is open
     if (!fileStream.is_open()) return std::unexpected("No file is currently open");
@@ -192,9 +280,20 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<s
     }
 
     // Write Modules to file
-    result = writeModules(modulesWithSchemas);
-    if (!result) return std::unexpected(result.error());
-    std::vector<UUID> moduleIds = result.value();
+    for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
+        const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
+
+        cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
+
+        // Write module to temp file
+        result = writeModule(fileStream, schemaPath, moduleData);
+        if (!result) {
+            cout << "Failed to write module: " << result.error() << endl;
+            return std::unexpected(result.error());
+        }
+        moduleIds.push_back(result.value());
+
+    }
 
     // Make old XREF table obsolete (now with improved stream handling)
     xrefTable.setObsolete(fileStream);
@@ -270,8 +369,14 @@ bool UMDFFile::updateModules(
         
                 // Ensure at end of file
                 fileStream.seekp(0, std::ios::end);
+
+                streampos moduleStart = fileStream.tellp();
         
-                dm->writeBinary(fileStream, xrefTable);
+                std::stringstream moduleBuffer;
+                dm->writeBinary(moduleStart, moduleBuffer, xrefTable);
+
+                string bufferData = moduleBuffer.str();
+                fileStream.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());
 
                 // Update loadedModules with the new module
                 for (auto moduleIt = loadedModules.begin(); moduleIt != loadedModules.end(); ) {
@@ -305,8 +410,10 @@ bool UMDFFile::updateModules(
     return true;
 }
 
+/* ======================================================= */
+/* =============== WRITER HELPER FUNCTIONS =============== */
+/* ======================================================= */
 
-// Helper functions
 bool UMDFFile::writeXref(std::ostream& outfile) { 
     // Explicitly seek to end of file
     outfile.seekp(0, std::ios::end);
@@ -316,64 +423,126 @@ bool UMDFFile::writeXref(std::ostream& outfile) {
     return xrefTable.writeXref(outfile);
 }
 
-std::expected<std::vector<UUID>, std::string> UMDFFile::writeModules(
-    const std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
-        
-    std::vector<UUID> moduleIds;  // Declare the variable here
-        
-    // CREATE MODULES 
-    for (const auto& [schemaPath, moduleData] : modulesWithSchemas) {
+std::expected<UUID, std::string> UMDFFile::writeModule(
+    std::ostream& outfile, const std::string& schemaPath, const ModuleData& moduleData) {
 
-        // Load schema from file
-        std::ifstream schemaFile(schemaPath);
-        if (!schemaFile.is_open()) {
-            cerr << "Failed to open schema file: " << schemaPath << endl;
-            return std::unexpected("Failed to open schema file");
+    // Load schema from file
+    std::ifstream schemaFile(schemaPath);
+    if (!schemaFile.is_open()) {
+        cerr << "Failed to open schema file: " << schemaPath << endl;
+        return std::unexpected("Failed to open schema file");
+    }
+    
+    nlohmann::json schemaJson;
+    schemaFile >> schemaJson;
+    
+    string moduleType = schemaJson["module_type"];
+    ModuleType type = module_type_from_string(moduleType);
+
+    UUID uuid = UUID();
+
+    unique_ptr<DataModule> dm;
+
+    cout << "Creating module: " << moduleType << endl;
+    
+    // CREATE MODULE
+    switch (type) {
+        case ModuleType::Image: {
+            dm = make_unique<ImageData>(schemaPath, schemaJson, uuid);
+            break;
         }
-        
-        nlohmann::json schemaJson;
-        schemaFile >> schemaJson;
-        
-        string moduleType = schemaJson["module_type"];
-        ModuleType type = module_type_from_string(moduleType);
-
-        UUID uuid = UUID();
-
-        unique_ptr<DataModule> dm;
-
-        cout << "Creating module: " << moduleType << endl;
-        
-        // CREATE MODULE
-        switch (type) {
-            case ModuleType::Image: {
-                dm = make_unique<ImageData>(schemaPath, schemaJson, uuid);
-                break;
-            }
-            case ModuleType::Tabular: {
-                dm = make_unique<TabularData>(schemaPath, schemaJson, uuid);
-                break;
-            }
-            default:
-                cout << "Unknown module type: " << moduleType << endl;
-                return std::unexpected("Unknown module type: " + moduleType);
+        case ModuleType::Tabular: {
+            dm = make_unique<TabularData>(schemaPath, schemaJson, uuid);
+            break;
         }
-
-        // ADD DATA TO MODULE
-        dm->addMetaData(moduleData.metadata);
-
-        cout << "Adding data to module" << endl;
-        dm->addData(moduleData.data);
-
-        cout << "Writing module to file" << endl;
-
-        // Ensure at end of file
-        fileStream.seekp(0, std::ios::end);
-
-        // WRITE MODULE TO FILE
-        dm->writeBinary(fileStream, xrefTable);
-
-        moduleIds.push_back(dm->getModuleID());
+        default:
+            cout << "Unknown module type: " << moduleType << endl;
+            return std::unexpected("Unknown module type: " + moduleType);
     }
 
-    return moduleIds;
+    // ADD DATA TO MODULE
+    dm->addMetaData(moduleData.metadata);
+
+    cout << "Adding data to module" << endl;
+    dm->addData(moduleData.data);
+
+    cout << "Writing module to file" << endl;
+
+    // Ensure at end of file
+    outfile.seekp(0, std::ios::end);
+
+    streampos moduleStart = outfile.tellp();
+
+    // WRITE MODULE TO FILE
+    std::stringstream moduleBuffer;
+    dm->writeBinary(moduleStart, moduleBuffer, xrefTable);
+
+    string bufferData = moduleBuffer.str();
+    outfile.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());
+
+    return dm->getModuleID();
+}
+
+void UMDFFile::cleanupTempFile() {
+    if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
+        std::filesystem::remove(tempFilePath);
+    }
+    tempFilePath.clear();
+}
+
+bool UMDFFile::renameTempFile(const std::string& finalFilePath) {
+    try {
+        std::filesystem::rename(tempFilePath, finalFilePath);
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Exception in renameTempFile: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool UMDFFile::validateTempFile(size_t moduleCount) {
+
+
+    cout << "Validating temp file: " << tempFilePath << endl;
+    cout << "Module count: " << moduleCount << endl;
+
+    // Check if temp file exists
+    if (!std::filesystem::exists(tempFilePath)) {
+        return false;
+    }
+    
+    // Check if temp file is not empty
+    std::ifstream tempFile(tempFilePath, std::ios::binary);
+    if (!tempFile) return false;
+
+    // Read header and confirm UMDF
+    if (!header.readPrimaryHeader(tempFile)) { 
+        closeFile();
+        return false; 
+    }
+
+    xrefTable = XRefTable::loadXrefTable(tempFile);
+
+    if (xrefTable.getEntries().size() != moduleCount) {
+        return false;
+    }
+
+    for (const auto& entry : xrefTable.getEntries()) {
+        // Get entry offset
+        uint64_t offset = entry.offset;
+
+        // Seek to entry offset
+        tempFile.seekg(offset);
+
+        // Read DataHeader
+        DataHeader dataHeader;
+        try {
+            dataHeader.readDataHeader(tempFile);
+        } catch (const std::exception& e) {
+            cout << "Exception reading DataHeader: " << e.what() << endl;
+            return false;
+        }
+    }
+
+    return true;
 }
