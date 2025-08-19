@@ -1,5 +1,5 @@
 #include <catch2/catch_all.hpp>
-#include "SchemaResolver.hpp"
+#include "../../src/DataModule/SchemaResolver.hpp"
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>

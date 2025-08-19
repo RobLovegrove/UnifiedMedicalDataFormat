@@ -545,7 +545,6 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& 
         header->getModuleType(), 
         header->getModuleID(), absoluteModuleStart, header->getModuleSize());
 
-    cout << *header << endl;
 }
 
 void DataModule::addTableData(

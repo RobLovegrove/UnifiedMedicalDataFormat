@@ -57,9 +57,6 @@ ImageData::ImageData(
 }
 
 void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
-    // Debug: Print the schema being parsed
-    std::cout << "ImageData::parseDataSchema called with schema:" << std::endl;
-    std::cout << schemaJson.dump(2) << std::endl;
     
     // Parse the data section using standard JSON Schema $ref
     if (schemaJson.contains("properties") && schemaJson["properties"].contains("frames")) {

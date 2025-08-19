@@ -136,11 +136,6 @@ void UMDFFile::loadModule(const XrefEntry& entry) {
 /* =============== WRITING OPERATIONS =============== */
 /* ================================================== */
 
-// struct ModuleData {
-//     nlohmann::json metadata;
-//    std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> data;
-// };
-
 std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string& filename, 
     std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
 
@@ -264,45 +259,120 @@ std::expected<std::vector<UUID>, std::string> UMDFFile::writeNewFile(std::string
     return moduleIds;
 }
 
-
-
-std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
+std::expected<std::vector<UUID>, std::string> UMDFFile::addModules(
+    std:: string& filename, std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
 
     std::expected<UUID, std::string> result;
     std::vector<UUID> moduleIds;
 
-    // Check if file is open
-    if (!fileStream.is_open()) return std::unexpected("No file is currently open");
+    tempFilePath = filename + ".tmp";
 
-    // Check if XREF table is loaded
-    if (xrefTable.getEntries().size() == 0) {
-        xrefTable = XRefTable::loadXrefTable(fileStream);
+    // Check if file exists and is not empty or currently open
+    if (!std::filesystem::exists(filename) || std::filesystem::is_empty(filename)) {
+        return std::unexpected("File does not exist or is empty");
     }
 
-    // Write Modules to file
-    for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
-        const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
-
-        cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
-
-        // Write module to temp file
-        result = writeModule(fileStream, schemaPath, moduleData);
-        if (!result) {
-            cout << "Failed to write module: " << result.error() << endl;
-            return std::unexpected(result.error());
+    // 3. Copy original file to temp file
+    try {
+        // Remove temp file if it exists
+        if (std::filesystem::exists(tempFilePath)) {
+            std::filesystem::remove(tempFilePath);
         }
-        moduleIds.push_back(result.value());
-
+        
+        // Copy original to temp
+        std::filesystem::copy_file(filename, tempFilePath);
+    } catch (const std::exception& e) {
+        return std::unexpected("Failed to copy original file: " + std::string(e.what()));
     }
 
-    // Make old XREF table obsolete (now with improved stream handling)
-    xrefTable.setObsolete(fileStream);
+    cout << "Opening tmp file: " << tempFilePath << endl;
 
-    // WRITE new XREF TABLE at the end
-    if (!writeXref(fileStream)) return std::unexpected("Failed to write xref table");
+    // Open temp file for writing
+    std::fstream tempFile;
+    try {
+        tempFile.open(tempFilePath, std::ios::in | std::ios::out | std::ios::binary);
+        if (!tempFile) {
+            std::filesystem::remove(tempFilePath);
+            return std::unexpected("Failed to open temp file for updating");
+        }
+    } catch (const std::exception& e) {
+        std::filesystem::remove(tempFilePath);
+        return std::unexpected("Exception opening temp file: " + std::string(e.what()));
+    }
 
-    // CLOSE FILE
-    closeFile();
+    
+    // Load XRef table from temp file
+    xrefTable.clear();
+    try {
+        xrefTable = XRefTable::loadXrefTable(tempFile);
+    } catch (const std::exception& e) {
+        tempFile.close();
+        std::filesystem::remove(tempFilePath);
+        return std::unexpected("Failed to load XRef table from temp file: " + std::string(e.what()));
+    }
+
+
+    try {
+        // Write Modules to file
+        for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
+            const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
+
+            cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
+
+            // Write module to temp file
+            result = writeModule(tempFile, schemaPath, moduleData);
+            if (!result) {
+                cout << "Failed to write module: " << result.error() << endl;
+                return std::unexpected(result.error());
+            }
+            moduleIds.push_back(result.value());
+        }
+
+    } catch (const std::exception& e) {
+        tempFile.close();
+        std::filesystem::remove(tempFilePath);
+        return std::unexpected("Exception loading XRef table: " + std::string(e.what()));
+    }
+
+    cout << "All new modules written to temp file" << endl;
+
+    // Make old XREF table obsolete and write new one
+    try {
+        xrefTable.setObsolete(tempFile);
+        
+        if (!writeXref(tempFile)) {
+            throw std::runtime_error("Failed to write new XRef table");
+        }
+    } catch (const std::exception& e) {
+        tempFile.close();
+        std::filesystem::remove(tempFilePath);
+        return std::unexpected("Exception updating XRef table: " + std::string(e.what()));
+    }
+
+    // Close temp file
+    tempFile.close();
+
+    // Validate temp file
+    try {
+        if (!validateTempFile()) {
+            std::filesystem::remove(tempFilePath);
+            return std::unexpected("Updated file validation failed");
+        }
+    } catch (const std::exception& e) {
+        std::filesystem::remove(tempFilePath);
+        return std::unexpected("Exception during validation: " + std::string(e.what()));
+    }
+
+    // Atomic replace (rename temp to original)
+    try {
+        std::filesystem::rename(tempFilePath, filename);
+    } catch (const std::exception& e) {
+        std::filesystem::remove(tempFilePath);
+        return std::unexpected("Failed to replace original file: " + std::string(e.what()));
+    }
+
+    cout << "File updated successfully: " << filename << endl;
+
     return moduleIds;
 }
 
@@ -523,8 +593,10 @@ bool UMDFFile::validateTempFile(size_t moduleCount) {
 
     xrefTable = XRefTable::loadXrefTable(tempFile);
 
-    if (xrefTable.getEntries().size() != moduleCount) {
-        return false;
+    if (moduleCount > 0) {
+        if (xrefTable.getEntries().size() != moduleCount) {
+            return false;
+        }
     }
 
     for (const auto& entry : xrefTable.getEntries()) {

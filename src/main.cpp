@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
         std::vector<std::pair<std::string, ModuleData>> imageModulesWithSchemas;
         imageModulesWithSchemas.push_back({"./schemas/image/v1.0.json", imageModule});
         
-        auto addResult = file.addModules(imageModulesWithSchemas);
+        auto addResult = file.addModules(outputFile, imageModulesWithSchemas);
         if (!addResult) {
             cerr << "Failed to add image data: " << addResult.error() << "\n";
             return 1;
