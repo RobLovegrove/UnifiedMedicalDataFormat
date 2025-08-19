@@ -7,3 +7,5 @@
 #include "test_schemaValidation.cpp"
 #include "test_schemaResolver.cpp"
 #include "test_circularReference.cpp"
+#include "test_imageData.cpp"
+#include "test_imageEncoder.cpp"
