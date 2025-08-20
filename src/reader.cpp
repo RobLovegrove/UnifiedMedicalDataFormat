@@ -5,6 +5,7 @@
 #include <sstream>
 #include <expected>
 #include <nlohmann/json.hpp>
+#include <optional>
 
 using namespace std;
 
@@ -82,7 +83,7 @@ std::expected<ModuleData, std::string> Reader::getModuleData(
     // Find the module in the loadedModules vector
     for (const auto& module : loadedModules) {
         if (module->getModuleID().toString() == moduleId) {
-            return module->getDataWithSchema();  // Success case
+            return module->getModuleData();  // Success case
         }
     }
 
@@ -91,16 +92,22 @@ std::expected<ModuleData, std::string> Reader::getModuleData(
     // If the module is not found, load it from the file
     for (const auto& entry : xrefTable.getEntries()) {
         if (entry.id.toString() == moduleId) {
-            loadModule(entry);
-            cout << "Module loaded" << endl;
-            return loadedModules.back()->getDataWithSchema();
+            auto error = loadModule(entry);
+            if (!error) {
+                cout << "Module loaded" << endl;
+                return loadedModules.back()->getModuleData();
+            }
+            else {
+                cout << "Error loading module: " << error.value() << endl;
+                return std::unexpected("Error loading module: " + error.value());
+            }
         }
     }
 
     return std::unexpected("Module not found: " + moduleId);
 }
 
-void Reader::loadModule(const XrefEntry& entry) {
+std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
 
      if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
         vector<char> buffer(entry.size);
@@ -109,17 +116,32 @@ void Reader::loadModule(const XrefEntry& entry) {
         istringstream stream(string(buffer.begin(), buffer.end()));
 
         cout << "Reading module: " << entry.id.toString() << endl;
-        unique_ptr<DataModule> dm = DataModule::fromStream(stream, entry.offset, entry.type);
 
-        if (!dm) {
-            cout << "Skipped unknown or unsupported module type: " << entry.type << endl;
-            return;
+        unique_ptr<DataModule> dm;
+        try {
+            dm = DataModule::fromStream(stream, entry.offset, entry.type);
+            if (!dm) {
+                return "Skipped unknown or unsupported module type: " + to_string(entry.type);
+            }
+
+            // Validate the module before storing it
+            try {
+                dm->getModuleData();  // Test if data access works
+            } catch (const std::exception& e) {
+                return "Module validation failed: " + string(e.what());
+            }
+        }
+        catch (const std::exception& e) {
+            cout << "Caught throw here" << endl;
+            return "Error reading module: " + string(e.what());
         }
         loadedModules.push_back(std::move(dm));
-    
     }
     else {
         //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
         cout << "TODO: Handle a large DataModule" << endl;
+        return "TODO: Handle a large DataModule";
     }
+
+    return nullopt;
 }

@@ -26,7 +26,6 @@ TabularData::TabularData(
 void TabularData::parseDataSchema(const nlohmann::json& schemaJson) {
 
     if (schemaJson.contains("required")) {
-        cout << "Required fields: " << schemaJson["required"].dump() << endl;
         dataRequired = schemaJson["required"];
     }
 
@@ -80,5 +79,5 @@ void TabularData::printData(std::ostream& out) const {
 
 std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
 TabularData::getModuleSpecificData() const {
-    return getTableDataAsJson(rows, fields);
+    return getTableDataAsJson(dataRequired, rows, fields);
 }

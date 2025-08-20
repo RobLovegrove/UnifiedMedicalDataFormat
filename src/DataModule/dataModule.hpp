@@ -86,9 +86,14 @@ protected:
         size_t writePos);
 
     void printTableData(
-        std::ostream& out, const std::vector<std::unique_ptr<DataField>>& fields, const std::vector<std::vector<uint8_t>>& rows) const;
+        std::ostream& out, 
+        const std::vector<std::unique_ptr<DataField>>& fields, 
+        const std::vector<std::vector<uint8_t>>& rows) const;
     
-    nlohmann::json getTableDataAsJson(const std::vector<std::vector<uint8_t>>& rows, const std::vector<std::unique_ptr<DataField>>& fields) const;
+    nlohmann::json getTableDataAsJson(
+        const std::vector<std::string>& requiredFields,
+        const std::vector<std::vector<uint8_t>>& rows, 
+        const std::vector<std::unique_ptr<DataField>>& fields) const;
 
     void writeMetaData(std::ostream& out);
     virtual void writeData(std::ostream& out) const = 0;
@@ -128,7 +133,7 @@ public:
     virtual void printData(std::ostream& out) const = 0;
 
     // Template method that handles common functionality
-    ModuleData getDataWithSchema() const;
+    ModuleData getModuleData() const;
 
     // Public methods to access header information
     UUID getModuleID() const { return header->getModuleID(); }

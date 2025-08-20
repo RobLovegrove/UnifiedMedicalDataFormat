@@ -704,7 +704,7 @@ ImageData::getModuleSpecificData() const {
         }
         
         // Get the frame's data with schema (now decompressed)
-        ModuleData frameData = frame->getDataWithSchema();
+        ModuleData frameData = frame->getModuleData();
         frameDataArray.push_back(frameData);
     }
     

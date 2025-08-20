@@ -373,7 +373,7 @@ int main(int argc, char** argv) {
         for (const auto& module : fileInfo["modules"]) {
             cout << "Loading module: " << module["uuid"] << endl;
             auto moduleData = reader.getModuleData(module["uuid"]);
-            if (moduleData) {
+            if (moduleData.has_value()) {
                 cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
                 cout << "Metadata: " << moduleData.value().metadata.dump(2) << endl;
                 
@@ -383,7 +383,7 @@ int main(int argc, char** argv) {
                     // Tabular data
                     cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
                 } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
-                    // Binary data (like image pixels)
+                    // Binary data 
                     const auto& binaryData = std::get<std::vector<uint8_t>>(data);
                     cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
                 } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
@@ -401,6 +401,9 @@ int main(int argc, char** argv) {
                     }
                 }
                 cout << endl;
+            }
+            else {
+                cout << "Error loading module: " << module["uuid"] << " " << moduleData.error() << endl;
             }
         }
         

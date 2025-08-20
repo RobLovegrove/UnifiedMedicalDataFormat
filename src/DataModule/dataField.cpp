@@ -472,6 +472,7 @@ bool ObjectField::validateValue(const nlohmann::json& value) const {
     // First check if all required fields are present
     for (const auto& requiredField : requiredFields) {
         if (!value.contains(requiredField)) {
+            cout << "Missing required field: " << requiredField << endl;    
             return false;  // Missing required field
         }
     }

@@ -214,7 +214,7 @@ std::expected<std::vector<UUID>, std::string> Writer::addModules(
     } catch (const std::exception& e) {
         tempFile.close();
         std::filesystem::remove(tempFilePath);
-        return std::unexpected("Exception loading XRef table: " + std::string(e.what()));
+        return std::unexpected("Exception writing modules: " + std::string(e.what()));
     }
 
     cout << "All new modules written to temp file" << endl;

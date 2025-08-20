@@ -733,14 +733,17 @@ void DataModule::printMetadata(std::ostream& out) const {
 }
 
 // Template method that handles common functionality
-ModuleData DataModule::getDataWithSchema() const {
+ModuleData DataModule::getModuleData() const {
     return {
         getMetadataAsJson(),
         getModuleSpecificData()
     };
 }
 
-nlohmann::json DataModule::getTableDataAsJson(const vector<vector<uint8_t>>& rows, const vector<unique_ptr<DataField>>& fields) const {
+nlohmann::json DataModule::getTableDataAsJson(
+    const vector<std::string>& requiredFields,
+    const vector<vector<uint8_t>>& rows, 
+    const vector<unique_ptr<DataField>>& fields) const {
 
     nlohmann::json dataArray = nlohmann::json::array();
 
@@ -804,6 +807,13 @@ nlohmann::json DataModule::getTableDataAsJson(const vector<vector<uint8_t>>& row
 
         dataArray.push_back(rowJson);
     }
+    for (const auto& row : dataArray) {
+        for (const auto& field : requiredFields) {
+            if (!row.contains(field)) {
+                throw std::runtime_error("Data missing required field: " + field);
+            }
+        }
+    }
     
     return dataArray;
 }
@@ -813,7 +823,7 @@ nlohmann::json DataModule::getTableDataAsJson(const vector<vector<uint8_t>>& row
 nlohmann::json DataModule::getMetadataAsJson() const {
     nlohmann::json metadataArray = nlohmann::json::array();
 
-    return getTableDataAsJson(metaDataRows, metaDataFields);
+    return getTableDataAsJson(metadataRequired, metaDataRows, metaDataFields);
 }
 
 // Note: Schema caching is now handled by SchemaResolver class
