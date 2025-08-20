@@ -1,6 +1,8 @@
 #include "imageData.hpp"
 #include "ImageEncoder.hpp"
 #include "../../Utility/uuid.hpp"
+#include "../../Utility/CompressionType.hpp"
+#include "../../Utility/ZstdCompressor.hpp"
 #include "../Header/dataHeader.hpp"
 #include "../dataModule.hpp"
 #include "../../Xref/xref.hpp"
@@ -16,26 +18,9 @@
 
 using namespace std;
 
-// Encoding conversion utilities implementation
-std::optional<ImageEncoding> stringToEncoding(const std::string& str) {
-    if (str == "raw") return ImageEncoding::RAW;
-    if (str == "jpeg2000-lossless") return ImageEncoding::JPEG2000_LOSSLESS;
-    if (str == "png") return ImageEncoding::PNG;
-    return std::nullopt;  // Invalid encoding
-}
-
-std::string encodingToString(ImageEncoding encoding) {
-    switch (encoding) {
-        case ImageEncoding::RAW: return "raw";
-        case ImageEncoding::JPEG2000_LOSSLESS: return "jpeg2000-lossless";
-        case ImageEncoding::PNG: return "png";
-        default: return "raw";  // Fallback
-    }
-}
-
 ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPath, uuid, ModuleType::Image) {
     // Initialize encoding to RAW by default (always safe for medical data)
-    encoding = ImageEncoding::RAW;
+    header->setDataCompression(CompressionType::RAW);
     
     // Initialize the image encoder
     encoder = std::make_unique<ImageEncoder>();
@@ -48,7 +33,7 @@ ImageData::ImageData(
     : DataModule(schemaPath, schemaJson, uuid, ModuleType::Image) {
 
     // Initialize encoding to RAW by default (always safe for medical data)
-    encoding = ImageEncoding::RAW;
+    header->setDataCompression(CompressionType::RAW);
     
     // Initialize the image encoder
     encoder = std::make_unique<ImageEncoder>();
@@ -204,7 +189,7 @@ void ImageData::addData(
         frameModule->addData(frame.data);
         
         // Set decompression flag based on current encoding
-        frameModule->needsDecompression = (encoding != ImageEncoding::RAW);
+        frameModule->needsDecompression = (header->getDataCompression() != CompressionType::RAW);
         
         // Add to frames collection
         frames.push_back(std::move(frameModule));
@@ -227,8 +212,8 @@ void ImageData::addData(
     auto compressionDuration = std::chrono::duration_cast<std::chrono::microseconds>(compressionEnd - compressionStart);
     
     std::cout << "Total compression time for " << data.size() << " frames (" 
-              << (encoding == ImageEncoding::JPEG2000_LOSSLESS ? "JPEG2000" : 
-                  encoding == ImageEncoding::PNG ? "PNG" : "RAW") << "): " 
+              << (header->getDataCompression() == CompressionType::JPEG2000_LOSSLESS ? "JPEG2000" : 
+                  header->getDataCompression() == CompressionType::PNG ? "PNG" : "RAW") << "): " 
               << compressionDuration.count() << " microseconds" << std::endl;
 
 }
@@ -325,14 +310,14 @@ void ImageData::addMetaData(const nlohmann::json& data) {
         // Extract encoding from image_structure and store in C++ member
         if (imageStruct.contains("encoding")) {
             std::string enc_str = imageStruct["encoding"];
-            auto encoding_opt = stringToEncoding(enc_str);
+            auto encoding_opt = stringToCompression(enc_str);
             if (encoding_opt.has_value()) {
-                encoding = encoding_opt.value();
+                header->setDataCompression(encoding_opt.value());
             } else {
                 // Invalid encoding - log warning and use default
                 std::cerr << "Warning: Invalid encoding '" << enc_str 
                           << "' in image_structure, using RAW encoding" << std::endl;
-                encoding = ImageEncoding::RAW;
+                header->setDataCompression(CompressionType::RAW);
             }
         }
         
@@ -523,19 +508,19 @@ void ImageData::readMetadataRows(std::istream& in) {
             // Decode the field value from buffer
             std::string enc_str = f.field->decodeFromBuffer(rowBuffer, offset).get<std::string>();
 
-            auto encoding_opt = stringToEncoding(enc_str);
+            auto encoding_opt = stringToCompression(enc_str);
             if (encoding_opt.has_value()) {
-                encoding = encoding_opt.value();
-                needsDecompression = (encoding != ImageEncoding::RAW);
+                header->setDataCompression(encoding_opt.value());
+                needsDecompression = (header->getDataCompression() != CompressionType::RAW);
             } else {
                 std::cerr << "Warning: Invalid encoding '" << enc_str
                         << "' in metadata, using RAW encoding" << std::endl;
-                encoding = ImageEncoding::RAW;
+                header->setDataCompression(CompressionType::RAW);
                 needsDecompression = false;
             }
         } else {
             // default if field missing
-            encoding = ImageEncoding::RAW;
+            header->setDataCompression(CompressionType::RAW);
             needsDecompression = false;
         }
     }
@@ -584,14 +569,14 @@ void ImageData::writeData(std::ostream& out) const {
     // Write each frame as embedded data (not as separate modules)
     for (size_t i = 0; i < frames.size(); i++) {
         // Check if we need to compress this frame
-        if (encoding != ImageEncoding::RAW) {
+        if (header->getDataCompression() != CompressionType::RAW) {
             // Compress the frame's pixel data
             // Get width and height from dimensions array
             int frameWidth = dimensions.size() > 0 ? dimensions[0] : 16;
             int frameHeight = dimensions.size() > 1 ? dimensions[1] : 16;
             
             // Use the encoder to compress the frame
-            frames[i]->pixelData = encoder->compress(frames[i]->pixelData, encoding, 
+            frames[i]->pixelData = encoder->compress(frames[i]->pixelData, header->getDataCompression(), 
                                                    frameWidth, frameHeight, channels, bitDepth);
             
             // Update the frame's data size after compression
@@ -607,7 +592,7 @@ void ImageData::writeData(std::ostream& out) const {
     uint64_t totalDataSize = endPos - startPos;
 
     // Calculate and display total compression statistics
-    if (encoding != ImageEncoding::RAW) {
+    if (header->getDataCompression() != CompressionType::RAW) {
         size_t totalOriginalSize = 0;
         size_t totalCompressedSize = 0;
         
@@ -630,6 +615,9 @@ void ImageData::writeData(std::ostream& out) const {
     }
 
     header->setDataSize(totalDataSize);
+    
+    // Set compression type in header
+    header->setDataCompression(header->getDataCompression());
 
 }
 
@@ -714,36 +702,32 @@ ImageData::getModuleSpecificData() const {
     
     // Print summary of frame processing with timing
     std::cout << "ImageData: Processed " << frames.size() << " frames with " 
-              << encodingToString(encoding) << " encoding" << std::endl;
+              << compressionToString(header->getDataCompression()) << " encoding" << std::endl;
     std::cout << "Total decompression time for " << frames.size() << " frames (" 
-              << encodingToString(encoding) << "): " 
+              << compressionToString(header->getDataCompression()) << "): " 
               << decompressionDuration.count() << " microseconds" << std::endl;
     
     return frameDataArray;  // Returns vector of ModuleData for frames
 }
 
 // Encoding methods implementation
-void ImageData::setEncoding(ImageEncoding enc) {
-    encoding = enc;
+void ImageData::setEncoding(CompressionType enc) {
+    header->setDataCompression(enc);
 }
 
-ImageEncoding ImageData::getEncoding() const {
-    return encoding;
+CompressionType ImageData::getEncoding() const {
+    return header->getDataCompression();
 }
 
-std::string ImageData::getEncodingString() const {
-    return encodingToString(encoding);
-}
-
-bool ImageData::setEncodingFromString(const std::string& enc_str) {
-    auto encoding_opt = stringToEncoding(enc_str);
-    if (encoding_opt.has_value()) {
-        encoding = encoding_opt.value();
-        return true;  // Success
-    } else {
-        return false;  // Invalid encoding
-    }
-}
+// bool ImageData::setEncodingFromString(const std::string& enc_str) {
+//     auto encoding_opt = stringToCompression(enc_str);
+//     if (encoding_opt.has_value()) {
+//         encoding = encoding_opt.value();
+//         return true;  // Success
+//     } else {
+//         return false;  // Invalid encoding
+//     }
+// }
 
 bool ImageData::validateEncodingInSchema() const {
     // Check if the schema defines an encoding field with valid enum values
@@ -757,7 +741,7 @@ bool ImageData::validateEncodingInSchema() const {
         // Check if the schema has valid enum values
         if (encodingDef.contains("enum") && encodingDef["enum"].is_array()) {
             for (const auto& enumVal : encodingDef["enum"]) {
-                if (!stringToEncoding(enumVal).has_value()) {
+                if (stringToCompression(enumVal) == CompressionType::UNKNOWN) {
                     return false;  // Invalid enum value found
                 }
             }
@@ -768,12 +752,12 @@ bool ImageData::validateEncodingInSchema() const {
 }
 
 std::vector<uint8_t> ImageData::decompressFrameData(const std::vector<uint8_t>& compressedData) const {
-    if (encoding == ImageEncoding::RAW) {
+    if (header->getDataCompression() == CompressionType::RAW) {
         return compressedData; // Already uncompressed
     }
     
     // Use the encoder to decompress the frame
-    return encoder->decompress(compressedData, encoding);
+    return encoder->decompress(compressedData, header->getDataCompression());
 }
 
 

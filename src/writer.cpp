@@ -4,6 +4,7 @@
 #include "DataModule/dataModule.hpp"
 #include "DataModule/Image/imageData.hpp"
 #include "DataModule/Tabular/tabularData.hpp"
+#include "Utility/ZstdCompressor.hpp"
 
 
 #include "Utility/utils.hpp"
@@ -475,12 +476,22 @@ std::expected<UUID, std::string> Writer::writeModule(
 
     streampos moduleStart = outfile.tellp();
 
+    // Start ZSTD summary mode for this module
+    ZstdCompressor::startSummaryMode();
+
     // WRITE MODULE TO FILE
     std::stringstream moduleBuffer;
     dm->writeBinary(moduleStart, moduleBuffer, xrefTable);
 
     string bufferData = moduleBuffer.str();
     outfile.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());
+
+    // Print ZSTD compression summary for this module and stop summary mode
+    if (ZstdCompressor::isSummaryMode()) {
+        std::cout << "Module ZSTD compression summary:" << std::endl;
+        ZstdCompressor::printSummary();
+        ZstdCompressor::stopSummaryMode();
+    }
 
     return dm->getModuleID();
 }

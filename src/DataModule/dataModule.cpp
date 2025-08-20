@@ -5,6 +5,7 @@
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
 #include "SchemaResolver.hpp"
+#include "../Utility/ZstdCompressor.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -20,6 +21,7 @@ DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type) {
     header->setModuleType(type);
     header->setSchemaPath(schemaPath);
     header->setModuleID(uuid);
+    header->setMetadataCompression(CompressionType::ZSTD);
 
     ifstream file = openSchemaFile(schemaPath);
     file >> schemaJson;
@@ -34,6 +36,7 @@ DataModule::DataModule(
     header->setModuleType(type);
     header->setSchemaPath(schemaPath);
     header->setModuleID(uuid);
+    header->setMetadataCompression(CompressionType::ZSTD);
 }
 
 void DataModule::initialise() {
@@ -126,7 +129,11 @@ unique_ptr<DataModule> DataModule::fromStream(
     unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
 
     dmHeader->readDataHeader(in);
-    
+
+    if (dmHeader->getModuleType() != ModuleType::Frame) {
+        cout << *dmHeader << endl;
+    }
+
     unique_ptr<DataModule> dm;
 
     try {
@@ -153,52 +160,100 @@ unique_ptr<DataModule> DataModule::fromStream(
 
     dm->header->setModuleStartOffset(moduleStartOffset);
 
-    // Only read string buffer if there's actually content
-    if (dm->header->getStringBufferSize() > 0) {
-        dm->stringBuffer.readFromFile(in, dm->header->getStringBufferSize());
-    }
-
-    // Read in metadata
-    if (dm->header->getMetadataSize() > 0) {
-    if (dm->header->getCompression()) {
-        cout << "TODO: Handle file compression" << endl;
-    } else {
-            std::vector<uint8_t> buffer(dm->header->getMetadataSize());
-            in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-
-            std::istringstream inputStream(
-                std::string(reinterpret_cast<char*>(buffer.data()), buffer.size())
-            );
-
-            if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
-                throw std::runtime_error("Failed to read full metadata block");
-            }
-
-            dm->readMetadataRows(inputStream);
+    if (dm->header->getMetadataCompression() == CompressionType::ZSTD) {
+        std::vector<uint8_t> buffer(dm->header->getMetadataSize());
+        in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+        if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
+            throw std::runtime_error("Failed to read full metadata block");
         }
+
+        // Decompress the metadata
+        std::vector<uint8_t> compressedData = ZstdCompressor::decompress(buffer);
+
+        std::istringstream inputStream {
+            std::string(reinterpret_cast<char*>(compressedData.data()), compressedData.size())
+        };
+
+        // Read the string buffer and metadata sizes
+        uint64_t stringBufferSize;
+        uint64_t metadataSize;
+
+        inputStream.read(reinterpret_cast<char*>(&stringBufferSize), sizeof(stringBufferSize));
+        inputStream.read(reinterpret_cast<char*>(&metadataSize), sizeof(metadataSize));
+
+        // Set header sizes
+        dm->header->setStringBufferSize(stringBufferSize);
+        dm->header->setMetadataSize(metadataSize);
+
+        dm->readStringBufferAndMetadata(inputStream);
+
     }
+    else {
+        dm->readStringBufferAndMetadata(in);
+    }
+
 
     if (dm->header->getDataSize() > 0) {
-    // Read in data
-    if (dm->header->getCompression()) {
-        cout << "TODO: Handle file compression" << endl;
-    } else {
+        // Read in data
+        std::vector<uint8_t> buffer(dm->header->getDataSize());
     
-            std::vector<uint8_t> buffer(dm->header->getDataSize());
+        in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
     
-            in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-    
+        if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
+            throw std::runtime_error("Failed to read full data block");
+        }
+
+        // Handle compression if needed
+        if (dm->header->getDataCompression() == CompressionType::ZSTD) {
+
+            std::vector<uint8_t> decompressedData = ZstdCompressor::decompress(buffer);
+
+            // Update the data size with the decompressed data size
+            dm->header->setDataSize(decompressedData.size());
+
+            std::istringstream inputStream {
+                std::string(reinterpret_cast<char*>(decompressedData.data()), decompressedData.size())
+            };
+
+            dm->readData(inputStream);
+        }
+        else {
             std::istringstream inputStream(
                 std::string(reinterpret_cast<char*>(buffer.data()), buffer.size())
             );
-    
-            if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
-                throw std::runtime_error("Failed to read full data block");
-            }        
+            
             dm->readData(inputStream);
         }
     }
     return dm;
+}
+
+void DataModule::readStringBufferAndMetadata(istream& in) {
+    // Only read string buffer if there's actually content
+    if (header->getStringBufferSize() > 0) {
+        stringBuffer.readFromFile(in, header->getStringBufferSize());
+    }
+
+    // Read in metadata
+    if (header->getMetadataSize() > 0) {
+        std::vector<uint8_t> buffer(header->getMetadataSize());
+        in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+
+        if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
+            throw std::runtime_error("Failed to read full metadata block");
+        }
+
+        // Handle compression if needed
+        if (header->getMetadataCompression() != CompressionType::RAW) {
+        }
+
+        std::istringstream inputStream(
+            std::string(reinterpret_cast<char*>(buffer.data()), buffer.size())
+        );
+
+        readMetadataRows(inputStream);
+    }
+
 }
 
 void DataModule::writeMetaData(ostream& out) {
@@ -514,11 +569,49 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& 
     // Write header
     header->writeToFile(out);
 
-    // Write String Buffer
-    writeStringBuffer(out);
+    if (header->getMetadataCompression() == CompressionType::ZSTD) {
 
-    // Write Metadata
-    writeMetaData(out);
+        uint64_t stringBufferSize = stringBuffer.getSize();
+        uint64_t metadataSize = 0;
+        for (const auto& row : metaDataRows) {
+            metadataSize += row.size();
+        }
+
+        // Create a buffer and write metadata and stringBuffer sizes
+        std::stringstream buffer;
+        
+        buffer.write(reinterpret_cast<const char*>(&stringBufferSize), sizeof(stringBufferSize));
+        buffer.write(reinterpret_cast<const char*>(&metadataSize), sizeof(metadataSize));
+        
+        // Write string buffer and metadata to buffer
+        writeStringBuffer(buffer);
+        writeMetaData(buffer);
+
+        // Convert to bytes
+        std::vector<uint8_t> dataBytes {
+            std::istreambuf_iterator<char>(buffer),
+            std::istreambuf_iterator<char>()
+        };
+
+        // Compress the buffer (this will use individual output if not in summary mode)
+        std::vector<uint8_t> compressedData = ZstdCompressor::compress(dataBytes);
+
+        size_t compressedDataSize = compressedData.size();
+
+        // Write the compressed data to the output stream
+        out.write(reinterpret_cast<const char*>(compressedData.data()), compressedDataSize);
+
+        // Update header with compressed data size
+        header->setStringBufferSize(0);
+        header->setMetadataSize(compressedDataSize);
+
+    }
+    else {
+        // Write String Buffer
+        writeStringBuffer(out);
+        // Write Metadata
+        writeMetaData(out);
+    }
 
     // Write Data
     writeData(out);

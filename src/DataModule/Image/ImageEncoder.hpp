@@ -7,8 +7,7 @@
 #include <memory>
 #include <openjpeg.h>
 
-// Forward declarations
-enum class ImageEncoding;
+#include "../../Utility/CompressionType.hpp"
 
 class ImageEncoder {
 public:
@@ -20,12 +19,12 @@ public:
     
     // Main encoding/decoding interface
     std::vector<uint8_t> compress(const std::vector<uint8_t>& rawData, 
-                                  ImageEncoding encoding,
+                                  CompressionType encoding,
                                   int width, int height,
                                   uint8_t channels, uint8_t bitDepth) const;
     
     std::vector<uint8_t> decompress(const std::vector<uint8_t>& compressedData,
-                                    ImageEncoding encoding) const;
+                                    CompressionType encoding) const;
     
     // Individual format methods
     std::vector<uint8_t> compressJPEG2000(const std::vector<uint8_t>& rawData, 

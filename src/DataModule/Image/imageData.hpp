@@ -17,17 +17,8 @@
 #include "../../Utility/moduleType.hpp"
 #include "FrameData.hpp"
 #include "ImageEncoder.hpp"
+#include "../../Utility/CompressionType.hpp"
 
-// Image encoding enum
-enum class ImageEncoding {
-    RAW,               // No compression
-    JPEG2000_LOSSLESS, // JPEG 2000 lossless compression
-    PNG                // PNG lossless compression
-};
-
-// Encoding conversion utilities
-std::optional<ImageEncoding> stringToEncoding(const std::string& str);
-std::string encodingToString(ImageEncoding encoding);
 
 class ImageData : public DataModule { 
 
@@ -40,7 +31,6 @@ protected:
     uint8_t channels;
     
     // Image encoding
-    ImageEncoding encoding;
     bool needsDecompression = false;
 
     // Frame schema reference
@@ -86,10 +76,8 @@ public:
     std::vector<std::string> getNonZeroDimensionNames() const;
     
     // Encoding methods
-    void setEncoding(ImageEncoding enc);
-    ImageEncoding getEncoding() const;
-    std::string getEncodingString() const;
-    bool setEncodingFromString(const std::string& enc_str);
+    void setEncoding(CompressionType enc);
+    CompressionType getEncoding() const;
     bool validateEncodingInSchema() const;
     
     // Image format getters

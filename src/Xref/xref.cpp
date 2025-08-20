@@ -123,7 +123,6 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
     // 5. Read Current Table Flag
     uint8_t isCurrent = 0;
     in.read(reinterpret_cast<char*>(&isCurrent), sizeof(isCurrent));
-    cout << "Current Table Flag: " << isCurrent << endl;
     if (isCurrent == 0) {
         throw std::runtime_error("Obsolete Xref table.");
     }

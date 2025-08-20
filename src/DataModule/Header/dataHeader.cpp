@@ -23,7 +23,12 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     writeTLVString(out, HeaderFieldType::ModuleType, module_type_to_string(moduleType));
     writeTLVString(out, HeaderFieldType::SchemaPath, schemaPath);
-    writeTLVBool(out, HeaderFieldType::Compression, compression);
+
+    uint8_t metadataCompressionValue = encodeCompression(metadataCompression);
+    uint8_t dataCompressionValue = encodeCompression(dataCompression);
+
+    writeTLVFixed(out, HeaderFieldType::MetadataCompression, &metadataCompressionValue, sizeof(metadataCompressionValue));
+    writeTLVFixed(out, HeaderFieldType::DataCompression, &dataCompressionValue, sizeof(dataCompressionValue));
     writeTLVBool(out, HeaderFieldType::Endianness, littleEndian);
 
     const auto& uuidBytes = moduleID.data();
@@ -204,9 +209,14 @@ void DataHeader::readDataHeader(std::istream& in) {
                 schemaPath = std::string(buffer.data(), length);
                 break;
 
-            case HeaderFieldType::Compression:
-                if (length != 1) throw std::runtime_error("Invalid Compression length.");
-                compression = buffer[0] != 0;
+            case HeaderFieldType::MetadataCompression:
+                if (length != 1) throw std::runtime_error("Invalid MetadataCompression length.");
+                metadataCompression = decodeCompressionType(buffer[0]);
+                break;
+
+            case HeaderFieldType::DataCompression:
+                if (length != 1) throw std::runtime_error("Invalid DataCompression length.");
+                dataCompression = decodeCompressionType(buffer[0]);
                 break;
 
             case HeaderFieldType::Endianness:
@@ -242,17 +252,18 @@ uint64_t DataHeader::getModuleSize() const {
 
 std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
     os << "DataHeader {\n"
-       << "  headerSize       : " << header.headerSize << "\n"
-       << "  stringBufferSize : " << header.stringBufferSize << "\n"
-       << "  metaDataSize     : " << header.metaDataSize << "\n"
-       << "  dataSize         : " << header.dataSize << "\n"
-       << "  isCurrent        : " << header.isCurrent << "\n"
-       << "  previousVersion  : " << header.previousVersion << "\n"
-       << "  moduleType       : " << header.moduleType << "\n"
-       << "  schemaPath       : " << header.schemaPath << "\n"
-       << "  compression      : " << std::boolalpha << header.compression << "\n"
-       << "  littleEndian     : " << std::boolalpha << header.littleEndian << "\n"
-       << "  moduleID         : " << header.moduleID.toString() << "\n"
+       << "  headerSize          : " << header.headerSize << "\n"
+       << "  stringBufferSize    : " << header.stringBufferSize << "\n"
+       << "  metaDataSize        : " << header.metaDataSize << "\n"
+       << "  dataSize            : " << header.dataSize << "\n"
+       << "  isCurrent           : " << header.isCurrent << "\n"
+       << "  previousVersion     : " << header.previousVersion << "\n"
+       << "  moduleType          : " << header.moduleType << "\n"
+       << "  schemaPath          : " << header.schemaPath << "\n"
+       << "  metadataCompression : " << compressionToString(header.metadataCompression) << "\n"
+       << "  dataCompression     : " << compressionToString(header.dataCompression) << "\n"
+       << "  littleEndian        : " << std::boolalpha << header.littleEndian << "\n"
+       << "  moduleID            : " << header.moduleID.toString() << "\n"
        << "}";
 
     return os;

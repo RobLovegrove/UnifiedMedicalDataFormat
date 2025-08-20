@@ -5,6 +5,7 @@
 #include "../../Xref/xref.hpp"
 #include "../stringBuffer.hpp"
 #include "../Header/dataHeader.hpp"
+#include "../../Utility/ZstdCompressor.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -14,12 +15,14 @@
 using namespace std;
 
 TabularData::TabularData(const string& schemaPath, UUID uuid) : DataModule(schemaPath, uuid, ModuleType::Tabular) {
+    header->setDataCompression(CompressionType::ZSTD);
     initialise();
 }
 
 TabularData::TabularData(
     const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid) 
     : DataModule(schemaPath, schemaJson, uuid, ModuleType::Tabular) {
+    header->setDataCompression(CompressionType::ZSTD);
     initialise();
 }
 
@@ -63,8 +66,31 @@ void TabularData::addData(const std::variant<nlohmann::json, std::vector<uint8_t
 }
 
 void TabularData::writeData(ostream& out) const {
-    uint64_t size = writeTableRows(out, rows);
-    header->setDataSize(size);
+
+    if (header->getDataCompression() == CompressionType::ZSTD) {
+
+        std::stringstream buffer;
+
+        writeTableRows(buffer, rows);
+
+        std::vector<uint8_t> dataBytes {
+            std::istreambuf_iterator<char>(buffer),
+            std::istreambuf_iterator<char>()
+        };
+
+        std::vector<uint8_t> compressedData = ZstdCompressor::compress(dataBytes);
+
+        size_t compressedDataSize = compressedData.size();
+
+        out.write(reinterpret_cast<const char*>(compressedData.data()), compressedDataSize);
+
+        header->setDataSize(compressedDataSize);
+
+    }
+    else {
+        uint64_t size = writeTableRows(out, rows);
+        header->setDataSize(size);
+    }
 }
 
 void TabularData::readData(istream& in) {

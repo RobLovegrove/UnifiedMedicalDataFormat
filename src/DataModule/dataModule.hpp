@@ -29,7 +29,9 @@ protected:
     std::streampos absoluteModuleStart;
 
     std::unique_ptr<DataHeader> header;
+
     nlohmann::json schemaJson;
+    
     StringBuffer stringBuffer;
     std::vector<std::unique_ptr<DataField>> metaDataFields;
     std::vector<std::vector<uint8_t>> metaDataRows;
@@ -48,6 +50,8 @@ protected:
         const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type);
 
     void initialise();
+
+    void readStringBufferAndMetadata(std::istream& in);
 
     void parseSchemaHeader(const nlohmann::json& schemaJson);
     void parseSchema(const nlohmann::json& schemaJson);

@@ -1,6 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include "DataModule/Image/imageData.hpp"
 #include "Utility/uuid.hpp"
+#include "Utility/CompressionType.hpp"
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
@@ -132,15 +133,15 @@ TEST_CASE("ImageData dimension handling", "[imageData][dimensions]") {
 TEST_CASE("ImageData encoding validation", "[imageData][encoding]") {
     
     SECTION("Validates encoding strings") {
-        REQUIRE(stringToEncoding("jpeg2000-lossless").has_value());
-        REQUIRE(stringToEncoding("png").has_value());
-        REQUIRE(stringToEncoding("raw").has_value());
-        REQUIRE_FALSE(stringToEncoding("invalid").has_value());
+        REQUIRE(stringToCompression("jpeg2000-lossless").has_value());
+        REQUIRE(stringToCompression("png").has_value());
+        REQUIRE(stringToCompression("raw").has_value());
+        REQUIRE_FALSE(stringToCompression("invalid").has_value());
     }
 
     SECTION("Converts encoding to string") {
-        REQUIRE(encodingToString(ImageEncoding::JPEG2000_LOSSLESS) == "jpeg2000-lossless");
-        REQUIRE(encodingToString(ImageEncoding::PNG) == "png");
-        REQUIRE(encodingToString(ImageEncoding::RAW) == "raw");
+        REQUIRE(compressionToString(CompressionType::JPEG2000_LOSSLESS) == "JPEG2000_LOSSLESS");
+        REQUIRE(compressionToString(CompressionType::PNG) == "PNG");
+        REQUIRE(compressionToString(CompressionType::RAW) == "RAW");
     }
 }

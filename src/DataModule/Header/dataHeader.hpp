@@ -7,19 +7,21 @@
 
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
+#include "../../Utility/CompressionType.hpp"
 
 enum class HeaderFieldType : uint8_t {
-    HeaderSize    = 1,
-    StringSize    = 2,
+    HeaderSize = 1,
+    StringSize = 2,
     MetadataSize = 3,
-    DataSize      = 4,
-    IsCurrent     = 5,
+    DataSize = 4,
+    IsCurrent = 5,
     PreviousVersion = 6,
-    ModuleType    = 7,
-    SchemaPath    = 8,
-    Compression   = 9,
-    Endianness    = 10,
-    ModuleID      = 11
+    ModuleType = 7,
+    SchemaPath = 8,
+    MetadataCompression = 9,
+    DataCompression = 10,
+    Endianness = 11,
+    ModuleID = 12
 };
 
 struct DataHeader {
@@ -33,7 +35,7 @@ protected:
     uint64_t moduleStartOffset;
     uint64_t totalModuleSize = 0;
 
-    bool isCurrent = true; // 1 = current, 0 = previous
+    bool isCurrent = true; // 1 = current, 0 = previous/old version
     uint64_t previousVersion = 0;
     
     std::streampos headerSizePos = 0;
@@ -46,8 +48,9 @@ protected:
 
     ModuleType moduleType;
     std::string schemaPath;
-    bool compression = false;
-    bool littleEndian = true;
+    CompressionType metadataCompression;
+    CompressionType dataCompression;
+    bool littleEndian;
     UUID moduleID;
 
     void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value) const;
@@ -88,7 +91,11 @@ public:
     uint64_t getStringBufferSize() const { return stringBufferSize; }
     void setStringBufferSize(uint64_t size) { stringBufferSize = size; }
 
-    bool getCompression() const { return compression; }
+    CompressionType getMetadataCompression() const { return metadataCompression; }
+    void setMetadataCompression(CompressionType compression) { metadataCompression = compression; }
+
+    CompressionType getDataCompression() const { return dataCompression; }
+    void setDataCompression(CompressionType compression) { dataCompression = compression; }
 
     bool getLittleEndian() const { return littleEndian; }
     void setLittleEndian(bool lE) { littleEndian = lE; }

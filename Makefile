@@ -24,6 +24,8 @@ OPENJPEG_CFLAGS := -I/opt/homebrew/include/openjpeg-2.5
 OPENJPEG_LIBS := -L/opt/homebrew/lib -lopenjp2
 PNG_CFLAGS := -I/opt/homebrew/include
 PNG_LIBS := -L/opt/homebrew/lib -lpng
+ZSTD_CFLAGS := -I/opt/homebrew/opt/zstd/include
+ZSTD_LIBS := -L/opt/homebrew/opt/zstd/lib -lzstd
 
 # Catch2 paths
 CATCH2_INCLUDE := -I/opt/homebrew/opt/catch2/include
@@ -61,10 +63,10 @@ VPATH := $(SRC_DIR):$(TEST_DIR)
 # Default target is release
 all: release
 
-debug: CXXFLAGS += -g -O0 $(OPENJPEG_CFLAGS) $(PNG_CFLAGS)
+debug: CXXFLAGS += -g -O0 $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS)
 debug: $(TARGET)
 
-release: CXXFLAGS += -O3 -DNDEBUG $(OPENJPEG_CFLAGS) $(PNG_CFLAGS)
+release: CXXFLAGS += -O3 -DNDEBUG $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS)
 release: $(TARGET)
 
 # Test targets
@@ -81,7 +83,7 @@ $(BUILD_DIR):
 # Compile source files to object files, creating directories as needed
 $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
+	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
 
 # Compile test files to object files
 $(BUILD_DIR)/tests/%.o: tests/%.cpp | $(BUILD_DIR)
@@ -95,12 +97,12 @@ $(BUILD_DIR)/test_main.o: tests/test_main.cpp | $(BUILD_DIR)
 
 # Link all object files into the final executable
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(OPENJPEG_LIBS) $(PNG_LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(OPENJPEG_LIBS) $(PNG_LIBS) $(ZSTD_LIBS)
 
 # Link test object files into test executable (without main.o)
 TEST_OBJS_FILTERED := $(filter-out build/main.o, $(OBJS))
 $(TEST_TARGET): $(TEST_MAIN_OBJ) $(TEST_OBJS) $(TEST_OBJS_FILTERED)
-	$(CXX) $(CXXFLAGS) $(CATCH2_INCLUDE) -o $@ $^ $(OPENJPEG_LIBS) $(PNG_LIBS) $(CATCH2_LIBS)
+	$(CXX) $(CXXFLAGS) $(CATCH2_INCLUDE) -o $@ $^ $(OPENJPEG_LIBS) $(PNG_LIBS) $(ZSTD_LIBS) $(CATCH2_LIBS)
 
 # Include dependency files to enable automatic rebuilding
 -include $(DEPS)

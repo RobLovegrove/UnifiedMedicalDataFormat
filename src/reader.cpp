@@ -1,4 +1,5 @@
 #include "reader.hpp"
+#include "Utility/ZstdCompressor.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -117,6 +118,9 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
 
         cout << "Reading module: " << entry.id.toString() << endl;
 
+        // Start ZSTD summary mode for this module
+        ZstdCompressor::startSummaryMode();
+
         unique_ptr<DataModule> dm;
         try {
             dm = DataModule::fromStream(stream, entry.offset, entry.type);
@@ -132,9 +136,16 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
             }
         }
         catch (const std::exception& e) {
-            cout << "Caught throw here" << endl;
             return "Error reading module: " + string(e.what());
         }
+        
+        // Print ZSTD decompression summary for this module and stop summary mode
+        if (ZstdCompressor::isSummaryMode()) {
+            std::cout << "Module ZSTD decompression summary:" << std::endl;
+            ZstdCompressor::printSummary();
+            ZstdCompressor::stopSummaryMode();
+        }
+        
         loadedModules.push_back(std::move(dm));
     }
     else {

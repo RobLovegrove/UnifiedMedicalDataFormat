@@ -1,5 +1,6 @@
 #include "ImageEncoder.hpp"
-#include "imageData.hpp" // For ImageEncoding enum
+// #include "imageData.hpp"
+#include "../../Utility/CompressionType.hpp"
 
 #include <openjpeg.h>
 #include <png.h>
@@ -14,32 +15,40 @@ ImageEncoder::ImageEncoder() {
 }
 
 std::vector<uint8_t> ImageEncoder::compress(const std::vector<uint8_t>& rawData, 
-                                            ImageEncoding encoding,
+                                            CompressionType encoding,
                                             int width, int height,
                                             uint8_t channels, uint8_t bitDepth) const {
     // Note: Individual frame timing removed - use total timing from ImageData instead
     switch (encoding) {
-        case ImageEncoding::JPEG2000_LOSSLESS:
+        case CompressionType::JPEG2000_LOSSLESS:
             return compressJPEG2000(rawData, width, height, channels, bitDepth);
-        case ImageEncoding::PNG:
+        case CompressionType::PNG:
             return compressPNG(rawData, width, height, channels, bitDepth);
+        case CompressionType::ZSTD:
+            // TODO: Implement ZSTD compression
+            std::cerr << "Warning: ZSTD compression not yet implemented, using RAW" << std::endl;
+            return rawData;
+        case CompressionType::RAW:
         default:
             return rawData; // No compression
     }
 }
 
 std::vector<uint8_t> ImageEncoder::decompress(const std::vector<uint8_t>& compressedData,
-                                              ImageEncoding encoding) const {
+                                              CompressionType encoding) const {
     // Note: Individual frame timing removed - use total timing from ImageData instead
     switch (encoding) {
-        case ImageEncoding::JPEG2000_LOSSLESS:
+        case CompressionType::JPEG2000_LOSSLESS:
             return decompressJPEG2000(compressedData);
-        case ImageEncoding::PNG:
+        case CompressionType::PNG:
             return decompressPNG(compressedData);
-        case ImageEncoding::RAW:
+        case CompressionType::ZSTD:
+            // TODO: Implement ZSTD decompression
+            std::cerr << "Warning: ZSTD decompression not yet implemented, returning as-is" << std::endl;
+            return compressedData;
+        case CompressionType::RAW:
         default:
             return compressedData; // Already uncompressed
-            break;
     }
 }
 
