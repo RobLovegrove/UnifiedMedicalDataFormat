@@ -1,7 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include "DataModule/Image/imageData.hpp"
 #include "Utility/uuid.hpp"
-#include "Utility/CompressionType.hpp"
+#include "Utility/Compression/CompressionType.hpp"
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>

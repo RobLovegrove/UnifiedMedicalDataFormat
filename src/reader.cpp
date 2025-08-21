@@ -1,5 +1,5 @@
 #include "reader.hpp"
-#include "Utility/ZstdCompressor.hpp"
+#include "Utility/Compression/ZstdCompressor.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -123,7 +123,7 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
 
         unique_ptr<DataModule> dm;
         try {
-            dm = DataModule::fromStream(stream, entry.offset, entry.type);
+            dm = DataModule::fromStream(stream, entry.offset, entry.type, header.getEncryptionData());
             if (!dm) {
                 return "Skipped unknown or unsupported module type: " + to_string(entry.type);
             }

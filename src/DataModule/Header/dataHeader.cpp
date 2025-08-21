@@ -1,4 +1,6 @@
 #include "dataHeader.hpp"
+#include "../../Utility/Compression/CompressionType.hpp"
+#include "../../Utility/Encryption/EncryptionManager.hpp"
 
 #include <string>
 #include <stdexcept>
@@ -29,6 +31,17 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     writeTLVFixed(out, HeaderFieldType::MetadataCompression, &metadataCompressionValue, sizeof(metadataCompressionValue));
     writeTLVFixed(out, HeaderFieldType::DataCompression, &dataCompressionValue, sizeof(dataCompressionValue));
+
+    if (encryptionData.encryptionType != EncryptionType::NONE) {
+
+        encryptionData.moduleSalt = EncryptionManager::generateSalt(16);  // 16 bytes
+        encryptionData.iv = EncryptionManager::generateIV(12);   
+
+        writeTLVFixed(out, HeaderFieldType::ModuleSalt, encryptionData.moduleSalt.data(), encryptionData.moduleSalt.size());
+        writeTLVFixed(out, HeaderFieldType::IV, encryptionData.iv.data(), encryptionData.iv.size());
+        authTagPos = writeTLVFixed(out, HeaderFieldType::AuthTag, encryptionData.authTag.data(), crypto_aead_aes256gcm_ABYTES);
+    }
+
     writeTLVBool(out, HeaderFieldType::Endianness, littleEndian);
 
     const auto& uuidBytes = moduleID.data();
@@ -92,9 +105,6 @@ bool DataHeader::updateIsCurrent(bool newIsCurrent, std::fstream& fileStream) {
     return fileStream.good();
 }
 
-
-
-
 void DataHeader::updateHeader(std::ostream& out) {
 
     // Update header size
@@ -112,6 +122,13 @@ void DataHeader::updateHeader(std::ostream& out) {
     // Update data size
     out.seekp(dataSizePos);
     out.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
+
+    if (encryptionData.encryptionType != EncryptionType::NONE) {
+
+        // Update auth tag
+        out.seekp(authTagPos);
+        out.write(reinterpret_cast<const char*>(encryptionData.authTag.data()), encryptionData.authTag.size());
+    }
 
 }
 
@@ -219,6 +236,18 @@ void DataHeader::readDataHeader(std::istream& in) {
                 dataCompression = decodeCompressionType(buffer[0]);
                 break;
 
+            case HeaderFieldType::ModuleSalt:
+                encryptionData.moduleSalt = std::vector<uint8_t>(buffer.data(), buffer.data() + length);
+                break;
+
+            case HeaderFieldType::IV:
+                encryptionData.iv = std::vector<uint8_t>(buffer.data(), buffer.data() + length);
+                break;
+
+            case HeaderFieldType::AuthTag:
+                encryptionData.authTag = std::vector<uint8_t>(buffer.data(), buffer.data() + length);
+                break;
+                
             case HeaderFieldType::Endianness:
                 if (length != 1) throw std::runtime_error("Invalid Endianness length.");
                 littleEndian = buffer[0] != 0;
@@ -262,6 +291,18 @@ std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
        << "  schemaPath          : " << header.schemaPath << "\n"
        << "  metadataCompression : " << compressionToString(header.metadataCompression) << "\n"
        << "  dataCompression     : " << compressionToString(header.dataCompression) << "\n"
+       << "  encryptionType      : "
+       << EncryptionManager::encryptionToString(header.encryptionData.encryptionType) << "\n";
+       if (header.encryptionData.encryptionType != EncryptionType::NONE) {
+           os << "  baseSalt            : " << header.encryptionData.baseSalt.size() << "\n" 
+              << "  moduleSalt          : " << header.encryptionData.moduleSalt.size() << "\n"
+              << "  memoryCost          : " << header.encryptionData.memoryCost << "\n"
+              << "  timeCost            : " << header.encryptionData.timeCost << "\n"
+              << "  parallelism         : " << header.encryptionData.parallelism << "\n"
+              << "  iv                  : " << header.encryptionData.iv.size() << "\n"
+              << "  authTag             : " << header.encryptionData.authTag.size() << "\n";
+       }
+       os 
        << "  littleEndian        : " << std::boolalpha << header.littleEndian << "\n"
        << "  moduleID            : " << header.moduleID.toString() << "\n"
        << "}";

@@ -4,7 +4,7 @@
 #include "DataModule/dataModule.hpp"
 #include "DataModule/Image/imageData.hpp"
 #include "DataModule/Tabular/tabularData.hpp"
-#include "Utility/ZstdCompressor.hpp"
+#include "Utility/Compression/ZstdCompressor.hpp"
 
 
 #include "Utility/utils.hpp"
@@ -47,8 +47,17 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
     cout << "Writing new file: " << filename << endl;
     cout << "Using temp file: " << tempFilePath << endl;
 
-    // CREATE HEADER
-    Header header;
+    // SET ENCRYPTION HEADER
+    EncryptionData encryptionData;
+    encryptionData.masterPassword = "password";
+    encryptionData.encryptionType = EncryptionType::AES_256_GCM;
+    encryptionData.baseSalt = EncryptionManager::generateSalt(16); // Use correct Argon2id salt size
+    encryptionData.memoryCost = 65536;
+    encryptionData.timeCost = 3;
+    encryptionData.parallelism = 1;
+
+    header.setEncryptionData(encryptionData);
+
     try {
         if (!header.writePrimaryHeader(tempFile)) {
             tempFile.close();
@@ -72,7 +81,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
             cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
 
             // Write module to temp file
-            result = writeModule(tempFile, schemaPath, moduleData);
+            result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
             if (!result) {
                 tempFile.close();
                 cleanupTempFile();
@@ -184,6 +193,13 @@ std::expected<std::vector<UUID>, std::string> Writer::addModules(
         std::filesystem::remove(tempFilePath);
         return std::unexpected("Exception opening temp file: " + std::string(e.what()));
     }
+
+    // Read header from temp file
+    if (!header.readPrimaryHeader(tempFile)) {
+        tempFile.close();
+        std::filesystem::remove(tempFilePath);
+        return std::unexpected("Failed to read header from temp file");
+    }
     
     // Load XRef table from temp file
     xrefTable.clear();
@@ -204,7 +220,7 @@ std::expected<std::vector<UUID>, std::string> Writer::addModules(
             cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
 
             // Write module to temp file
-            result = writeModule(tempFile, schemaPath, moduleData);
+            result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
             if (!result) {
                 cout << "Failed to write module: " << result.error() << endl;
                 return std::unexpected(result.error());
@@ -297,6 +313,13 @@ bool Writer::updateModules(
         std::filesystem::remove(tempFilePath);
         return false;
     }
+
+    // Read header from temp file
+    if (!header.readPrimaryHeader(tempFile)) {
+        tempFile.close();
+        std::filesystem::remove(tempFilePath);
+        return false;
+    }
     
     // Load XRef table from temp file
     xrefTable.clear();
@@ -317,8 +340,9 @@ bool Writer::updateModules(
                 // Go to module offset in file
                 tempFile.seekg(it->offset);
         
-                // Read the DataHeader
+                // Create the DataHeader
                 DataHeader dataHeader;
+                dataHeader.setEncryptionData(header.getEncryptionData());
                 dataHeader.readDataHeader(tempFile);
         
                 // Return to the start of the module
@@ -332,11 +356,11 @@ bool Writer::updateModules(
         
                 switch (dataHeader.getModuleType()) {
                     case ModuleType::Image: {
-                        dm = make_unique<ImageData>(dataHeader.getSchemaPath(), dataHeader.getModuleID());
+                        dm = make_unique<ImageData>(dataHeader.getSchemaPath(), dataHeader.getModuleID(), dataHeader.getEncryptionData());
                         break;
                     }
                     case ModuleType::Tabular: {
-                        dm = make_unique<TabularData>(dataHeader.getSchemaPath(), dataHeader.getModuleID());
+                        dm = make_unique<TabularData>(dataHeader.getSchemaPath(), dataHeader.getModuleID(), dataHeader.getEncryptionData());
                         break;
                     }
                     default:
@@ -427,7 +451,7 @@ bool Writer::writeXref(std::ostream& outfile) {
 }
 
 std::expected<UUID, std::string> Writer::writeModule(
-    std::ostream& outfile, const std::string& schemaPath, const ModuleData& moduleData) {
+    std::ostream& outfile, const std::string& schemaPath, const ModuleData& moduleData, EncryptionData encryptionData) {
 
     // Load schema from file
     std::ifstream schemaFile(schemaPath);
@@ -451,11 +475,11 @@ std::expected<UUID, std::string> Writer::writeModule(
     // CREATE MODULE
     switch (type) {
         case ModuleType::Image: {
-            dm = make_unique<ImageData>(schemaPath, schemaJson, uuid);
+            dm = make_unique<ImageData>(schemaPath, schemaJson, uuid, encryptionData);
             break;
         }
         case ModuleType::Tabular: {
-            dm = make_unique<TabularData>(schemaPath, schemaJson, uuid);
+            dm = make_unique<TabularData>(schemaPath, schemaJson, uuid, encryptionData);
             break;
         }
         default:

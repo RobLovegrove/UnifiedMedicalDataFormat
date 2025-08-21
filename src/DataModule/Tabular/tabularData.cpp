@@ -5,7 +5,8 @@
 #include "../../Xref/xref.hpp"
 #include "../stringBuffer.hpp"
 #include "../Header/dataHeader.hpp"
-#include "../../Utility/ZstdCompressor.hpp"
+#include "../../Utility/Compression/ZstdCompressor.hpp"
+#include "../../Utility/Encryption/EncryptionManager.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -14,14 +15,14 @@
 
 using namespace std;
 
-TabularData::TabularData(const string& schemaPath, UUID uuid) : DataModule(schemaPath, uuid, ModuleType::Tabular) {
+TabularData::TabularData(const string& schemaPath, UUID uuid, EncryptionData encryptionData) : DataModule(schemaPath, uuid, ModuleType::Tabular, encryptionData) {
     header->setDataCompression(CompressionType::ZSTD);
     initialise();
 }
 
 TabularData::TabularData(
-    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid) 
-    : DataModule(schemaPath, schemaJson, uuid, ModuleType::Tabular) {
+    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData) 
+    : DataModule(schemaPath, schemaJson, uuid, ModuleType::Tabular, encryptionData) {
     header->setDataCompression(CompressionType::ZSTD);
     initialise();
 }

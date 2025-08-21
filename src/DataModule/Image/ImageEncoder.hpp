@@ -7,7 +7,7 @@
 #include <memory>
 #include <openjpeg.h>
 
-#include "../../Utility/CompressionType.hpp"
+#include "../../Utility/Compression/CompressionType.hpp"
 
 class ImageEncoder {
 public:

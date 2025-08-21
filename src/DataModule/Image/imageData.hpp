@@ -17,7 +17,7 @@
 #include "../../Utility/moduleType.hpp"
 #include "FrameData.hpp"
 #include "ImageEncoder.hpp"
-#include "../../Utility/CompressionType.hpp"
+#include "../../Utility/Compression/CompressionType.hpp"
 
 
 class ImageData : public DataModule { 
@@ -51,9 +51,9 @@ protected:
     getModuleSpecificData() const override;
 
 public:
-    explicit ImageData(const std::string& schemaPath, UUID uuid);
+    explicit ImageData(const std::string& schemaPath, UUID uuid, EncryptionData encryptionData);
     explicit ImageData(
-        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid);
+        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData);
 
     virtual ~ImageData() override = default;
     

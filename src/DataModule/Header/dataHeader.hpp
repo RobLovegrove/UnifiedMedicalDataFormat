@@ -7,7 +7,8 @@
 
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
-#include "../../Utility/CompressionType.hpp"
+#include "../../Utility/Compression/CompressionType.hpp"
+#include "../../Utility/Encryption/EncryptionManager.hpp"
 
 enum class HeaderFieldType : uint8_t {
     HeaderSize = 1,
@@ -20,8 +21,16 @@ enum class HeaderFieldType : uint8_t {
     SchemaPath = 8,
     MetadataCompression = 9,
     DataCompression = 10,
-    Endianness = 11,
-    ModuleID = 12
+    EncryptionType = 11,
+    BaseSalt = 12,
+    ModuleSalt = 13,
+    MemoryCost = 14,
+    TimeCost = 15,
+    Parallelism = 16,
+    IV = 17,
+    AuthTag = 18,
+    Endianness = 19,
+    ModuleID = 20
 };
 
 struct DataHeader {
@@ -43,6 +52,8 @@ protected:
     std::streampos dataSizePos = 0;
     std::streampos stringBufferSizePos = 0;
 
+    std::streampos authTagPos = 0;
+
     std::streampos dataOffsetPos = 0;
     std::streampos stringOffsetPos = 0;
 
@@ -50,8 +61,10 @@ protected:
     std::string schemaPath;
     CompressionType metadataCompression;
     CompressionType dataCompression;
+    EncryptionData encryptionData;
     bool littleEndian;
     UUID moduleID;
+
 
     void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value) const;
     void writeTLVBool(std::ostream& out, HeaderFieldType type, bool value) const;
@@ -105,6 +118,9 @@ public:
 
     uint64_t getPrevious() const { return previousVersion; }
     void setPrevious(uint64_t offset) { previousVersion = offset; }
+
+    EncryptionData getEncryptionData() const { return encryptionData; }
+    void setEncryptionData(EncryptionData data) { encryptionData = data; }
 
 // METHODS
     virtual ~DataHeader() = default;

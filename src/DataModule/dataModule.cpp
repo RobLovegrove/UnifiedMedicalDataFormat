@@ -5,7 +5,8 @@
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
 #include "SchemaResolver.hpp"
-#include "../Utility/ZstdCompressor.hpp"
+#include "../Utility/Compression/ZstdCompressor.hpp"
+#include "../Utility/Encryption/EncryptionManager.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -15,13 +16,14 @@
 
 using namespace std;
 
-DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type) {
+DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type, EncryptionData encryptionData) {
 
     header = make_unique<DataHeader>();
     header->setModuleType(type);
     header->setSchemaPath(schemaPath);
     header->setModuleID(uuid);
     header->setMetadataCompression(CompressionType::ZSTD);
+    header->setEncryptionData(encryptionData);
 
     ifstream file = openSchemaFile(schemaPath);
     file >> schemaJson;
@@ -29,7 +31,7 @@ DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type) {
 }
 
 DataModule::DataModule(
-    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type) 
+    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type, EncryptionData encryptionData) 
     : schemaJson(schemaJson) {
 
     header = make_unique<DataHeader>();
@@ -37,6 +39,7 @@ DataModule::DataModule(
     header->setSchemaPath(schemaPath);
     header->setModuleID(uuid);
     header->setMetadataCompression(CompressionType::ZSTD);
+    header->setEncryptionData(encryptionData);
 }
 
 void DataModule::initialise() {
@@ -124,10 +127,19 @@ ifstream DataModule::openSchemaFile(const string& schemaPath) {
 }
 
 unique_ptr<DataModule> DataModule::fromStream(
-    istream& in, uint64_t moduleStartOffset, uint8_t moduleType) {
+    istream& in, uint64_t moduleStartOffset, uint8_t moduleType, EncryptionData encryptionData) {
 
     unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
 
+    if (moduleType == static_cast<uint8_t>(ModuleType::Frame)) {
+        EncryptionData frameEncryptionData;
+        frameEncryptionData.encryptionType = EncryptionType::NONE;
+        dmHeader->setEncryptionData(frameEncryptionData);
+    }
+    else {
+        dmHeader->setEncryptionData(encryptionData);
+    }
+    
     dmHeader->readDataHeader(in);
 
     if (dmHeader->getModuleType() != ModuleType::Frame) {
@@ -139,13 +151,13 @@ unique_ptr<DataModule> DataModule::fromStream(
     try {
         switch (static_cast<ModuleType>(moduleType)) {
         case ModuleType::Tabular:
-            dm = make_unique<TabularData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
+            dm = make_unique<TabularData>(dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getEncryptionData());
             break;
         case ModuleType::Image:
-            dm = make_unique<ImageData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
+            dm = make_unique<ImageData>(dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getEncryptionData());
             break;
         case ModuleType::Frame:
-            dm = make_unique<FrameData>(dmHeader->getSchemaPath(), dmHeader->getModuleID());
+            dm = make_unique<FrameData>(dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getEncryptionData());
             break;
         default:
             return nullptr;  // Gracefully skip unknown modules
@@ -569,52 +581,46 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& 
     // Write header
     header->writeToFile(out);
 
-    if (header->getMetadataCompression() == CompressionType::ZSTD) {
+    if (header->getModuleType() != ModuleType::Frame && header->getEncryptionData().encryptionType != EncryptionType::NONE) {
+        // Encrypted
+        if (header->getMetadataCompression() == CompressionType::ZSTD) {
 
-        uint64_t stringBufferSize = stringBuffer.getSize();
-        uint64_t metadataSize = 0;
-        for (const auto& row : metaDataRows) {
-            metadataSize += row.size();
+            std::stringstream metadataBuffer;
+            writeCompressedMetadata(metadataBuffer);
+            std::stringstream dataBuffer;
+            writeData(dataBuffer); // Compression handled in writeData
+
+            encryptModule(metadataBuffer, dataBuffer, out);
+            
         }
+        else {
 
-        // Create a buffer and write metadata and stringBuffer sizes
-        std::stringstream buffer;
-        
-        buffer.write(reinterpret_cast<const char*>(&stringBufferSize), sizeof(stringBufferSize));
-        buffer.write(reinterpret_cast<const char*>(&metadataSize), sizeof(metadataSize));
-        
-        // Write string buffer and metadata to buffer
-        writeStringBuffer(buffer);
-        writeMetaData(buffer);
+            // Encrypted but not compressed
+            std::stringstream metadataBuffer;
+            writeStringBuffer(metadataBuffer);
+            writeMetaData(metadataBuffer);
 
-        // Convert to bytes
-        std::vector<uint8_t> dataBytes {
-            std::istreambuf_iterator<char>(buffer),
-            std::istreambuf_iterator<char>()
-        };
+            std::stringstream dataBuffer;
+            writeData(dataBuffer);
 
-        // Compress the buffer (this will use individual output if not in summary mode)
-        std::vector<uint8_t> compressedData = ZstdCompressor::compress(dataBytes);
-
-        size_t compressedDataSize = compressedData.size();
-
-        // Write the compressed data to the output stream
-        out.write(reinterpret_cast<const char*>(compressedData.data()), compressedDataSize);
-
-        // Update header with compressed data size
-        header->setStringBufferSize(0);
-        header->setMetadataSize(compressedDataSize);
-
+            encryptModule(metadataBuffer, dataBuffer, out);
+        }
     }
     else {
-        // Write String Buffer
-        writeStringBuffer(out);
-        // Write Metadata
-        writeMetaData(out);
+        // Not encrypted
+        if (header->getMetadataCompression() == CompressionType::ZSTD) {
+            // Compressed but not encrypted
+            writeCompressedMetadata(out);
+        }
+        else {
+            // Not compressed or encrypted
+            // Write String Buffer
+            writeStringBuffer(out);
+            // Write Metadata
+            writeMetaData(out);
+        }
+        writeData(out);
     }
-
-    // Write Data
-    writeData(out);
 
     streampos moduleEnd = out.tellp();
 
@@ -639,6 +645,112 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& 
         header->getModuleID(), absoluteModuleStart, header->getModuleSize());
 
 }
+
+void DataModule::writeCompressedMetadata(std::ostream& metadataStream) {
+
+    uint64_t stringBufferSize = stringBuffer.getSize();
+    uint64_t metadataSize = 0;
+    for (const auto& row : metaDataRows) {
+        metadataSize += row.size();
+    }
+
+    // Create a buffer and write metadata and stringBuffer sizes
+    std::stringstream buffer;
+    
+    buffer.write(reinterpret_cast<const char*>(&stringBufferSize), sizeof(stringBufferSize));
+    buffer.write(reinterpret_cast<const char*>(&metadataSize), sizeof(metadataSize));
+    
+    // Write string buffer and metadata to buffer
+    writeStringBuffer(buffer);
+    writeMetaData(buffer);
+
+    // Convert to bytes
+    std::vector<uint8_t> dataBytes {
+        std::istreambuf_iterator<char>(buffer),
+        std::istreambuf_iterator<char>()
+    };
+
+    // Compress the buffer
+    std::vector<uint8_t> compressedData = ZstdCompressor::compress(dataBytes);
+
+    size_t compressedDataSize = compressedData.size();
+
+    // Write the compressed data to the output stream
+    metadataStream.write(reinterpret_cast<const char*>(compressedData.data()), compressedDataSize);
+
+    // Update header with compressed data size
+    header->setStringBufferSize(0);
+    header->setMetadataSize(compressedDataSize);
+}
+
+void DataModule::encryptModule(std::stringstream& metadataStream, std::stringstream& dataStream, std::ostream& out) {
+
+    // Write string, metadata and data size to encrpytion buffer
+    std::vector<uint8_t> encryptionBuffer;
+
+    uint64_t stringBufferSize = header->getStringBufferSize();
+    uint64_t metadataSize = header->getMetadataSize();
+    uint64_t dataSize = header->getDataSize();
+
+    encryptionBuffer.reserve(sizeof(uint64_t) * 3 + stringBufferSize + metadataSize + dataSize);
+
+    encryptionBuffer.insert(encryptionBuffer.end(), reinterpret_cast<const char*>(&stringBufferSize), reinterpret_cast<const char*>(&stringBufferSize) + sizeof(stringBufferSize));
+    encryptionBuffer.insert(encryptionBuffer.end(), reinterpret_cast<const char*>(&metadataSize), reinterpret_cast<const char*>(&metadataSize) + sizeof(metadataSize));
+    encryptionBuffer.insert(encryptionBuffer.end(), reinterpret_cast<const char*>(&dataSize), reinterpret_cast<const char*>(&dataSize) + sizeof(dataSize));
+
+    encryptionBuffer.insert(encryptionBuffer.end(), metadataStream.str().begin(), metadataStream.str().end());
+    encryptionBuffer.insert(encryptionBuffer.end(), dataStream.str().begin(), dataStream.str().end());
+
+    // Encrypt the encryption buffer
+    // Generate module-specific encryption parameters
+    EncryptionData encryptionData = header->getEncryptionData();
+
+    std::vector<uint8_t> combinedSalt;
+    combinedSalt.reserve(encryptionData.baseSalt.size() + encryptionData.moduleSalt.size());
+    combinedSalt.insert(combinedSalt.end(), encryptionData.baseSalt.begin(), encryptionData.baseSalt.end());
+    combinedSalt.insert(combinedSalt.end(), encryptionData.moduleSalt.begin(), encryptionData.moduleSalt.end());
+    
+    // Derive the encryption key using the correct crypto_pwhash function
+    auto derivedKey = EncryptionManager::deriveKeyArgon2id(
+        encryptionData.masterPassword, 
+        combinedSalt,  // Use base salt for now
+        encryptionData.memoryCost, encryptionData.timeCost, encryptionData.parallelism
+    );
+
+    // Encrypt the data
+    std::vector<uint8_t> encryptedData = EncryptionManager::encryptAES256GCM(
+        encryptionBuffer, derivedKey, encryptionData.iv, encryptionData.authTag
+    );
+
+    header->setEncryptionData(encryptionData);
+    cout << "Encryption Data: " << endl;
+    cout << "Module Salt Size: " << encryptionData.moduleSalt.size() << endl;
+    cout << "IV Size: " << encryptionData.iv.size() << endl;
+    cout << "Auth Tag Size: " << encryptionData.authTag.size() << endl; 
+    cout << "Memory Cost: " << encryptionData.memoryCost << endl;
+    cout << "Time Cost: " << encryptionData.timeCost << endl;
+    cout << "Parallelism: " << encryptionData.parallelism << endl;
+    cout << "Master Password: " << encryptionData.masterPassword << endl;
+    cout << "Base Salt Size: " << encryptionData.baseSalt.size() << endl;
+
+    // Write encrypted data
+    out.write(reinterpret_cast<const char*>(encryptedData.data()), encryptedData.size());
+
+    // Update header sizes
+    header->setStringBufferSize(0);
+    header->setMetadataSize(0);
+    header->setDataSize(encryptedData.size());
+}
+
+
+
+
+
+
+
+
+
+
 
 void DataModule::addTableData(
     const nlohmann::json& data, vector<unique_ptr<DataField>>& fields, 
@@ -921,7 +1033,7 @@ nlohmann::json DataModule::getMetadataAsJson() const {
 
 // Note: Schema caching is now handled by SchemaResolver class
 
-nlohmann::json DataModule::resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath) {
-    // Delegate to SchemaResolver for circular reference detection and caching
-    return SchemaResolver::resolveReference(refPath, baseSchemaPath);
-}
+// nlohmann::json DataModule::resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath) {
+//     // Delegate to SchemaResolver for circular reference detection and caching
+//     return SchemaResolver::resolveReference(refPath, baseSchemaPath);
+// }

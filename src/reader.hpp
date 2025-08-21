@@ -26,9 +26,8 @@ private:
 
     bool isOpen() const { return fileStream.is_open(); }
 
-    
-
 public:
+
     // Reading operations 
     nlohmann::json getFileInfo();
     std::expected<ModuleData, std::string> getModuleData(const std::string& moduleId);

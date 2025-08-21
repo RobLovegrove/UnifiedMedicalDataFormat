@@ -1,12 +1,13 @@
 #include "imageData.hpp"
 #include "ImageEncoder.hpp"
 #include "../../Utility/uuid.hpp"
-#include "../../Utility/CompressionType.hpp"
-#include "../../Utility/ZstdCompressor.hpp"
+#include "../../Utility/Compression/CompressionType.hpp"
+#include "../../Utility/Compression/ZstdCompressor.hpp"
 #include "../Header/dataHeader.hpp"
 #include "../dataModule.hpp"
 #include "../../Xref/xref.hpp"
 #include "../ModuleData.hpp"
+#include "../../Utility/Encryption/EncryptionManager.hpp"
 
 #include "string"
 #include <fstream>
@@ -18,7 +19,7 @@
 
 using namespace std;
 
-ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPath, uuid, ModuleType::Image) {
+ImageData::ImageData(const string& schemaPath, UUID uuid, EncryptionData encryptionData) : DataModule(schemaPath, uuid, ModuleType::Image, encryptionData) {
     // Initialize encoding to RAW by default (always safe for medical data)
     header->setDataCompression(CompressionType::RAW);
     
@@ -29,8 +30,8 @@ ImageData::ImageData(const string& schemaPath, UUID uuid) : DataModule(schemaPat
 }
 
 ImageData::ImageData(
-    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid) 
-    : DataModule(schemaPath, schemaJson, uuid, ModuleType::Image) {
+    const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData) 
+    : DataModule(schemaPath, schemaJson, uuid, ModuleType::Image, encryptionData) {
 
     // Initialize encoding to RAW by default (always safe for medical data)
     header->setDataCompression(CompressionType::RAW);
@@ -105,7 +106,7 @@ void ImageData::addData(
 
     for (size_t i = 0; i < data.size(); ++i) {
         const auto& frame = data[i];
-        auto frameModule = std::make_unique<FrameData>(frameSchemaPath, UUID());
+        auto frameModule = std::make_unique<FrameData>(frameSchemaPath, UUID(), header->getEncryptionData());
 
         // Validate frame structure against schema
         if (!frame.metadata.contains("position") || !frame.metadata.contains("orientation")) {
@@ -655,7 +656,7 @@ void ImageData::readData(std::istream& in) {
         
         // Use DataModule::fromStream to read the frame
         auto frame = std::unique_ptr<FrameData>(static_cast<FrameData*>(
-            DataModule::fromStream(frameStream, 0, static_cast<uint8_t>(ModuleType::Frame)).release()
+            DataModule::fromStream(frameStream, 0, static_cast<uint8_t>(ModuleType::Frame), header->getEncryptionData()).release()
         ));
 
         frame->needsDecompression = needsDecompression;

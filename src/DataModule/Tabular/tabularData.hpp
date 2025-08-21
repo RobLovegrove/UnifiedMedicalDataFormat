@@ -10,6 +10,7 @@
 #include "../../Xref/xref.hpp"
 #include "../../Utility/uuid.hpp"
 #include "../ModuleData.hpp"
+#include "../../Utility/Encryption/EncryptionManager.hpp"
 
 class TabularData : public DataModule { 
 
@@ -32,9 +33,9 @@ protected:
     getModuleSpecificData() const override;
 
 public:
-    explicit TabularData(const std::string& schemaPath, UUID uuid);
+    explicit TabularData(const std::string& schemaPath, UUID uuid, EncryptionData encryptionData);
     explicit TabularData(
-        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid);
+        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData);
         
     virtual ~TabularData() override = default;
     

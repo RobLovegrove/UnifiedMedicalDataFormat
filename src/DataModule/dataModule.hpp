@@ -6,6 +6,7 @@
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
 #include "ModuleData.hpp"
+#include "../Utility/Encryption/EncryptionManager.hpp"
 
 #include <vector>
 #include <unordered_map>
@@ -40,15 +41,15 @@ protected:
     std::vector<std::string> metadataRequired;
     std::vector<std::string> dataRequired;
 
-    // Schema reference resolution (now handled by SchemaResolver)
-    // Note: resolveSchemaReference method is kept for backward compatibility
-    nlohmann::json resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath);
+    //nlohmann::json resolveSchemaReference(const std::string& refPath, const std::string& baseSchemaPath);
 
+    // Constructor and Destructor
     explicit DataModule() {};
-    DataModule(const std::string& schemaPath, UUID uuid, ModuleType type);
+    DataModule(const std::string& schemaPath, UUID uuid, ModuleType type, EncryptionData encryptionData);
     DataModule(
-        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type);
+        const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type, EncryptionData encryptionData);
 
+    // Initialisation methods
     void initialise();
 
     void readStringBufferAndMetadata(std::istream& in);
@@ -99,13 +100,21 @@ protected:
         const std::vector<std::vector<uint8_t>>& rows, 
         const std::vector<std::unique_ptr<DataField>>& fields) const;
 
+    // Write Methods
+
     void writeMetaData(std::ostream& out);
     virtual void writeData(std::ostream& out) const = 0;
     void writeStringBuffer(std::ostream& out);
+
+    void writeCompressedMetadata(std::ostream& metadataStream);
+
+    void encryptModule(std::stringstream& metadataStream, std::stringstream& dataStream, std::ostream& out);
+
+    // Read Methods
     virtual void readMetadataRows(std::istream& in);
     virtual void readData(std::istream& in) = 0;
 
-    // Helper method to reconstruct metadata from stored fields
+    // Helper method to reconstruct metadata from encoded fields
     nlohmann::json getMetadataAsJson() const;
 
     // Getter for header (protected for derived classes)
@@ -120,7 +129,7 @@ public:
     virtual ~DataModule() = default; 
 
     static std::unique_ptr<DataModule> fromStream(
-        std::istream& in, uint64_t moduleStartOffset, uint8_t moduleType);
+        std::istream& in, uint64_t moduleStartOffset, uint8_t moduleType, EncryptionData encryptionData);
 
     // static std::unique_ptr<DataModule> create(
     //     const std::string& schemaPath, UUID uuid, ModuleType type);

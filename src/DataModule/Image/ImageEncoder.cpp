@@ -1,6 +1,6 @@
 #include "ImageEncoder.hpp"
 // #include "imageData.hpp"
-#include "../../Utility/CompressionType.hpp"
+#include "../../Utility/Compression/CompressionType.hpp"
 
 #include <openjpeg.h>
 #include <png.h>

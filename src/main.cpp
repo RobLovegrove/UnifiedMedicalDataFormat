@@ -29,9 +29,9 @@ int main(int argc, char** argv) {
     UUID uuid;
 
     CLI::App app{"UMDF - Unified Medical Data Format Tool"};
-    
-    Reader reader;
+
     Writer writer;
+    Reader reader;
 
     string inputFile;
     string outputFile;
@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
         // Write the new file using UMDFFile (tabular data only)
         auto result = writer.writeNewFile(outputFile, modulesWithSchemas);
         if (!result) {
-            cerr << "Failed to write data\n";
+            cerr << "Failed to write data: " << result.error() << endl;
             return 1;
         }
 
