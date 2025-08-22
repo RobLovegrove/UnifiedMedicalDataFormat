@@ -107,12 +107,18 @@ protected:
     void writeStringBuffer(std::ostream& out);
 
     void writeCompressedMetadata(std::ostream& metadataStream);
+    
 
     void encryptModule(std::stringstream& metadataStream, std::stringstream& dataStream, std::ostream& out);
 
     // Read Methods
+    std::istringstream decryptData(std::istream& in);
+
     virtual void readMetadataRows(std::istream& in);
     virtual void readData(std::istream& in) = 0;
+
+    void readCompressedMetadata(std::istream& in);
+    void readDecryptedMetadataAndData(std::istream& in);
 
     // Helper method to reconstruct metadata from encoded fields
     nlohmann::json getMetadataAsJson() const;

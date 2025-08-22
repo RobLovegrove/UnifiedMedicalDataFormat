@@ -88,14 +88,14 @@ std::expected<ModuleData, std::string> Reader::getModuleData(
         }
     }
 
-    cout << "Module not found in loadedModules, loading from file" << endl;
+
     
     // If the module is not found, load it from the file
     for (const auto& entry : xrefTable.getEntries()) {
         if (entry.id.toString() == moduleId) {
             auto error = loadModule(entry);
             if (!error) {
-                cout << "Module loaded" << endl;
+
                 return loadedModules.back()->getModuleData();
             }
             else {
@@ -116,7 +116,7 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
         fileStream.read(buffer.data(), entry.size);
         istringstream stream(string(buffer.begin(), buffer.end()));
 
-        cout << "Reading module: " << entry.id.toString() << endl;
+
 
         // Start ZSTD summary mode for this module
         ZstdCompressor::startSummaryMode();
@@ -150,7 +150,7 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
     }
     else {
         //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
-        cout << "TODO: Handle a large DataModule" << endl;
+
         return "TODO: Handle a large DataModule";
     }
 

@@ -51,7 +51,7 @@ void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
         if (framesProp.contains("$ref")) {
             // Extract the frame schema reference path directly
             frameSchemaPath = framesProp["$ref"];
-            std::cout << "Frame schema path extracted: " << frameSchemaPath << std::endl;
+
         } else {
             throw runtime_error("Image schema data section missing valid $ref to frame schema");
         }
@@ -102,7 +102,7 @@ void ImageData::addData(
     // Start timing for total compression
     auto compressionStart = std::chrono::high_resolution_clock::now();
 
-    cout << "Constructing " << data.size() << " frames" << endl;
+
 
     for (size_t i = 0; i < data.size(); ++i) {
         const auto& frame = data[i];
@@ -216,7 +216,6 @@ void ImageData::addData(
               << (header->getDataCompression() == CompressionType::JPEG2000_LOSSLESS ? "JPEG2000" : 
                   header->getDataCompression() == CompressionType::PNG ? "PNG" : "RAW") << "): " 
               << compressionDuration.count() << " microseconds" << std::endl;
-
 }
 
 void ImageData::addMetaData(const nlohmann::json& data) {
@@ -605,6 +604,7 @@ void ImageData::writeData(std::ostream& out) const {
         }
         
         double compressionRatio = 100.0 * totalCompressedSize / totalOriginalSize;
+        
         std::cout << "\n=== COMPRESSION SUMMARY ===" << std::endl;
         std::cout << "Total frames: " << frames.size() << std::endl;
         std::cout << "Total original size: " << totalOriginalSize << " bytes" << std::endl;
@@ -616,6 +616,8 @@ void ImageData::writeData(std::ostream& out) const {
     }
 
     header->setDataSize(totalDataSize);
+
+
     
     // Set compression type in header
     header->setDataCompression(header->getDataCompression());

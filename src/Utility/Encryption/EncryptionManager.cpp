@@ -40,21 +40,19 @@ std::vector<uint8_t> EncryptionManager::deriveKeyArgon2id(
 
     if (memoryCost < crypto_pwhash_MEMLIMIT_MIN || 
         memoryCost > crypto_pwhash_MEMLIMIT_MAX) {
-        std::cout << "ERROR: Memory cost " << memoryCost << " out of range [" 
-             << crypto_pwhash_MEMLIMIT_MIN << ", " 
-             << crypto_pwhash_MEMLIMIT_MAX << "]!" << std::endl;
+
+
         throw std::runtime_error("Memory cost out of range");
     }
     
     if (timeCost < crypto_pwhash_OPSLIMIT_MIN || 
         timeCost > crypto_pwhash_OPSLIMIT_MAX) {
-        std::cout << "ERROR: Time cost " << timeCost << " out of range [" 
-             << crypto_pwhash_OPSLIMIT_MIN << ", " 
-             << crypto_pwhash_OPSLIMIT_MAX << "]!" << std::endl;
+
+
         throw std::runtime_error("Time cost out of range");
     }
     
-    std::cout << "All parameters valid, calling crypto_pwhash_argon2id..." << std::endl;
+
     
     std::vector<uint8_t> key(32); // 256-bit key for AES-256
 

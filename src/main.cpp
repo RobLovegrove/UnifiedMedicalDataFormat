@@ -303,7 +303,7 @@ int main(int argc, char** argv) {
         
         // Load all modules to show final state
         for (const auto& module : finalFileInfo["modules"]) {
-            cout << "Loading module: " << module["uuid"] << endl;
+
             auto moduleData = reader.getModuleData(module["uuid"]);
             if (moduleData) {
                 cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
@@ -371,7 +371,7 @@ int main(int argc, char** argv) {
 
         // Load all modules
         for (const auto& module : fileInfo["modules"]) {
-            cout << "Loading module: " << module["uuid"] << endl;
+
             auto moduleData = reader.getModuleData(module["uuid"]);
             if (moduleData.has_value()) {
                 cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;

@@ -114,7 +114,7 @@ void DataModule::parseSchemaHeader(const nlohmann::json& schemaJson) {
         header->setModuleType(module_type_from_string(moduleType));
     }
     else {
-        cout << "TODO: Handle what happens when a non valid moduleType is found" << endl;
+
     }
 }
 
@@ -142,9 +142,7 @@ unique_ptr<DataModule> DataModule::fromStream(
     
     dmHeader->readDataHeader(in);
 
-    if (dmHeader->getModuleType() != ModuleType::Frame) {
-        cout << *dmHeader << endl;
-    }
+
 
     unique_ptr<DataModule> dm;
 
@@ -172,72 +170,163 @@ unique_ptr<DataModule> DataModule::fromStream(
 
     dm->header->setModuleStartOffset(moduleStartOffset);
 
-    if (dm->header->getMetadataCompression() == CompressionType::ZSTD) {
-        std::vector<uint8_t> buffer(dm->header->getMetadataSize());
-        in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-        if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
-            throw std::runtime_error("Failed to read full metadata block");
-        }
+    if (dm->header->getEncryptionData().encryptionType != EncryptionType::NONE) {
 
-        // Decompress the metadata
-        std::vector<uint8_t> compressedData = ZstdCompressor::decompress(buffer);
 
-        std::istringstream inputStream {
-            std::string(reinterpret_cast<char*>(compressedData.data()), compressedData.size())
-        };
-
-        // Read the string buffer and metadata sizes
-        uint64_t stringBufferSize;
-        uint64_t metadataSize;
-
-        inputStream.read(reinterpret_cast<char*>(&stringBufferSize), sizeof(stringBufferSize));
-        inputStream.read(reinterpret_cast<char*>(&metadataSize), sizeof(metadataSize));
-
-        // Set header sizes
-        dm->header->setStringBufferSize(stringBufferSize);
-        dm->header->setMetadataSize(metadataSize);
-
-        dm->readStringBufferAndMetadata(inputStream);
-
+        // Decrypt the data
+        cout << "Decrypting data" << endl;
+        std::istringstream decryptedStream = dm->decryptData(in);
+        cout << "Data successfully decrypted" << endl;
+        cout << "Decrypted stream size: " << decryptedStream.str().size() << endl;
+        
+        dm->readDecryptedMetadataAndData(decryptedStream);
+        
     }
     else {
-        dm->readStringBufferAndMetadata(in);
+        dm->readDecryptedMetadataAndData(in);
+    }
+
+    return dm;
+}
+
+void DataModule::readDecryptedMetadataAndData(istream& in) {
+    if (header->getMetadataCompression() == CompressionType::ZSTD) {
+        readCompressedMetadata(in);
+    }
+    else {
+        readStringBufferAndMetadata(in);
     }
 
 
-    if (dm->header->getDataSize() > 0) {
+
+    if (header->getDataSize() > 0) {
+
+        
         // Read in data
-        std::vector<uint8_t> buffer(dm->header->getDataSize());
+        std::vector<uint8_t> buffer(header->getDataSize());
     
         in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-    
-        if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
-            throw std::runtime_error("Failed to read full data block");
-        }
+        
+
 
         // Handle compression if needed
-        if (dm->header->getDataCompression() == CompressionType::ZSTD) {
-
+        if (header->getDataCompression() == CompressionType::ZSTD) {
             std::vector<uint8_t> decompressedData = ZstdCompressor::decompress(buffer);
 
             // Update the data size with the decompressed data size
-            dm->header->setDataSize(decompressedData.size());
+            header->setDataSize(decompressedData.size());
 
             std::istringstream inputStream {
                 std::string(reinterpret_cast<char*>(decompressedData.data()), decompressedData.size())
             };
 
-            dm->readData(inputStream);
+            readData(inputStream);
         }
         else {
             std::istringstream inputStream(
                 std::string(reinterpret_cast<char*>(buffer.data()), buffer.size())
             );
             
-            dm->readData(inputStream);
+            readData(inputStream);
         }
     }
-    return dm;
+}
+
+
+std::istringstream DataModule::decryptData(istream& in) {
+    // Read in the encrypted data
+    std::vector<uint8_t> encryptedData(header->getDataSize());
+
+    in.read(reinterpret_cast<char*>(encryptedData.data()), encryptedData.size());
+
+
+
+    if (in.gcount() != static_cast<std::streamsize>(encryptedData.size())) {
+        throw std::runtime_error("Failed to read full data block");
+    }
+
+    // Debug: Show encrypted data read from file
+
+
+
+    EncryptionData encryptionData = header->getEncryptionData();
+
+    std::vector<uint8_t> combinedSalt;
+    combinedSalt.reserve(encryptionData.baseSalt.size() + encryptionData.moduleSalt.size());
+    combinedSalt.insert(combinedSalt.end(), encryptionData.baseSalt.begin(), encryptionData.baseSalt.end());
+    combinedSalt.insert(combinedSalt.end(), encryptionData.moduleSalt.begin(), encryptionData.moduleSalt.end());
+    
+    // Derive the encryption key using the correct crypto_pwhash function
+    auto derivedKey = EncryptionManager::deriveKeyArgon2id(
+        encryptionData.masterPassword, 
+        combinedSalt,
+        encryptionData.memoryCost, encryptionData.timeCost, encryptionData.parallelism
+    );
+
+    // Decrypt the data
+    std::vector<uint8_t> decryptedData = EncryptionManager::decryptAES256GCM(
+        encryptedData,           
+        derivedKey,              
+        encryptionData.iv,       
+        encryptionData.authTag
+    );
+
+    if (decryptedData.empty()) {
+        throw std::runtime_error("Failed to decrypt data");
+    }
+    
+
+
+    // Convert the decrypted data to an istream
+    std::istringstream decryptedStream(
+        std::string(reinterpret_cast<const char*>(decryptedData.data()), 
+                    decryptedData.size())
+    );
+
+    // Read in the string buffer and metadata and data sizes
+    uint64_t stringBufferSize, metadataSize, dataSize;
+    decryptedStream.read(reinterpret_cast<char*>(&stringBufferSize), sizeof(uint64_t));
+    decryptedStream.read(reinterpret_cast<char*>(&metadataSize), sizeof(uint64_t));
+    decryptedStream.read(reinterpret_cast<char*>(&dataSize), sizeof(uint64_t));
+
+    // Set header sizes
+    header->setStringBufferSize(stringBufferSize);
+    header->setMetadataSize(metadataSize);
+    header->setDataSize(dataSize);
+
+
+
+    return decryptedStream;
+}
+
+
+void DataModule::readCompressedMetadata(istream& in) {
+    std::vector<uint8_t> buffer(header->getMetadataSize());
+    in.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+    
+    if (in.gcount() != static_cast<std::streamsize>(buffer.size())) {
+        throw std::runtime_error("Failed to read full metadata block");
+    }
+
+    // Decompress the metadata
+    std::vector<uint8_t> compressedData = ZstdCompressor::decompress(buffer);
+
+    std::istringstream inputStream {
+        std::string(reinterpret_cast<char*>(compressedData.data()), compressedData.size())
+    };
+
+    // Read the string buffer and metadata sizes
+    uint64_t stringBufferSize;
+    uint64_t metadataSize;
+
+    inputStream.read(reinterpret_cast<char*>(&stringBufferSize), sizeof(stringBufferSize));
+    inputStream.read(reinterpret_cast<char*>(&metadataSize), sizeof(metadataSize));
+
+    // Set header sizes
+    header->setStringBufferSize(stringBufferSize);
+    header->setMetadataSize(metadataSize);
+
+    readStringBufferAndMetadata(inputStream);
 }
 
 void DataModule::readStringBufferAndMetadata(istream& in) {
@@ -587,21 +676,26 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& 
 
             std::stringstream metadataBuffer;
             writeCompressedMetadata(metadataBuffer);
+
             std::stringstream dataBuffer;
             writeData(dataBuffer); // Compression handled in writeData
+
+
 
             encryptModule(metadataBuffer, dataBuffer, out);
             
         }
         else {
 
-            // Encrypted but not compressed
+            // Encrypted but metadata not compressed
             std::stringstream metadataBuffer;
             writeStringBuffer(metadataBuffer);
             writeMetaData(metadataBuffer);
 
             std::stringstream dataBuffer;
             writeData(dataBuffer);
+
+
 
             encryptModule(metadataBuffer, dataBuffer, out);
         }
@@ -683,73 +777,72 @@ void DataModule::writeCompressedMetadata(std::ostream& metadataStream) {
     header->setMetadataSize(compressedDataSize);
 }
 
-void DataModule::encryptModule(std::stringstream& metadataStream, std::stringstream& dataStream, std::ostream& out) {
-
-    // Write string, metadata and data size to encrpytion buffer
+void DataModule::encryptModule(std::stringstream& metadataStream,
+    std::stringstream& dataStream,
+    std::ostream& out) 
+{
     std::vector<uint8_t> encryptionBuffer;
 
     uint64_t stringBufferSize = header->getStringBufferSize();
-    uint64_t metadataSize = header->getMetadataSize();
-    uint64_t dataSize = header->getDataSize();
+    uint64_t metadataSize     = header->getMetadataSize();
+    uint64_t dataSize         = header->getDataSize();
 
+    // Pre-allocate
     encryptionBuffer.reserve(sizeof(uint64_t) * 3 + stringBufferSize + metadataSize + dataSize);
 
-    encryptionBuffer.insert(encryptionBuffer.end(), reinterpret_cast<const char*>(&stringBufferSize), reinterpret_cast<const char*>(&stringBufferSize) + sizeof(stringBufferSize));
-    encryptionBuffer.insert(encryptionBuffer.end(), reinterpret_cast<const char*>(&metadataSize), reinterpret_cast<const char*>(&metadataSize) + sizeof(metadataSize));
-    encryptionBuffer.insert(encryptionBuffer.end(), reinterpret_cast<const char*>(&dataSize), reinterpret_cast<const char*>(&dataSize) + sizeof(dataSize));
+    auto appendUint64 = [&](uint64_t value) {
+    uint8_t buf[sizeof(uint64_t)];
+    std::memcpy(buf, &value, sizeof(value));
+    encryptionBuffer.insert(encryptionBuffer.end(), buf, buf + sizeof(value));
+    };
 
-    encryptionBuffer.insert(encryptionBuffer.end(), metadataStream.str().begin(), metadataStream.str().end());
-    encryptionBuffer.insert(encryptionBuffer.end(), dataStream.str().begin(), dataStream.str().end());
+    // Append sizes
+    appendUint64(stringBufferSize);
+    appendUint64(metadataSize);
+    appendUint64(dataSize);
 
-    // Encrypt the encryption buffer
-    // Generate module-specific encryption parameters
+    // Append actual metadata and data streams
+    std::string metaStr = metadataStream.str();
+    std::string dataStr = dataStream.str();
+    encryptionBuffer.insert(encryptionBuffer.end(), metaStr.begin(), metaStr.end());
+    encryptionBuffer.insert(encryptionBuffer.end(), dataStr.begin(), dataStr.end());
+
+    // Encryption parameters
     EncryptionData encryptionData = header->getEncryptionData();
 
     std::vector<uint8_t> combinedSalt;
     combinedSalt.reserve(encryptionData.baseSalt.size() + encryptionData.moduleSalt.size());
     combinedSalt.insert(combinedSalt.end(), encryptionData.baseSalt.begin(), encryptionData.baseSalt.end());
     combinedSalt.insert(combinedSalt.end(), encryptionData.moduleSalt.begin(), encryptionData.moduleSalt.end());
-    
-    // Derive the encryption key using the correct crypto_pwhash function
+
+    // Derive key
     auto derivedKey = EncryptionManager::deriveKeyArgon2id(
-        encryptionData.masterPassword, 
-        combinedSalt,  // Use base salt for now
-        encryptionData.memoryCost, encryptionData.timeCost, encryptionData.parallelism
+    encryptionData.masterPassword, 
+    combinedSalt,
+    encryptionData.memoryCost,
+    encryptionData.timeCost,
+    encryptionData.parallelism
     );
 
-    // Encrypt the data
+    // Encrypt the entire buffer
     std::vector<uint8_t> encryptedData = EncryptionManager::encryptAES256GCM(
-        encryptionBuffer, derivedKey, encryptionData.iv, encryptionData.authTag
+    encryptionBuffer,
+    derivedKey,
+    encryptionData.iv,
+    encryptionData.authTag
     );
 
+    // Update encryption data back into header
     header->setEncryptionData(encryptionData);
-    cout << "Encryption Data: " << endl;
-    cout << "Module Salt Size: " << encryptionData.moduleSalt.size() << endl;
-    cout << "IV Size: " << encryptionData.iv.size() << endl;
-    cout << "Auth Tag Size: " << encryptionData.authTag.size() << endl; 
-    cout << "Memory Cost: " << encryptionData.memoryCost << endl;
-    cout << "Time Cost: " << encryptionData.timeCost << endl;
-    cout << "Parallelism: " << encryptionData.parallelism << endl;
-    cout << "Master Password: " << encryptionData.masterPassword << endl;
-    cout << "Base Salt Size: " << encryptionData.baseSalt.size() << endl;
 
-    // Write encrypted data
+    // Write encrypted data to output
     out.write(reinterpret_cast<const char*>(encryptedData.data()), encryptedData.size());
 
-    // Update header sizes
+    // Update header sizes (only encrypted payload is stored now)
     header->setStringBufferSize(0);
     header->setMetadataSize(0);
     header->setDataSize(encryptedData.size());
 }
-
-
-
-
-
-
-
-
-
 
 
 void DataModule::addTableData(

@@ -74,6 +74,8 @@ void TabularData::writeData(ostream& out) const {
 
         writeTableRows(buffer, rows);
 
+
+
         std::vector<uint8_t> dataBytes {
             std::istreambuf_iterator<char>(buffer),
             std::istreambuf_iterator<char>()
@@ -82,6 +84,8 @@ void TabularData::writeData(ostream& out) const {
         std::vector<uint8_t> compressedData = ZstdCompressor::compress(dataBytes);
 
         size_t compressedDataSize = compressedData.size();
+
+
 
         out.write(reinterpret_cast<const char*>(compressedData.data()), compressedDataSize);
 
@@ -92,6 +96,8 @@ void TabularData::writeData(ostream& out) const {
         uint64_t size = writeTableRows(out, rows);
         header->setDataSize(size);
     }
+
+
 }
 
 void TabularData::readData(istream& in) {

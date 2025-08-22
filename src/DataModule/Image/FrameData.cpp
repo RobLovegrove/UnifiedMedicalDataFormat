@@ -31,7 +31,7 @@ void FrameData::readData(std::istream& in) {
 }
 
 void FrameData::printData(std::ostream&) const {
-    std::cout << "No implementation should be needed for FrameData::printData" << std::endl;
+
 }
 
 void FrameData::addData(

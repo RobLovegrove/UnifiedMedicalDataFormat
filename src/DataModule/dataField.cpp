@@ -94,9 +94,7 @@ nlohmann::json VarStringField::decodeFromBuffer(
     offset += sizeof(stringLength);
 
     if (stringStart + stringLength > stringBuffer->getSize()) {
-        cout << "stringStart: " << stringStart << endl;
-        cout << "stringLength: " << stringLength << endl;
-        cout << "stringBuffer->getSize(): " << stringBuffer->getSize() << endl; 
+ 
         throw std::runtime_error("VarStringField decode error: string offset + length exceeds buffer size");
     }
 
@@ -438,7 +436,7 @@ void ObjectField::encodeToBuffer(
             field->encodeToBuffer(value[subName], buffer, subOffset);
         } else {
 
-            cout << "TODO: Handle optional/required fields in ObjectField" << endl;
+
             // TODO: Handle optional fields or throw if required
             // Example:
             // if (field->isRequired()) throw runtime_error("Missing required field " + subName);
@@ -472,7 +470,7 @@ bool ObjectField::validateValue(const nlohmann::json& value) const {
     // First check if all required fields are present
     for (const auto& requiredField : requiredFields) {
         if (!value.contains(requiredField)) {
-            cout << "Missing required field: " << requiredField << endl;    
+    
             return false;  // Missing required field
         }
     }

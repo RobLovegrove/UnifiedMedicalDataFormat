@@ -31,7 +31,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
     // Set up file paths
     tempFilePath = filename + ".tmp";
 
-    cout << "Opening tmp file: " << tempFilePath << endl;
+
     
     // Open temp file for writing
     std::ofstream tempFile;
@@ -44,13 +44,13 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         return std::unexpected("Exception opening temp file: " + std::string(e.what()));
     }
 
-    cout << "Writing new file: " << filename << endl;
-    cout << "Using temp file: " << tempFilePath << endl;
+
 
     // SET ENCRYPTION HEADER
     EncryptionData encryptionData;
     encryptionData.masterPassword = "password";
     encryptionData.encryptionType = EncryptionType::AES_256_GCM;
+    //encryptionData.encryptionType = EncryptionType::NONE;
     encryptionData.baseSalt = EncryptionManager::generateSalt(16); // Use correct Argon2id salt size
     encryptionData.memoryCost = 65536;
     encryptionData.timeCost = 3;
@@ -70,7 +70,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         return std::unexpected("Exception writing header: " + std::string(e.what()));
     }
 
-    cout << "Header written to temp file" << endl;
+
 
     // Write Modules to file
     try {
@@ -78,7 +78,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
             const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
 
-            cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
+
 
             // Write module to temp file
             result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
@@ -97,7 +97,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         return std::unexpected("Exception writing modules: " + std::string(e.what()));
     }
 
-    cout << "All modules written to temp file" << endl;
+
 
     // Write XREF table to temp file
     try {
@@ -112,7 +112,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         return std::unexpected("Exception writing xref table: " + std::string(e.what()));
     }
 
-    cout << "XREF table written to temp file" << endl;
+
 
     // Close temp file
     try {
@@ -122,7 +122,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         return std::unexpected("Exception closing temp file: " + std::string(e.what()));
     }
 
-    cout << "Temp file closed" << endl;
+
 
 
     try {
@@ -135,7 +135,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         return std::unexpected("Exception during temp file validation: " + std::string(e.what()));
     }
 
-    cout << "Temp file validated" << endl;
+
 
     // Rename temp file to new file
 
@@ -149,7 +149,7 @@ std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& 
         return std::unexpected("Exception renaming temp file: " + std::string(e.what()));
     }
 
-    cout << "File committed successfilly: " << filename << endl;
+
 
     return moduleIds;
 }
@@ -179,7 +179,7 @@ std::expected<std::vector<UUID>, std::string> Writer::addModules(
         return std::unexpected("Failed to copy original file: " + std::string(e.what()));
     }
 
-    cout << "Opening tmp file: " << tempFilePath << endl;
+
 
     // Open temp file for writing
     std::fstream tempFile;
@@ -217,12 +217,12 @@ std::expected<std::vector<UUID>, std::string> Writer::addModules(
         for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
             const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
 
-            cout << "Processing module " << (i + 1) << "/" << modulesWithSchemas.size() << endl;
+
 
             // Write module to temp file
             result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
             if (!result) {
-                cout << "Failed to write module: " << result.error() << endl;
+
                 return std::unexpected(result.error());
             }
             moduleIds.push_back(result.value());
@@ -271,7 +271,7 @@ std::expected<std::vector<UUID>, std::string> Writer::addModules(
         return std::unexpected("Failed to replace original file: " + std::string(e.what()));
     }
 
-    cout << "File updated successfully: " << filename << endl;
+
 
     return moduleIds;
 }
@@ -299,7 +299,7 @@ bool Writer::updateModules(
         return false;
     }
 
-    cout << "Opening tmp file: " << tempFilePath << endl;
+
 
     // Open temp file for writing
     std::fstream tempFile;
@@ -364,7 +364,7 @@ bool Writer::updateModules(
                         break;
                     }
                     default:
-                        cout << "Unknown module type: " << dataHeader.getModuleType() << endl;
+
                         return false;
                 }
         
@@ -432,7 +432,7 @@ bool Writer::updateModules(
         return false;
     }
 
-    cout << "File updated successfully: " << filename << endl;
+
 
     return true;
 }
@@ -470,7 +470,7 @@ std::expected<UUID, std::string> Writer::writeModule(
 
     unique_ptr<DataModule> dm;
 
-    cout << "Creating module: " << moduleType << endl;
+
     
     // CREATE MODULE
     switch (type) {
@@ -483,17 +483,17 @@ std::expected<UUID, std::string> Writer::writeModule(
             break;
         }
         default:
-            cout << "Unknown module type: " << moduleType << endl;
+
             return std::unexpected("Unknown module type: " + moduleType);
     }
 
     // ADD DATA TO MODULE
     dm->addMetaData(moduleData.metadata);
 
-    cout << "Adding data to module" << endl;
+
     dm->addData(moduleData.data);
 
-    cout << "Writing module to file" << endl;
+
 
     // Ensure at end of file
     outfile.seekp(0, std::ios::end);
@@ -540,8 +540,7 @@ bool Writer::renameTempFile(const std::string& finalFilePath) {
 bool Writer::validateTempFile(size_t moduleCount) {
 
 
-    cout << "Validating temp file: " << tempFilePath << endl;
-    cout << "Module count: " << moduleCount << endl;
+
 
     // Check if temp file exists
     if (!std::filesystem::exists(tempFilePath)) {
@@ -578,7 +577,7 @@ bool Writer::validateTempFile(size_t moduleCount) {
         try {
             dataHeader.readDataHeader(tempFile);
         } catch (const std::exception& e) {
-            cout << "Exception reading DataHeader: " << e.what() << endl;
+
             return false;
         }
     }
