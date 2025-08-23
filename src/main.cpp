@@ -95,23 +95,57 @@ int main(int argc, char** argv) {
         patientModule.data = patientData;
         modulesWithSchemas.push_back({"./schemas/patient/v1.0.json", patientModule});
         
-        // Write the new file using UMDFFile (tabular data only)
-        auto result = writer.writeNewFile(outputFile, modulesWithSchemas);
-        if (!result) {
-            cerr << "Failed to write data: " << result.error() << endl;
+        // // Write the new file using UMDFFile (tabular data only)
+        // auto result = writer.writeNewFile(outputFile, modulesWithSchemas);
+        // if (!result) {
+        //     cerr << "Failed to write data: " << result.error() << endl;
+        //     return 1;
+        // }
+
+        // Creating new UMDF file
+        cout << "Creating new UMDF file: " << outputFile << endl;
+        try {
+        Result result = writer.createNewFile(outputFile);
+        if (!result.success) {
+                cerr << "Failed to create new file: " << result.message << endl;
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            cerr << "Failed to create new file: " << e.what() << endl;
             return 1;
         }
 
+        vector<UUID> moduleIds;
+
+        cout << "Adding tabular data to file" << endl;
+        for (const auto& module : modulesWithSchemas) {
+            auto addResult = writer.addModule(module.first, module.second);
+            if (!addResult) {
+                cerr << "Failed to add module: " << addResult.error() << endl;
+                return 1;
+            }
+            moduleIds.push_back(*addResult);
+        }
+
         cout << "Initial file written with tabular data. Module UUIDs:\n";
-        for (const auto& uuid : result.value()) {
+        for (const auto& uuid : moduleIds) {
             cout << "  - " << uuid.toString() << endl;
+        }
+
+        // Close the file
+        cout << "Closing file" << endl;
+        auto closeResult = writer.closeFile();
+        if (!closeResult.success) {
+            cerr << "Failed to close file: " << closeResult.message << endl;
+            return 1;
         }
 
         cout << "\n=== STEP 2: Reading the file to verify tabular data ===\n";
         
         // Read the file to verify tabular data
-        if (!reader.openFile(outputFile)) {
-            cerr << "Failed to open file for reading: " << outputFile << "\n";
+        auto readResult = reader.openFile(outputFile);
+        if (!readResult.success) {
+            cerr << "Failed to open file for reading: " << outputFile << " " << readResult.message << endl;
             return 1;
         }
         
@@ -133,6 +167,8 @@ int main(int argc, char** argv) {
                 cout << "  - " << module["type"] << " (UUID: " << module["uuid"] << ")\n";
             }
         }
+
+        reader.closeFile();
 
         cout << "\n=== STEP 3: Adding image data using update API ===\n";
         
@@ -241,24 +277,51 @@ int main(int argc, char** argv) {
         // Add image data using the addModules API
         std::vector<std::pair<std::string, ModuleData>> imageModulesWithSchemas;
         imageModulesWithSchemas.push_back({"./schemas/image/v1.0.json", imageModule});
-        
-        auto addResult = writer.addModules(outputFile, imageModulesWithSchemas);
-        if (!addResult) {
-            cerr << "Failed to add image data: " << addResult.error() << "\n";
+
+        vector<UUID> imageModuleIds;
+
+        cout << "Reopening file" << endl;
+        auto reopenResult = writer.openFile(outputFile);
+        if (!reopenResult.success) {
+            cerr << "Failed to reopen file: " << reopenResult.message << endl;
             return 1;
         }
+
+        cout << "Adding image data to file" << endl;
+        for (const auto& module : imageModulesWithSchemas) {
+            auto addResult = writer.addModule(module.first, module.second);
+            if (!addResult) {
+                cerr << "Failed to add module: " << addResult.error() << endl;
+                return 1;
+            }
+            imageModuleIds.push_back(*addResult);
+        }
+        
+        // auto addResult = writer.addModules(outputFile, imageModulesWithSchemas);
+        // if (!addResult) {
+        //     cerr << "Failed to add image data: " << addResult.error() << "\n";
+        //     return 1;
+        // }
         
         cout << "Image data added successfully. New module UUIDs:\n";
-        for (const auto& uuid : addResult.value()) {
+        for (const auto& uuid : imageModuleIds) {
             cout << "  - " << uuid.toString() << endl;
+        }
+
+        // Close the file
+        cout << "Closing file" << endl;
+        closeResult = writer.closeFile();
+        if (!closeResult.success) {
+            cerr << "Failed to close file: " << closeResult.message << endl;
+            return 1;
         }
 
         cout << "\n=== STEP 4: Rereading the file to show all data ===\n";
         
         // Close and reopen to get fresh file info
-        reader.closeFile();
-        if (!reader.openFile(outputFile)) {
-            cerr << "Failed to reopen file for final reading: " << outputFile << "\n";
+        reopenResult = reader.openFile(outputFile);
+        if (!reopenResult.success) {
+            cerr << "Failed to reopen file for final reading: " << outputFile << " " << reopenResult.message << endl;
             return 1;
         }
         
@@ -284,10 +347,35 @@ int main(int argc, char** argv) {
             {tabularUUID, patientModuleData.value()}
         };
 
-        if (!writer.updateModules(outputFile, updates)) {
-            cerr << "Failed to update tabular data" << "\n";
+        reader.closeFile();
+
+        auto result = writer.openFile(outputFile);
+        if (!result.success) {
+            cerr << "Failed to reopen file: " << result.message << endl;
             return 1;
         }
+
+        cout << "Updating tabular data" << endl;
+        for (const auto& update : updates) {
+            auto result = writer.updateModule(update.first, update.second);
+            if (!result.success) {
+                cerr << "Failed to update module: " << result.message << endl;
+                return 1;
+            }
+        }
+
+        result = writer.closeFile();
+        if (!result.success) {
+            cerr << "Failed to close file: " << result.message << endl;
+            return 1;
+        }
+
+        cout << "Closing file" << endl;
+
+        // if (!writer.updateModules(outputFile, updates)) {
+        //     cerr << "Failed to update tabular data" << "\n";
+        //     return 1;
+        // }
         
         cout << "Final file opened successfully. Module count: " << finalFileInfo["module_count"] << "\n";
         
@@ -298,11 +386,21 @@ int main(int argc, char** argv) {
                 cout << "  - " << module["type"] << " (UUID: " << module["uuid"] << ")\n";
             }
         }
-
         cout << "\n=== Final data verification ===\n";
-        
+        reader.closeFile();
+
+        result = reader.openFile(outputFile);
+        if (!result.success) {
+            cerr << "Failed to reopen file: " << result.message << endl;
+            return 1;
+        }
+
+        finalFileInfo = reader.getFileInfo();
+
         // Load all modules to show final state
         for (const auto& module : finalFileInfo["modules"]) {
+
+            cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
 
             auto moduleData = reader.getModuleData(module["uuid"]);
             if (moduleData) {
@@ -338,6 +436,9 @@ int main(int argc, char** argv) {
         
         cout << "=== Full workflow demonstration complete! ===\n";
         cout << "File: " << outputFile << " now contains both tabular and image data.\n";
+
+        // Remove the file
+        std::filesystem::remove(outputFile);
     }
 
     else if (*readCmd) {
@@ -345,15 +446,16 @@ int main(int argc, char** argv) {
         // Read file using new API
         cout << "Reading from file: " << inputFile << "\n";
         
-        if (!reader.openFile(inputFile)) {
-            cerr << "Failed to open file: " << inputFile << "\n";
+        auto result = reader.openFile(inputFile);
+        if (!result.success) {
+            cerr << "Failed to open file: " << inputFile << " " << result.message << endl;
             return 1;
         }
         
         // Get file info
         auto fileInfo = reader.getFileInfo();
         if (fileInfo.contains("success") && !fileInfo["success"]) {
-            cerr << "Error reading file: " << fileInfo["error"] << "\n";
+            cerr << "Error reading file: " << fileInfo["error"] << endl;
             return 1;
         }
         

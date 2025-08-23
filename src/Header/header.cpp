@@ -156,6 +156,8 @@ std::expected<EncryptionData, std::string> Header::readPrimaryHeader(std::istrea
                 break;
             
             default:
+                cout << "Unknown HeaderFieldType: " << typeId << endl;
+                cout << "Length: " << length << endl;
                 return std::unexpected("Unknown HeaderFieldType: " + std::to_string(typeId));
         }
     }

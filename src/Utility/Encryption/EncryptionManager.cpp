@@ -7,21 +7,12 @@
 static std::once_flag initFlag;
 
 // Private method to ensure libsodium is initialized
-static void ensureInitialized() {
+void EncryptionManager::ensureInitialized() {
     std::call_once(initFlag, []() {
         if (sodium_init() < 0) {
             throw std::runtime_error("Failed to initialize libsodium");
         }
     });
-}
-
-bool EncryptionManager::initialize() {
-    try {
-        ensureInitialized();
-        return true;
-    } catch (...) {
-        return false;
-    }
 }
 
 std::vector<uint8_t> EncryptionManager::deriveKeyArgon2id(

@@ -63,9 +63,8 @@ public:
     // Utility methods
     static EncryptionType decodeEncryptionType(uint8_t value);
     static std::string encryptionToString(EncryptionType encryptionType);
-    
-    // Initialize libsodium
-    static bool initialize();
+
+    static void ensureInitialized();
 };
 
 

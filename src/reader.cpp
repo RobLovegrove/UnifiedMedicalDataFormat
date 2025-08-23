@@ -1,4 +1,5 @@
 #include "reader.hpp"
+#include "writer.hpp"
 #include "Utility/Compression/ZstdCompressor.hpp"
 
 #include <iostream>
@@ -10,27 +11,34 @@
 
 using namespace std;
 
-bool Reader::openFile(const std::string& filename) {
+Result Reader::openFile(const std::string& filename) {
+
 
     if (fileStream.is_open()) {
         closeFile();
     }
 
+    // Reset header
+    header = Header();
+    xrefTable = XRefTable();
+    loadedModules.clear();
+
     // UMDFFile opens the stream
     fileStream.open(filename, std::ios::in | std::ios::out | std::ios::binary);
-    if (!fileStream.is_open()) return false;
+    if (!fileStream.is_open()) return Result{false, "Failed to open file"};
     
     // Read header and confirm UMDF
-    if (!header.readPrimaryHeader(fileStream)) { 
+    auto headerResult = header.readPrimaryHeader(fileStream);
+    if (!headerResult) { 
         closeFile();
-        return false; 
+        return Result{false, "Failed to read header: " + headerResult.error()}; 
     } 
 
-    return true;
+    return Result{true, "File opened successfully"};
 
 }
 
-void Reader::closeFile() {
+Result Reader::closeFile() {
     if (fileStream.is_open()) {
 
         xrefTable.clear();
@@ -38,6 +46,8 @@ void Reader::closeFile() {
 
         fileStream.close();
     }
+
+    return Result{true, "File closed successfully"};
 }
 
 /* ================================================== */

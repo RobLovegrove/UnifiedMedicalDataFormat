@@ -12,10 +12,10 @@
 #include "DataModule/dataModule.hpp"
 #include "DataModule/ModuleData.hpp"
 #include "Utility/uuid.hpp"
+#include "./writer.hpp"
 
 class Reader {
 private:
-
     Header header;
     XRefTable xrefTable;
 
@@ -36,8 +36,8 @@ public:
     std::optional<std::string> loadModule(const XrefEntry& entry);
 
     // File management
-    bool openFile(const std::string& filename);
-    void closeFile();
+    Result openFile(const std::string& filename);
+    Result closeFile();
 
 };
 
