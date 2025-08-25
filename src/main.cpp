@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
         });
         
         patientModule.data = patientData;
-        modulesWithSchemas.push_back({"./schemas/patient/v1.0.json", patientModule});
+        pair<string, ModuleData> patientPair = {"./schemas/patient/v1.0.json", patientModule};
 
         // Creating new UMDF file
         cout << "Creating new UMDF file: " << outputFile << endl;
@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        vector<UUID> moduleIds;
+        UUID moduleId;
 
         auto encounterResult = writer.createNewEncounter();
         if (!encounterResult) {
@@ -118,19 +118,15 @@ int main(int argc, char** argv) {
         UUID encounterId = encounterResult.value();
 
         cout << "Adding tabular data to file" << endl;
-        for (const auto& module : modulesWithSchemas) {
-            auto addResult = writer.addModuleToEncounter(encounterId, module.first, module.second);
-            if (!addResult) {
-                cerr << "Failed to add module: " << addResult.error() << endl;
-                return 1;
-            }
-            moduleIds.push_back(addResult.value());
+        auto addResult = writer.addModuleToEncounter(encounterId, patientPair.first, patientPair.second);
+        if (!addResult) {
+            cerr << "Failed to add module: " << addResult.error() << endl;
+            return 1;
         }
+        moduleId = addResult.value();
 
         cout << "Initial file written with tabular data. Module UUIDs:\n";
-        for (const auto& uuid : moduleIds) {
-            cout << "  - " << uuid.toString() << endl;
-        }
+        cout << "  - " << moduleId.toString() << endl;
 
         // Close the file
         cout << "Closing file" << endl;
@@ -285,7 +281,7 @@ int main(int argc, char** argv) {
         }
 
         cout << "Adding image data to file" << endl;
-        auto addResult = writer.addModuleToEncounter(encounterId, imagePair.first, imagePair.second);
+        addResult = writer.addModuleToEncounter(encounterId, imagePair.first, imagePair.second);
         if (!addResult) {
             cerr << "Failed to add module: " << addResult.error() << endl;
             return 1;

@@ -20,12 +20,11 @@ private:
     // Encounter ID → root module(s)
     std::unordered_map<UUID, Encounter> encounters;
 
-
     std::streampos encounterSizeOffset;
     std::streampos linkSizeOffset;
 
-    uint32_t encounterSize;
-    uint32_t linkSize;
+    uint32_t encounterSize = 0;
+    uint32_t linkSize = 0;
 
     bool wouldCreateCycle(const UUID& source, const UUID& target) const;
 
@@ -35,7 +34,16 @@ private:
     void writeLinks(std::ostream& outfile);
     void updateHeader(std::ostream& outfile);
 
+    // Reading Methods
+    void readGraphHeader(std::istream& in);
+    void readEncounters(std::istream& in);
+    void readLinks(std::istream& in);
+    void buildAdjacencyLists();
+
 public:
+
+    static ModuleGraph readModuleGraph(std::istream& in);
+
     void addLink(const ModuleLink& link);
     void removeLink(const ModuleLink& link);
 
@@ -43,7 +51,7 @@ public:
     const std::vector<std::shared_ptr<ModuleLink>>& getIncomingLinks(const UUID& moduleId) const;
     const std::vector<std::shared_ptr<ModuleLink>>& allLinks() const;
 
-
+    const std::unordered_map<UUID, Encounter>& getEncounters() const { return encounters; }
     UUID createEncounter();
 
     bool encounterExists(const UUID& encounterId) const;
@@ -52,13 +60,17 @@ public:
     void addModuleToEncounter(const UUID& encounterId, const UUID& moduleId);
     void removeModuleFromEncounter(const UUID& encounterId, const UUID& moduleId);
 
-    void addLinkModule(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType);
-    void removeLinkModule(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType);
+    void addModuleLink(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType);
+    void removeModuleLink(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType);
 
     // Graph traversal methods
     std::vector<UUID> getRootModules() const;
 
-    void writeModuleGraph(std::ostream& outfile);
+    uint32_t writeModuleGraph(std::ostream& outfile);
+    
+    void displayLinks() const;
+    void displayEncounters() const;
+    void printEncounterPath(const UUID& encounterId) const;
 
     // std::vector<UUID> getEncounterMembers(const UUID& rootId) const;
     // std::vector<UUID> getDerivedData(const UUID& sourceId) const;

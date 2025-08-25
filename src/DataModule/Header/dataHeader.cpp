@@ -97,8 +97,6 @@ void DataHeader::updateHeader(std::ostream& out) {
     out.write(reinterpret_cast<const char*>(&metaDataSize), sizeof(metaDataSize));
 
     // Update data size
-
-
     out.seekp(dataSizePos);
     out.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
 

@@ -71,6 +71,8 @@ bool XRefTable::writeXref(std::ostream& out) const{
     // 7. Write footer
     out.write(xrefMarker, sizeof(xrefMarker));
     out.write(reinterpret_cast<const char*>(&xrefOffset), sizeof(xrefOffset));
+    out.write(reinterpret_cast<const char*>(&moduleGraphOffset), sizeof(moduleGraphOffset));
+    out.write(reinterpret_cast<const char*>(&moduleGraphSize), sizeof(moduleGraphSize));
 
     out.write(EOFmarker, sizeof(EOFmarker));
 
@@ -79,7 +81,11 @@ bool XRefTable::writeXref(std::ostream& out) const{
 
 XRefTable XRefTable::loadXrefTable(std::istream& in) {
 
-    constexpr size_t FOOTER_SIZE = sizeof(EOFmarker) + sizeof(xrefOffset) + sizeof(xrefMarker);
+    constexpr size_t FOOTER_SIZE = sizeof(EOFmarker) 
+        + sizeof(xrefOffset) 
+        + sizeof(moduleGraphOffset) 
+        + sizeof(moduleGraphSize) 
+        + sizeof(xrefMarker);
 
     XRefTable table;
 
@@ -96,11 +102,16 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
     // 2. Read footer marker and xref offset
     char inXrefMarker[12];
     uint64_t inXrefOffset = 0;
+    uint64_t inModuleGraphOffset = 0;
+    uint32_t inModuleGraphSize = 0;
     char inEOFmarker[8];
 
     in.read(inXrefMarker, sizeof(xrefMarker));
     in.read(reinterpret_cast<char*>(&inXrefOffset), sizeof(xrefOffset));
+    in.read(reinterpret_cast<char*>(&inModuleGraphOffset), sizeof(moduleGraphOffset));
+    in.read(reinterpret_cast<char*>(&inModuleGraphSize), sizeof(moduleGraphSize));
     in.read(inEOFmarker, sizeof(EOFmarker));
+
 
     if (std::memcmp(inXrefMarker, xrefMarker, 12) != 0) {
         throw std::runtime_error("Invalid Xref offset marker.");
@@ -111,6 +122,8 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
 
     // 3. Seek to xref offset
     table.setXrefOffset(inXrefOffset);
+    table.setModuleGraphOffset(inModuleGraphOffset);
+    table.setModuleGraphSize(inModuleGraphSize);
     in.seekg(inXrefOffset);
 
     // 4. Read "XREF" signature

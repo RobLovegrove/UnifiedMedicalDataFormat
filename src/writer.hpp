@@ -49,6 +49,9 @@ private:
     void resetWriter();
 
 public:
+
+    void printEncounterPath(const UUID& encounterId);
+
     Result createNewFile(std::string& filename);
     Result openFile(std::string& filename);
 

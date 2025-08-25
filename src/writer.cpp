@@ -103,6 +103,26 @@ Result Writer::openFile(std::string& filename) {
         return Result{false, "Failed to load XRef table from temp file: " + std::string(e.what())};
     }
 
+    try {
+        // Read ModuleGraph
+        fileStream.seekg(xrefTable.getModuleGraphOffset());
+
+        std::stringstream buffer;
+        std::vector<char> temp(xrefTable.getModuleGraphSize());
+        fileStream.read(temp.data(), temp.size());
+        buffer.write(temp.data(), temp.size());
+
+        // Read the module graph from the buffer
+        moduleGraph = ModuleGraph::readModuleGraph(buffer);
+
+        cout << "Displaying encounters" << endl << endl;
+        moduleGraph.displayEncounters();
+    }
+    catch (const std::exception& e) {
+        closeFile();
+        return Result{false, "Failed to read ModuleGraph: " + string(e.what())};
+    }
+
     return Result{true, "File opened successfully"};
 }
 
@@ -225,14 +245,24 @@ Result Writer::closeFile() {
         return Result{false, "Temp file is empty"};
     }
 
+    streampos moduleGraphOffset = fileStream.tellp();
+
     // Write module graph to temp file
     try {
-        moduleGraph.writeModuleGraph(fileStream);
+        uint32_t moduleGraphSize = moduleGraph.writeModuleGraph(fileStream);
+
+        // Add ModuleGraph offset to XREF table
+        xrefTable.setModuleGraphOffset(moduleGraphOffset);
+        xrefTable.setModuleGraphSize(moduleGraphSize);
+
     } catch (const std::exception& e) {
         fileStream.close();
         std::filesystem::remove(tempFilePath);
         return Result{false, "Exception writing module graph: " + std::string(e.what())};
     }
+
+    cout << "Displaying encounters" << endl << endl;
+    moduleGraph.displayEncounters();
 
     // Make old XREF table obsolete and write new one
     try {
@@ -276,6 +306,7 @@ Result Writer::closeFile() {
         return Result{false, "Exception renaming temp file: " + std::string(e.what())};
     }
 
+    // Reset writer
     newFile = false;
 
     return Result{true, "File closed successfully"};
@@ -287,6 +318,7 @@ void Writer::resetWriter() {
     xrefTable.clear();
     tempFilePath.clear();
     filePath.clear();
+    moduleGraph = ModuleGraph();
 }
 
 Result Writer::setUpFileStream(std::string& filename) {
@@ -332,6 +364,10 @@ Result Writer::setUpFileStream(std::string& filename) {
     return Result{true, "File stream set up successfully"};
 }
 
+
+void Writer::printEncounterPath(const UUID& encounterId) {
+    moduleGraph.printEncounterPath(encounterId);
+}
 
 
 // std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& filename, 
@@ -752,7 +788,13 @@ std::expected<UUID, std::string> Writer::addModuleToEncounter(
 
     // Check if encounter exists
     if (!moduleGraph.encounterExists(encounterId)) {
-        return std::unexpected("Encounter ID not found");
+
+        const auto& encounters = moduleGraph.getEncounters();
+        for (const auto& [encounterId, encounter] : encounters) {
+            cout << "Encounter " << encounterId.toString() << ": " << encounter.rootModule.value().toString() << " -> " << encounter.lastModule.value().toString() << endl;
+        }
+
+        return std::unexpected("Encounter ID " + encounterId.toString() + " not found");
     }
     
     UUID moduleId = UUID();
@@ -763,10 +805,15 @@ std::expected<UUID, std::string> Writer::addModuleToEncounter(
         return std::unexpected("Exception adding module to encounter: " + std::string(e.what()));
     }
 
-    auto result = addModule(schemaPath, moduleId, module);
-    if (!result.success) {
+    try {
+        auto result = addModule(schemaPath, moduleId, module);
+        if (!result.success) {
+            moduleGraph.removeModuleFromEncounter(encounterId, moduleId);
+            return std::unexpected(result.message);
+        }
+    } catch (const std::exception& e) {
         moduleGraph.removeModuleFromEncounter(encounterId, moduleId);
-        return std::unexpected(result.message);
+        return std::unexpected("Exception adding module to encounter: " + std::string(e.what()));
     }
 
     return moduleId;
@@ -789,7 +836,7 @@ std::expected<UUID, std::string> Writer::addDerivedModule(
         UUID moduleId = UUID();
 
         try {
-            moduleGraph.addLinkModule(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
+            moduleGraph.addModuleLink(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
         } catch (const std::exception& e) {
             return std::unexpected("Exception adding derived module: " + std::string(e.what()));
         }
@@ -797,7 +844,7 @@ std::expected<UUID, std::string> Writer::addDerivedModule(
         auto result = addModule(schemaPath, moduleId, module);
         
         if (!result.success) {
-            moduleGraph.removeLinkModule(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
+            moduleGraph.removeModuleLink(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
             return std::unexpected(result.message);
         }
 
@@ -821,7 +868,7 @@ std::expected<UUID, std::string> Writer::addAnnotation(
         UUID moduleId = UUID();
 
         try {
-            moduleGraph.addLinkModule(parentModuleId, moduleId, ModuleLinkType::ANNOTATES);
+            moduleGraph.addModuleLink(parentModuleId, moduleId, ModuleLinkType::ANNOTATES);
         } catch (const std::exception& e) {
             return std::unexpected("Exception adding annotation: " + std::string(e.what()));
         }
@@ -829,13 +876,11 @@ std::expected<UUID, std::string> Writer::addAnnotation(
         auto result = addModule(schemaPath, moduleId, module);
         
         if (!result.success) {
-            moduleGraph.removeLinkModule(parentModuleId, moduleId, ModuleLinkType::ANNOTATES);
+            moduleGraph.removeModuleLink(parentModuleId, moduleId, ModuleLinkType::ANNOTATES);
             return std::unexpected(result.message);
         }
 
         return moduleId;
-
-
 
 }
 
@@ -990,6 +1035,7 @@ Result Writer::validateTempFile(size_t moduleCount) {
     }
 
     for (const auto& entry : xrefTable.getEntries()) {
+
         // Get entry offset
         uint64_t offset = entry.offset;
 

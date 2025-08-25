@@ -22,6 +22,9 @@ private:
     std::vector<XrefEntry> entries;
     uint64_t xrefOffset;
 
+    uint64_t moduleGraphOffset;
+    uint32_t moduleGraphSize;
+
     static char xrefMarker[12];
     static char EOFmarker[8];
 
@@ -39,6 +42,12 @@ public:
 
     void setXrefOffset(uint64_t offset) { xrefOffset = offset; }
     uint64_t getXrefOffset() const { return xrefOffset; }
+
+    void setModuleGraphOffset(uint64_t offset) { moduleGraphOffset = offset; }
+    uint64_t getModuleGraphOffset() const { return moduleGraphOffset; }
+
+    void setModuleGraphSize(uint32_t size) { moduleGraphSize = size; }
+    uint32_t getModuleGraphSize() const { return moduleGraphSize; }
 
     bool writeXref(std::ostream& out) const;
 

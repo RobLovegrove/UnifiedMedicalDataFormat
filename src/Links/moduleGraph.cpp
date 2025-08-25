@@ -1,16 +1,292 @@
 #include "moduleGraph.hpp"
 #include "../Utility/tlvHeader.hpp"
+#include "../Utility/moduleType.hpp"
 
 #include <algorithm>
 #include <queue>
 #include <unordered_set>
 #include <stack>
 #include <sstream>
-
-
-
+#include <functional>
 
 using namespace std;
+
+/* READER FUNCTIONS */
+
+ModuleGraph ModuleGraph::readModuleGraph(std::istream& in) {
+
+    ModuleGraph moduleGraph;
+
+    // Read graph header
+    try {
+        moduleGraph.readGraphHeader(in);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception reading graph header: " + std::string(e.what()));
+    }
+
+    // Read encounters
+    try {
+        moduleGraph.readEncounters(in);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception reading encounters: " + std::string(e.what()));
+    }
+
+    // Read links
+    try {
+        moduleGraph.readLinks(in);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception reading links: " + std::string(e.what()));
+    }
+
+
+    cout << "Adjacency list size: " << moduleGraph.adjacency.size() << endl;
+    cout << "Reverse adjacency list size: " << moduleGraph.reverseAdjacency.size() << endl;
+
+    // Build adjacency lists
+    moduleGraph.buildAdjacencyLists();
+
+    return moduleGraph;
+}
+
+void ModuleGraph::readGraphHeader(std::istream& in) {
+
+    // Read header size
+    uint8_t typeId;
+    uint32_t length;
+    uint32_t headerSize;
+    
+    in.read(reinterpret_cast<char*>(&typeId), sizeof(typeId));
+    in.read(reinterpret_cast<char*>(&length), sizeof(length));
+
+    if (typeId != static_cast<uint8_t>(HeaderFieldType::HeaderSize)) {
+        throw std::runtime_error("Invalid header: expected HeaderSize first.");
+    }
+
+    in.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
+
+    size_t bytesRead = sizeof(typeId) + sizeof(length) + sizeof(headerSize);    
+    while (bytesRead < headerSize) {
+        in.read(reinterpret_cast<char*>(&typeId), sizeof(typeId));
+        in.read(reinterpret_cast<char*>(&length), sizeof(length));
+        bytesRead += sizeof(typeId) + sizeof(length);
+
+        std::vector<char> buffer(length);
+        in.read(buffer.data(), length);
+        bytesRead += length;
+
+        auto type = static_cast<HeaderFieldType>(typeId);
+        switch (type) {
+            case HeaderFieldType::EncounterSize:
+                if (length != sizeof(encounterSize)) throw std::runtime_error("Invalid EncounterSize length.");
+                std::memcpy(&encounterSize, buffer.data(), sizeof(encounterSize));
+                break;
+            case HeaderFieldType::LinkSize:
+                if (length != sizeof(linkSize)) throw std::runtime_error("Invalid LinkSize length.");
+                std::memcpy(&linkSize, buffer.data(), sizeof(linkSize));
+                break;
+            default:
+                throw std::runtime_error("Invalid ModuleGraph header field type: " + std::to_string(typeId));
+        }
+    }
+}
+
+void ModuleGraph::readEncounters(std::istream& in) {
+
+    size_t bytesRead = 0;
+    while (bytesRead < encounterSize) {
+        cout << "Reading encounter" << endl;
+        Encounter encounter;
+
+        std::array<uint8_t, 16> temp;
+        UUID tempUUID;
+
+        in.read(reinterpret_cast<char*>(temp.data()), temp.size());
+        tempUUID.setData(temp);
+        encounter.encounterId = tempUUID;
+
+        in.read(reinterpret_cast<char*>(temp.data()), temp.size());
+        tempUUID.setData(temp);
+        encounter.rootModule = tempUUID;
+
+        in.read(reinterpret_cast<char*>(temp.data()), temp.size());
+        tempUUID.setData(temp);
+        encounter.lastModule = tempUUID;
+
+        bytesRead += temp.size() * 3;
+
+        encounters[encounter.encounterId] = encounter;
+    }
+
+    cout << "Encounters read" << endl;
+
+    for (const auto& [encounterId, encounter] : encounters) {
+        cout << "Encounter " << encounterId.toString() << ": " << encounter.rootModule.value().toString() << " -> " << encounter.lastModule.value().toString() << endl;
+    }
+}
+
+void ModuleGraph::readLinks(std::istream& in) {
+
+    size_t bytesRead = 0;
+    while (bytesRead < linkSize) {
+
+        UUID sourceId;
+        UUID targetId;
+        ModuleLinkType linkType;
+        bool deleted;
+
+        std::array<uint8_t, 16> temp;
+        
+        in.read(reinterpret_cast<char*>(temp.data()), temp.size());
+        sourceId.setData(temp);
+
+        in.read(reinterpret_cast<char*>(temp.data()), temp.size());
+        targetId.setData(temp);
+
+        in.read(reinterpret_cast<char*>(&linkType), sizeof(linkType));
+        in.read(reinterpret_cast<char*>(&deleted), sizeof(deleted));
+        bytesRead += temp.size() * 2 + sizeof(linkType) + sizeof(deleted);
+
+        links.push_back(std::make_shared<ModuleLink>(sourceId, targetId, linkType));
+    }
+}
+
+void ModuleGraph::buildAdjacencyLists() {
+    adjacency.clear();
+    reverseAdjacency.clear();
+
+    for (const auto& linkPtr : links) {
+        if (linkPtr->deleted) continue; // skip deleted links
+
+        // Forward adjacency: source -> target(s)
+        adjacency[linkPtr->sourceId].push_back(linkPtr);
+
+        // Reverse adjacency: target -> source(s)
+        reverseAdjacency[linkPtr->targetId].push_back(linkPtr);
+    }
+}
+
+// Writing methods
+
+uint32_t ModuleGraph::writeModuleGraph(std::ostream& outfile) {
+
+    // Create a buffer to write to
+    std::stringstream buffer;
+
+    // Write graph header
+    try {
+        writeGraphHeader(buffer);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception writing graph header: " + std::string(e.what()));
+    }
+
+    // Write encounters
+    try {
+        writeEncounters(buffer);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception writing encounters: " + std::string(e.what()));
+    }
+
+    // Write links
+    try {
+        writeLinks(buffer);
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception writing links: " + std::string(e.what()));
+    }
+
+    // Update the header size
+    updateHeader(buffer);
+
+    outfile << buffer.str();
+
+    return buffer.str().size();
+}
+
+void ModuleGraph::writeGraphHeader(std::ostream& outfile) {
+    // Get start position
+    std::streampos startPos = outfile.tellp();
+
+    // WRITE HEADER SIZE
+    uint32_t headerSize = 0;
+    streampos headerSizeOffset = writeTLVFixed(
+        outfile, 
+        HeaderFieldType::HeaderSize, 
+        &headerSize, 
+        sizeof(uint32_t));
+
+    // WRITE ENCOUNTER SIZE
+    encounterSizeOffset = writeTLVFixed(
+        outfile, 
+        HeaderFieldType::EncounterSize, 
+        &encounterSize, 
+        sizeof(encounterSize));
+
+    // WRITE LINK SIZE
+    linkSizeOffset = writeTLVFixed(
+        outfile, 
+        HeaderFieldType::LinkSize, 
+        &linkSize, 
+        sizeof(linkSize));
+
+    // Update the header size
+    std::streampos currentPos = outfile.tellp();
+    headerSize = static_cast<uint32_t>(currentPos - startPos);
+    outfile.seekp(headerSizeOffset);
+    outfile.write(reinterpret_cast<const char*>(&headerSize), sizeof(uint32_t));
+
+    // Restore the position
+    outfile.seekp(currentPos);
+}
+
+void ModuleGraph::updateHeader(std::ostream& outfile) {
+
+    streampos currentPos = outfile.tellp();
+
+    outfile.seekp(encounterSizeOffset);
+    outfile.write(reinterpret_cast<const char*>(&encounterSize), sizeof(encounterSize));
+
+    outfile.seekp(linkSizeOffset);
+    outfile.write(reinterpret_cast<const char*>(&linkSize), sizeof(linkSize));
+
+    outfile.seekp(currentPos);
+}
+
+void ModuleGraph::writeEncounters(std::ostream& outfile) {
+
+    encounterSize = 0;
+    for (auto& [encounterId, encounter] : encounters) {
+
+        if (encounter.rootModule.has_value()) {
+
+            outfile.write(reinterpret_cast<const char*>(encounterId.data().data()), encounterId.data().size());
+            outfile.write(reinterpret_cast<const char*>(encounter.rootModule.value().data().data()), encounter.rootModule.value().data().size());
+            encounterSize += encounterId.data().size() + encounter.rootModule.value().data().size();
+
+            if (encounter.lastModule.has_value()) {
+                outfile.write(reinterpret_cast<const char*>(encounter.lastModule.value().data().data()), encounter.lastModule.value().data().size());
+                encounterSize += encounter.lastModule.value().data().size();
+            }
+            else {
+                outfile.write(reinterpret_cast<const char*>(encounter.rootModule.value().data().data()), encounter.rootModule.value().data().size());
+                encounterSize += encounter.rootModule.value().data().size();
+            }
+        }
+    }
+}
+
+void ModuleGraph::writeLinks(std::ostream& outfile) {
+
+    cout << "Writing links" << endl;
+    linkSize = 0;
+    for (const std::shared_ptr<ModuleLink>& link : links) {
+
+        outfile.write(reinterpret_cast<const char*>(link->sourceId.data().data()), link->sourceId.data().size());
+        outfile.write(reinterpret_cast<const char*>(link->targetId.data().data()), link->targetId.data().size());
+        outfile.write(reinterpret_cast<const char*>(&link->linkType), sizeof(link->linkType));
+        outfile.write(reinterpret_cast<const char*>(&link->deleted), sizeof(link->deleted));
+
+        linkSize += sizeof(link->sourceId.data().size()) + sizeof(link->targetId.data().size()) + sizeof(link->linkType) + sizeof(link->deleted);
+    }
+}
 
 // Helper functions
 
@@ -63,11 +339,13 @@ Encounter& ModuleGraph::getEncounter(const UUID& encounterId) {
 }
 
 void ModuleGraph::addModuleToEncounter(const UUID& encounterId, const UUID& moduleId) {
-    auto encounter = getEncounter(encounterId);
+
+    Encounter& encounter = getEncounter(encounterId);
     if (!encounter.rootModule.has_value()) {
         // First module becomes the root
         encounter.rootModule = moduleId;
         encounter.lastModule = moduleId;
+
     } else {
         // Link to the last module added
         ModuleLink link(encounter.lastModule.value(), moduleId, ModuleLinkType::BELONGS_TO);
@@ -122,13 +400,13 @@ void ModuleGraph::removeModuleFromEncounter(const UUID& encounterId, const UUID&
 }
 
 
-void ModuleGraph::addLinkModule(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType) {
+void ModuleGraph::addModuleLink(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType) {
 
     ModuleLink link(parentModuleId, moduleId, linkType);
     addLink(link);
 }
 
-void ModuleGraph::removeLinkModule(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType) {
+void ModuleGraph::removeModuleLink(const UUID& parentModuleId, const UUID& moduleId, ModuleLinkType linkType) {
 
     ModuleLink link(parentModuleId, moduleId, linkType);
     removeLink(link);
@@ -179,120 +457,6 @@ void ModuleGraph::removeLink(const ModuleLink& link) {
             inLinks.end());
     }
 }
-
-
-
-
-void ModuleGraph::writeModuleGraph(std::ostream& outfile) {
-
-    // Create a buffer to write to
-    std::stringstream buffer;
-
-    // Write graph header
-    try {
-        writeGraphHeader(buffer);
-    } catch (const std::exception& e) {
-        throw std::runtime_error("Exception writing graph header: " + std::string(e.what()));
-    }
-
-    // Write encounters
-    try {
-        writeEncounters(buffer);
-    } catch (const std::exception& e) {
-        throw std::runtime_error("Exception writing encounters: " + std::string(e.what()));
-    }
-
-    // Write links
-    try {
-        writeLinks(buffer);
-    } catch (const std::exception& e) {
-        throw std::runtime_error("Exception writing links: " + std::string(e.what()));
-    }
-
-    outfile << buffer.str();
-}
-
-
-void ModuleGraph::writeGraphHeader(std::ostream& outfile) {
-    // Get start position
-    std::streampos startPos = outfile.tellp();
-
-    // WRITE HEADER SIZE
-    uint32_t headerSize = 0;
-    streampos headerSizeOffset = writeTLVFixed(
-        outfile, 
-        HeaderFieldType::HeaderSize, 
-        &headerSize, 
-        sizeof(uint32_t));
-
-    // WRITE ENCOUNTER SIZE
-    encounterSizeOffset = writeTLVFixed(
-        outfile, 
-        HeaderFieldType::EncounterSize, 
-        &encounterSize, 
-        sizeof(encounterSize));
-
-    // WRITE LINK SIZE
-    linkSizeOffset = writeTLVFixed(
-        outfile, 
-        HeaderFieldType::LinkSize, 
-        &linkSize, 
-        sizeof(linkSize));
-
-    // Update the header size
-    std::streampos currentPos = outfile.tellp();
-    headerSize = static_cast<uint32_t>(currentPos - startPos);
-    outfile.seekp(headerSizeOffset);
-    outfile.write(reinterpret_cast<const char*>(&headerSize), sizeof(uint32_t));
-
-    // Restore the position
-    outfile.seekp(currentPos);
-}
-
-void ModuleGraph::updateHeader(std::ostream& outfile) {
-
-    streampos currentPos = outfile.tellp();
-
-    outfile.seekp(encounterSizeOffset);
-    outfile.write(reinterpret_cast<const char*>(&encounterSize), sizeof(encounterSize));
-
-    outfile.seekp(linkSizeOffset);
-    outfile.write(reinterpret_cast<const char*>(&linkSize), sizeof(linkSize));
-
-    outfile.seekp(currentPos);
-}
-
-void ModuleGraph::writeEncounters(std::ostream& outfile) {
-    for (auto& [encounterId, encounter] : encounters) {
-        if (encounter.rootModule.has_value()) {
-
-            std::string encounterIdStr = encounterId.toString();
-            std::string rootModuleStr = encounter.rootModule.value().toString();
-            std::string lastModuleStr = encounter.lastModule.value().toString();
-
-            outfile.write(reinterpret_cast<const char*>(encounterIdStr.data()), sizeof(encounterIdStr.size()));
-            outfile.write(reinterpret_cast<const char*>(rootModuleStr.data()), sizeof(rootModuleStr.size()));
-            if (encounter.lastModule.has_value()) {
-                outfile.write(reinterpret_cast<const char*>(lastModuleStr.data()), sizeof(lastModuleStr.size()));
-            }
-            else {
-                outfile.write(reinterpret_cast<const char*>(encounterIdStr.data()), sizeof(encounterIdStr.size()));
-            }
-        }
-    }
-}
-
-void ModuleGraph::writeLinks(std::ostream& outfile) {
-    for (auto& linkPtr : links) {
-        outfile.write(reinterpret_cast<const char*>(&linkPtr->sourceId), sizeof(linkPtr->sourceId));
-        outfile.write(reinterpret_cast<const char*>(&linkPtr->targetId), sizeof(linkPtr->targetId));
-        outfile.write(reinterpret_cast<const char*>(&linkPtr->linkType), sizeof(linkPtr->linkType));
-    }
-}
-
-
-
-
 
 const std::vector<std::shared_ptr<ModuleLink>>& ModuleGraph::getOutgoingLinks(const UUID& moduleId) const {
     static const std::vector<std::shared_ptr<ModuleLink>> empty;
@@ -423,3 +587,131 @@ std::vector<UUID> ModuleGraph::getRootModules() const {
     
 //     return annotations;
 // }
+
+void ModuleGraph::displayEncounters() const {
+    for (const auto& [encounterId, encounter] : encounters) {
+        if (!encounter.rootModule.has_value()) {
+            std::cout << "Encounter " << encounterId.toString() << " (no root)\n";
+            continue;
+        }
+
+        std::cout << "Encounter " << encounterId.toString() << ": ";
+
+        // Start with root
+        UUID current = encounter.rootModule.value();
+        std::cout << current.toString();
+
+        // Follow BelongsTo chain until lastModule
+        while (current != encounter.lastModule) {
+            auto it = adjacency.find(current);
+            if (it == adjacency.end()) break; // no outgoing links
+
+            // Look for the BelongsTo chain link
+            UUID next{};
+            bool found = false;
+            for (const auto& link : it->second) {
+                if (link->linkType == ModuleLinkType::BELONGS_TO) {
+                    next = link->targetId;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) break; // broken chain
+
+            std::cout << " -> " << next.toString();
+            current = next;
+        }
+
+        std::cout << "\n";
+    }
+}
+
+void ModuleGraph::displayLinks() const {
+    std::cout << "==== ModuleGraph Links ====" << std::endl;
+
+    if (links.empty()) {
+        std::cout << "No links present." << std::endl;
+        return;
+    }
+
+    for (const auto& linkPtr : links) {
+        std::cout 
+            << "Source: " << linkPtr->sourceId.toString()
+            << " -> Target: " << linkPtr->targetId.toString()
+            << " | Type: " << static_cast<int>(linkPtr->linkType) // or create a helper to convert to string
+            << " | Deleted: " << (linkPtr->deleted ? "Yes" : "No")
+            << std::endl;
+    }
+
+    std::cout << "============================" << std::endl;
+}
+
+
+void ModuleGraph::printEncounterPath(const UUID& encounterId) const {
+    auto encounterIt = encounters.find(encounterId);
+    if (encounterIt == encounters.end()) {
+        std::cout << "Encounter " << encounterId.toString() << " not found.\n";
+        return;
+    }
+
+    const Encounter& encounter = encounterIt->second;
+
+    if (!encounter.rootModule.has_value()) {
+        std::cout << "Encounter " << encounterId.toString() << " has no root module.\n";
+        return;
+    }
+
+    std::cout << "Printing Encounter:\n";
+    std::cout << "Encounter ID: " << encounterId.toString() << "\n\n";
+
+    // Recursive helper to print a module and its derived/annotated children
+    std::function<void(const UUID&, int)> printModule;
+    printModule = [&](const UUID& moduleId, int indent) {
+        // Print module ID with indentation
+        for (int i = 0; i < indent; ++i) std::cout << "    ";
+        std::cout << moduleId.toString() << "\n";
+
+        // Print derived modules (indented)
+        auto derivedIt = adjacency.find(moduleId);
+        if (derivedIt != adjacency.end()) {
+            for (const auto& link : derivedIt->second) {
+                if (link->linkType == ModuleLinkType::DERIVED_FROM) {
+                    printModule(link->targetId, indent + 1);
+                }
+            }
+        }
+
+        // Print annotations (with arrow)
+        if (derivedIt != adjacency.end()) {
+            for (const auto& link : derivedIt->second) {
+                if (link->linkType == ModuleLinkType::ANNOTATES) {
+                    for (int i = 0; i < indent; ++i) std::cout << "    ";
+                    std::cout << "-> " << link->targetId.toString() << "\n";
+                }
+            }
+        }
+    };
+
+    // Traverse BELONGS_TO chain along encounter
+    UUID current = encounter.rootModule.value();
+    while (true) {
+        printModule(current, 0);
+
+        if (current == encounter.lastModule) break;
+
+        // Move to next module in BELONGS_TO chain
+        auto it = adjacency.find(current);
+        if (it == adjacency.end()) break;
+
+        bool foundNext = false;
+        for (const auto& link : it->second) {
+            if (link->linkType == ModuleLinkType::BELONGS_TO) {
+                current = link->targetId;
+                foundNext = true;
+                break;
+            }
+        }
+        if (!foundNext) break;
+    }
+}

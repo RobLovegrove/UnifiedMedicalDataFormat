@@ -13,7 +13,6 @@ using namespace std;
 
 Result Reader::openFile(const std::string& filename) {
 
-
     if (fileStream.is_open()) {
         closeFile();
     }
@@ -33,6 +32,43 @@ Result Reader::openFile(const std::string& filename) {
         closeFile();
         return Result{false, "Failed to read header: " + headerResult.error()}; 
     } 
+
+    try {
+        // Read XREF table
+        xrefTable = XRefTable::loadXrefTable(fileStream);
+    }
+    catch (const std::exception& e) {
+        closeFile();
+        return Result{false, "Failed to read XREF table: " + string(e.what())};
+    }
+
+    try {
+        // Read ModuleGraph
+        fileStream.seekg(xrefTable.getModuleGraphOffset());
+
+        std::stringstream buffer;
+
+        // allocate temporary space
+        std::vector<char> temp(xrefTable.getModuleGraphSize());
+
+        // read raw bytes
+        fileStream.read(temp.data(), temp.size());
+
+        // copy into stringstream
+        buffer.write(temp.data(), temp.size());
+
+        // Read the module graph from the buffer
+        moduleGraph = ModuleGraph::readModuleGraph(buffer);
+
+        cout << "Displaying encounters" << endl << endl;
+        moduleGraph.displayEncounters();
+    }
+    catch (const std::exception& e) {
+        closeFile();
+        return Result{false, "Failed to read ModuleGraph: " + string(e.what())};
+    }
+
+
 
     return Result{true, "File opened successfully"};
 
@@ -81,6 +117,13 @@ nlohmann::json Reader::getFileInfo() {
         moduleList.push_back(moduleInfo);
     }
     result["modules"] = moduleList;
+
+    cout << "Printing encounter paths" << endl;
+    const auto& encounters = moduleGraph.getEncounters();
+    for (const auto& [encounterId, encounter] : encounters) {
+        moduleGraph.printEncounterPath(encounterId);
+    }
+
     return result;
 }
 
@@ -98,8 +141,6 @@ std::expected<ModuleData, std::string> Reader::getModuleData(
         }
     }
 
-
-    
     // If the module is not found, load it from the file
     for (const auto& entry : xrefTable.getEntries()) {
         if (entry.id.toString() == moduleId) {
@@ -165,4 +206,9 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
     }
 
     return nullopt;
+}
+
+
+void Reader::printEncounterPath(const UUID& encounterId) {
+    moduleGraph.printEncounterPath(encounterId);
 }

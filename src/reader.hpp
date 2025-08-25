@@ -18,6 +18,7 @@ class Reader {
 private:
     Header header;
     XRefTable xrefTable;
+    ModuleGraph moduleGraph;
 
     static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 100 * 1024 * 1024;  // 100MB
 
@@ -27,6 +28,8 @@ private:
     bool isOpen() const { return fileStream.is_open(); }
 
 public:
+
+    void printEncounterPath(const UUID& encounterId);
 
     // Reading operations 
     nlohmann::json getFileInfo();
