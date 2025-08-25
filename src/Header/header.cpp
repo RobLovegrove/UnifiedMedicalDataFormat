@@ -3,6 +3,7 @@
 #include "Utility/utils.hpp"
 #include "Utility/uuid.hpp"
 #include "DataModule/Header/dataHeader.hpp"
+#include "Utility/tlvHeader.hpp"
 
 #include <sstream>
 #include <fstream>
@@ -167,13 +168,4 @@ std::expected<EncryptionData, std::string> Header::readPrimaryHeader(std::istrea
     }
 
     return encryptionData;
-}
-
-std::streampos Header::writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const {
-    uint8_t typeID = static_cast<uint8_t>(type);
-    out.write(reinterpret_cast<const char*>(&typeID), sizeof(typeID));
-    out.write(reinterpret_cast<const char*>(&size), sizeof(size));
-    std::streampos pos = out.tellp();
-    out.write(reinterpret_cast<const char*>(data), size);
-    return pos;
 }

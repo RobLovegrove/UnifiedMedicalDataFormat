@@ -10,7 +10,7 @@
 #include "../../Xref/xref.hpp"
 #include "../../Utility/uuid.hpp"
 #include "../ModuleData.hpp"
-#include "../../Utility/Encryption/EncryptionManager.hpp"
+#include "../../Utility/Encryption/encryptionManager.hpp"
 
 class TabularData : public DataModule { 
 

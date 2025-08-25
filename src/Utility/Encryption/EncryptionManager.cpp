@@ -1,4 +1,4 @@
-#include "EncryptionManager.hpp"
+#include "encryptionManager.hpp"
 #include <stdexcept>
 #include <mutex>
 #include <iostream>

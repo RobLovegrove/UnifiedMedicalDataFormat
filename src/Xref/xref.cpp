@@ -210,3 +210,12 @@ void XRefTable::updateEntryOffset(UUID id, uint64_t offset) {
         }
     }
 }
+
+bool XRefTable::contains(UUID id) const {
+    for (const auto& entry : entries) {
+        if (entry.id == id) {
+            return true;
+        }
+    }
+    return false;
+}

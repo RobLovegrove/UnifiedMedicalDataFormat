@@ -94,13 +94,6 @@ int main(int argc, char** argv) {
         
         patientModule.data = patientData;
         modulesWithSchemas.push_back({"./schemas/patient/v1.0.json", patientModule});
-        
-        // // Write the new file using UMDFFile (tabular data only)
-        // auto result = writer.writeNewFile(outputFile, modulesWithSchemas);
-        // if (!result) {
-        //     cerr << "Failed to write data: " << result.error() << endl;
-        //     return 1;
-        // }
 
         // Creating new UMDF file
         cout << "Creating new UMDF file: " << outputFile << endl;
@@ -117,14 +110,21 @@ int main(int argc, char** argv) {
 
         vector<UUID> moduleIds;
 
+        auto encounterResult = writer.createNewEncounter();
+        if (!encounterResult) {
+            cerr << "Failed to create new encounter: " << encounterResult.error() << endl;
+            return 1;
+        }
+        UUID encounterId = encounterResult.value();
+
         cout << "Adding tabular data to file" << endl;
         for (const auto& module : modulesWithSchemas) {
-            auto addResult = writer.addModule(module.first, module.second);
+            auto addResult = writer.addModuleToEncounter(encounterId, module.first, module.second);
             if (!addResult) {
                 cerr << "Failed to add module: " << addResult.error() << endl;
                 return 1;
             }
-            moduleIds.push_back(*addResult);
+            moduleIds.push_back(addResult.value());
         }
 
         cout << "Initial file written with tabular data. Module UUIDs:\n";
@@ -275,10 +275,7 @@ int main(int argc, char** argv) {
         imageModule.data = frameModules;
         
         // Add image data using the addModules API
-        std::vector<std::pair<std::string, ModuleData>> imageModulesWithSchemas;
-        imageModulesWithSchemas.push_back({"./schemas/image/v1.0.json", imageModule});
-
-        vector<UUID> imageModuleIds;
+        std::pair<std::string, ModuleData> imagePair = {"./schemas/image/v1.0.json", imageModule};
 
         cout << "Reopening file" << endl;
         auto reopenResult = writer.openFile(outputFile);
@@ -288,14 +285,13 @@ int main(int argc, char** argv) {
         }
 
         cout << "Adding image data to file" << endl;
-        for (const auto& module : imageModulesWithSchemas) {
-            auto addResult = writer.addModule(module.first, module.second);
-            if (!addResult) {
-                cerr << "Failed to add module: " << addResult.error() << endl;
-                return 1;
-            }
-            imageModuleIds.push_back(*addResult);
+        auto addResult = writer.addModuleToEncounter(encounterId, imagePair.first, imagePair.second);
+        if (!addResult) {
+            cerr << "Failed to add module: " << addResult.error() << endl;
+            return 1;
         }
+        UUID imageModuleId = addResult.value();
+
         
         // auto addResult = writer.addModules(outputFile, imageModulesWithSchemas);
         // if (!addResult) {
@@ -303,10 +299,21 @@ int main(int argc, char** argv) {
         //     return 1;
         // }
         
-        cout << "Image data added successfully. New module UUIDs:\n";
-        for (const auto& uuid : imageModuleIds) {
-            cout << "  - " << uuid.toString() << endl;
+        cout << "Image data added successfully. New module UUID:\n";
+        cout << "  - " << imageModuleId.toString() << endl;
+
+
+        // Add derived module
+        cout << "Adding derived module" << endl;
+        auto derivedModuleResult = writer.addDerivedModule(imageModuleId, imagePair.first, imagePair.second);
+        if (!derivedModuleResult) {
+            cerr << "Failed to add derived module: " << derivedModuleResult.error() << endl;
+            return 1;
         }
+        UUID derivedModuleId = derivedModuleResult.value();
+
+        cout << "Derived module added successfully. New module UUID:\n";
+        cout << "  - " << derivedModuleId.toString() << endl;
 
         // Close the file
         cout << "Closing file" << endl;

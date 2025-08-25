@@ -5,6 +5,8 @@
 #include "DataModule/Image/imageData.hpp"
 #include "DataModule/Tabular/tabularData.hpp"
 #include "Utility/Compression/ZstdCompressor.hpp"
+#include "Links/moduleGraph.hpp"
+#include "Links/moduleLink.hpp"
 
 
 #include "Utility/utils.hpp"
@@ -104,27 +106,25 @@ Result Writer::openFile(std::string& filename) {
     return Result{true, "File opened successfully"};
 }
 
-std::expected<UUID, std::string> Writer::addModule(const std::string& schemaPath, const ModuleData& module) {
-    
-    UUID moduleId;
+Result Writer::addModule(const std::string& schemaPath, UUID moduleId, const ModuleData& module) {
+
     
     // Check if file stream is open
     if (!fileStream.is_open()) {
-        return std::unexpected("No file is open");
+        return Result{false, "No file is open"};
     }
 
     try {
-        auto result = writeModule(fileStream, schemaPath, module, header.getEncryptionData());
-        if (!result) {
-            return std::unexpected(result.error());
+        auto result = writeModule(fileStream, schemaPath, moduleId, module, header.getEncryptionData());
+        if (!result.success) {
+            return Result{false, result.message};
         }
-        moduleId = result.value();
 
     } catch (const std::exception& e) {
-        return std::unexpected("Exception writing module: " + std::string(e.what()));
+        return Result{false, "Exception writing module: " + std::string(e.what())};
     }
 
-    return moduleId;
+    return Result{true, "Module added successfully"};
 }
 
 Result Writer::updateModule(const std::string& moduleId, const ModuleData& module) {
@@ -196,6 +196,7 @@ Result Writer::updateModule(const std::string& moduleId, const ModuleData& modul
     }
 
     return Result{true, "Module updated successfully"};
+
 }
 
 Result Writer::closeFile() {
@@ -222,6 +223,15 @@ Result Writer::closeFile() {
     // Check temp file is not empty
     if (std::filesystem::is_empty(tempFilePath)) {
         return Result{false, "Temp file is empty"};
+    }
+
+    // Write module graph to temp file
+    try {
+        moduleGraph.writeModuleGraph(fileStream);
+    } catch (const std::exception& e) {
+        fileStream.close();
+        std::filesystem::remove(tempFilePath);
+        return Result{false, "Exception writing module graph: " + std::string(e.what())};
     }
 
     // Make old XREF table obsolete and write new one
@@ -324,248 +334,241 @@ Result Writer::setUpFileStream(std::string& filename) {
 
 
 
-std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& filename, 
-    std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
+// std::expected<std::vector<UUID>, std::string> Writer::writeNewFile(std::string& filename, 
+//     std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
 
-    std::expected<UUID, std::string> result;
-    std::vector<UUID> moduleIds;
+//     std::expected<UUID, std::string> result;
+//     std::vector<UUID> moduleIds;
 
-    // Set up file paths
-    tempFilePath = filename + ".tmp";
+//     // Set up file paths
+//     tempFilePath = filename + ".tmp";
     
-    // Open temp file for writing
-    std::ofstream tempFile;
-    try {
-        tempFile.open(tempFilePath, std::ios::binary);
-        if (!tempFile) {
-            return std::unexpected("Failed to create temp file: " + tempFilePath);
-        }
-    } catch (const std::exception& e) {
-        return std::unexpected("Exception opening temp file: " + std::string(e.what()));
-    }
+//     // Open temp file for writing
+//     std::ofstream tempFile;
+//     try {
+//         tempFile.open(tempFilePath, std::ios::binary);
+//         if (!tempFile) {
+//             return std::unexpected("Failed to create temp file: " + tempFilePath);
+//         }
+//     } catch (const std::exception& e) {
+//         return std::unexpected("Exception opening temp file: " + std::string(e.what()));
+//     }
 
-    // SET ENCRYPTION HEADER
-    EncryptionData encryptionData;
-    encryptionData.masterPassword = "password";
-    encryptionData.encryptionType = EncryptionType::AES_256_GCM;
-    //encryptionData.encryptionType = EncryptionType::NONE;
-    encryptionData.baseSalt = EncryptionManager::generateSalt(16); // Use correct Argon2id salt size
-    encryptionData.memoryCost = 65536;
-    encryptionData.timeCost = 3;
-    encryptionData.parallelism = 1;
+//     // SET ENCRYPTION HEADER
+//     EncryptionData encryptionData;
+//     encryptionData.masterPassword = "password";
+//     encryptionData.encryptionType = EncryptionType::AES_256_GCM;
+//     //encryptionData.encryptionType = EncryptionType::NONE;
+//     encryptionData.baseSalt = EncryptionManager::generateSalt(16); // Use correct Argon2id salt size
+//     encryptionData.memoryCost = 65536;
+//     encryptionData.timeCost = 3;
+//     encryptionData.parallelism = 1;
 
-    header.setEncryptionData(encryptionData);
+//     header.setEncryptionData(encryptionData);
 
-    try {
-        if (!header.writePrimaryHeader(tempFile)) {
-            tempFile.close();
-            removeTempFile();
-            return std::unexpected("Failed to write header to temp file");
-        }
-    } catch (const std::exception& e) {
-        tempFile.close();
-        removeTempFile();
-        return std::unexpected("Exception writing header: " + std::string(e.what()));
-    }
+//     try {
+//         if (!header.writePrimaryHeader(tempFile)) {
+//             tempFile.close();
+//             removeTempFile();
+//             return std::unexpected("Failed to write header to temp file");
+//         }
+//     } catch (const std::exception& e) {
+//         tempFile.close();
+//         removeTempFile();
+//         return std::unexpected("Exception writing header: " + std::string(e.what()));
+//     }
 
-    // Write Modules to file
-    try {
-        // CREATE MODULES 
-        for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
-            const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
+//     // Write Modules to file
+//     try {
+//         // CREATE MODULES 
+//         for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
+//             const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
 
+//             // Write module to temp file
+//             result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
+//             if (!result) {
+//                 tempFile.close();
+//                 removeTempFile();
+//                 return std::unexpected(result.error());
+//             }
+//             moduleIds.push_back(result.value());
 
+//         }
 
-            // Write module to temp file
-            result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
-            if (!result) {
-                tempFile.close();
-                removeTempFile();
-                return std::unexpected(result.error());
-            }
-            moduleIds.push_back(result.value());
+//     } catch (const std::exception& e) {
+//         tempFile.close();
+//         removeTempFile();
+//         return std::unexpected("Exception writing modules: " + std::string(e.what()));
+//     }
 
-        }
+//     // Write XREF table to temp file
+//     try {
+//         if (!writeXref(tempFile)) {
+//             tempFile.close();
+//             removeTempFile();
+//             return std::unexpected("Failed to write xref table to temp file");
+//         }
+//     } catch (const std::exception& e) {
+//         tempFile.close();
+//         removeTempFile();
+//         return std::unexpected("Exception writing xref table: " + std::string(e.what()));
+//     }
 
-    } catch (const std::exception& e) {
-        tempFile.close();
-        removeTempFile();
-        return std::unexpected("Exception writing modules: " + std::string(e.what()));
-    }
+//     // Close temp file
+//     try {
+//         tempFile.close();
+//     } catch (const std::exception& e) {
+//         removeTempFile();
+//         return std::unexpected("Exception closing temp file: " + std::string(e.what()));
+//     }
 
-    // Write XREF table to temp file
-    try {
-        if (!writeXref(tempFile)) {
-            tempFile.close();
-            removeTempFile();
-            return std::unexpected("Failed to write xref table to temp file");
-        }
-    } catch (const std::exception& e) {
-        tempFile.close();
-        removeTempFile();
-        return std::unexpected("Exception writing xref table: " + std::string(e.what()));
-    }
-
-
-
-    // Close temp file
-    try {
-        tempFile.close();
-    } catch (const std::exception& e) {
-        removeTempFile();
-        return std::unexpected("Exception closing temp file: " + std::string(e.what()));
-    }
-
-
-
-
-    try {
-        auto result = validateTempFile(modulesWithSchemas.size());
-        if (!result.success) {
-            removeTempFile();
-            return std::unexpected(result.message);
-        }
-    } catch (const std::exception& e) {
-        removeTempFile();
-        return std::unexpected("Exception during temp file validation: " + std::string(e.what()));
-    }
+//     try {
+//         auto result = validateTempFile(modulesWithSchemas.size());
+//         if (!result.success) {
+//             removeTempFile();
+//             return std::unexpected(result.message);
+//         }
+//     } catch (const std::exception& e) {
+//         removeTempFile();
+//         return std::unexpected("Exception during temp file validation: " + std::string(e.what()));
+//     }
 
 
 
-    // Rename temp file to new file
+//     // Rename temp file to new file
 
-    try {
-        if (!renameTempFile(filename)) {
-            removeTempFile();
-            return std::unexpected("Failed to rename temp file");
-        }
-    } catch (const std::exception& e) {
-        removeTempFile();
-        return std::unexpected("Exception renaming temp file: " + std::string(e.what()));
-    }
+//     try {
+//         if (!renameTempFile(filename)) {
+//             removeTempFile();
+//             return std::unexpected("Failed to rename temp file");
+//         }
+//     } catch (const std::exception& e) {
+//         removeTempFile();
+//         return std::unexpected("Exception renaming temp file: " + std::string(e.what()));
+//     }
 
 
 
-    return moduleIds;
-}
+//     return moduleIds;
+// }
 
-std::expected<std::vector<UUID>, std::string> Writer::addModules(
-    std:: string& filename, std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
+// std::expected<std::vector<UUID>, std::string> Writer::addModules(
+//     std:: string& filename, std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas) {
 
-    std::expected<UUID, std::string> result;
-    std::vector<UUID> moduleIds;
+//     std::expected<UUID, std::string> result;
+//     std::vector<UUID> moduleIds;
 
-    tempFilePath = filename + ".tmp";
+//     tempFilePath = filename + ".tmp";
 
-    // Check if file exists and is not empty or currently open
-    if (!std::filesystem::exists(filename) || std::filesystem::is_empty(filename)) {
-        return std::unexpected("File does not exist or is empty");
-    }
+//     // Check if file exists and is not empty or currently open
+//     if (!std::filesystem::exists(filename) || std::filesystem::is_empty(filename)) {
+//         return std::unexpected("File does not exist or is empty");
+//     }
 
-    // Copy original file to temp file
-    try {
-        // Remove temp file if it exists
-        if (std::filesystem::exists(tempFilePath)) {
-            std::filesystem::remove(tempFilePath);
-        }
-        // Copy original to temp
-        std::filesystem::copy_file(filename, tempFilePath);
-    } catch (const std::exception& e) {
-        return std::unexpected("Failed to copy original file: " + std::string(e.what()));
-    }
+//     // Copy original file to temp file
+//     try {
+//         // Remove temp file if it exists
+//         if (std::filesystem::exists(tempFilePath)) {
+//             std::filesystem::remove(tempFilePath);
+//         }
+//         // Copy original to temp
+//         std::filesystem::copy_file(filename, tempFilePath);
+//     } catch (const std::exception& e) {
+//         return std::unexpected("Failed to copy original file: " + std::string(e.what()));
+//     }
 
-    // Open temp file for writing
-    std::fstream tempFile;
-    try {
-        tempFile.open(tempFilePath, std::ios::in | std::ios::out | std::ios::binary);
-        if (!tempFile) {
-            std::filesystem::remove(tempFilePath);
-            return std::unexpected("Failed to open temp file for updating");
-        }
-    } catch (const std::exception& e) {
-        std::filesystem::remove(tempFilePath);
-        return std::unexpected("Exception opening temp file: " + std::string(e.what()));
-    }
+//     // Open temp file for writing
+//     std::fstream tempFile;
+//     try {
+//         tempFile.open(tempFilePath, std::ios::in | std::ios::out | std::ios::binary);
+//         if (!tempFile) {
+//             std::filesystem::remove(tempFilePath);
+//             return std::unexpected("Failed to open temp file for updating");
+//         }
+//     } catch (const std::exception& e) {
+//         std::filesystem::remove(tempFilePath);
+//         return std::unexpected("Exception opening temp file: " + std::string(e.what()));
+//     }
 
-    // Read header from temp file
-    if (!header.readPrimaryHeader(tempFile)) {
-        tempFile.close();
-        std::filesystem::remove(tempFilePath);
-        return std::unexpected("Failed to read header from temp file");
-    }
+//     // Read header from temp file
+//     if (!header.readPrimaryHeader(tempFile)) {
+//         tempFile.close();
+//         std::filesystem::remove(tempFilePath);
+//         return std::unexpected("Failed to read header from temp file");
+//     }
     
-    // Load XRef table from temp file
-    xrefTable.clear();
-    try {
-        xrefTable = XRefTable::loadXrefTable(tempFile);
-    } catch (const std::exception& e) {
-        tempFile.close();
-        std::filesystem::remove(tempFilePath);
-        return std::unexpected("Failed to load XRef table from temp file: " + std::string(e.what()));
-    }
+//     // Load XRef table from temp file
+//     xrefTable.clear();
+//     try {
+//         xrefTable = XRefTable::loadXrefTable(tempFile);
+//     } catch (const std::exception& e) {
+//         tempFile.close();
+//         std::filesystem::remove(tempFilePath);
+//         return std::unexpected("Failed to load XRef table from temp file: " + std::string(e.what()));
+//     }
 
 
-    try {
-        // Write Modules to file
-        for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
-            const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
-            // Write module to temp file
-            result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
-            if (!result) {
+//     try {
+//         // Write Modules to file
+//         for (size_t i = 0; i < modulesWithSchemas.size(); ++i) {
+//             const auto& [schemaPath, moduleData] = modulesWithSchemas[i];
+//             // Write module to temp file
+//             result = writeModule(tempFile, schemaPath, moduleData, header.getEncryptionData());
+//             if (!result) {
 
-                return std::unexpected(result.error());
-            }
-            moduleIds.push_back(result.value());
-        }
+//                 return std::unexpected(result.error());
+//             }
+//             moduleIds.push_back(result.value());
+//         }
 
-    } catch (const std::exception& e) {
-        tempFile.close();
-        std::filesystem::remove(tempFilePath);
-        return std::unexpected("Exception writing modules: " + std::string(e.what()));
-    }
+//     } catch (const std::exception& e) {
+//         tempFile.close();
+//         std::filesystem::remove(tempFilePath);
+//         return std::unexpected("Exception writing modules: " + std::string(e.what()));
+//     }
 
-    cout << "All new modules written to temp file" << endl;
+//     cout << "All new modules written to temp file" << endl;
 
-    // Make old XREF table obsolete and write new one
-    try {
-        xrefTable.setObsolete(tempFile);
+//     // Make old XREF table obsolete and write new one
+//     try {
+//         xrefTable.setObsolete(tempFile);
         
-        if (!writeXref(tempFile)) {
-            throw std::runtime_error("Failed to write new XRef table");
-        }
-    } catch (const std::exception& e) {
-        tempFile.close();
-        std::filesystem::remove(tempFilePath);
-        return std::unexpected("Exception updating XRef table: " + std::string(e.what()));
-    }
+//         if (!writeXref(tempFile)) {
+//             throw std::runtime_error("Failed to write new XRef table");
+//         }
+//     } catch (const std::exception& e) {
+//         tempFile.close();
+//         std::filesystem::remove(tempFilePath);
+//         return std::unexpected("Exception updating XRef table: " + std::string(e.what()));
+//     }
 
-    // Close temp file
-    tempFile.close();
+//     // Close temp file
+//     tempFile.close();
 
-    // Validate temp file
-    try {
-        auto result = validateTempFile();
-        if (!result.success) {
-            std::filesystem::remove(tempFilePath);
-            return std::unexpected(result.message);
-        }
-    } catch (const std::exception& e) {
-        std::filesystem::remove(tempFilePath);
-        return std::unexpected("Exception during validation: " + std::string(e.what()));
-    }
+//     // Validate temp file
+//     try {
+//         auto result = validateTempFile();
+//         if (!result.success) {
+//             std::filesystem::remove(tempFilePath);
+//             return std::unexpected(result.message);
+//         }
+//     } catch (const std::exception& e) {
+//         std::filesystem::remove(tempFilePath);
+//         return std::unexpected("Exception during validation: " + std::string(e.what()));
+//     }
 
-    // Atomic replace (rename temp to original)
-    try {
-        std::filesystem::rename(tempFilePath, filename);
-    } catch (const std::exception& e) {
-        std::filesystem::remove(tempFilePath);
-        return std::unexpected("Failed to replace original file: " + std::string(e.what()));
-    }
+//     // Atomic replace (rename temp to original)
+//     try {
+//         std::filesystem::rename(tempFilePath, filename);
+//     } catch (const std::exception& e) {
+//         std::filesystem::remove(tempFilePath);
+//         return std::unexpected("Failed to replace original file: " + std::string(e.what()));
+//     }
 
 
 
-    return moduleIds;
-}
+//     return moduleIds;
+// }
 
 bool Writer::updateModules(
     std::string& filename,
@@ -725,6 +728,142 @@ bool Writer::updateModules(
 }
 
 /* ======================================================= */
+/* =============== MODULE GRAPH OPERATIONS =============== */
+/* ======================================================= */
+
+
+std::expected<UUID, std::string> Writer::createNewEncounter() {
+
+    // Check if file stream is open
+    if (!fileStream.is_open()) {
+        return std::unexpected("No file is open");
+    }
+    
+    return moduleGraph.createEncounter();
+}
+
+std::expected<UUID, std::string> Writer::addModuleToEncounter(
+    const UUID& encounterId, const std::string& schemaPath, const ModuleData& module) {
+
+    // Check if file stream is open
+    if (!fileStream.is_open()) {
+        return std::unexpected("No file is open");
+    }
+
+    // Check if encounter exists
+    if (!moduleGraph.encounterExists(encounterId)) {
+        return std::unexpected("Encounter ID not found");
+    }
+    
+    UUID moduleId = UUID();
+
+    try {
+        moduleGraph.addModuleToEncounter(encounterId, moduleId);
+    } catch (const std::exception& e) {
+        return std::unexpected("Exception adding module to encounter: " + std::string(e.what()));
+    }
+
+    auto result = addModule(schemaPath, moduleId, module);
+    if (!result.success) {
+        moduleGraph.removeModuleFromEncounter(encounterId, moduleId);
+        return std::unexpected(result.message);
+    }
+
+    return moduleId;
+}
+
+std::expected<UUID, std::string> Writer::addDerivedModule(
+    const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module) {
+
+
+        // Check if file stream is open
+        if (!fileStream.is_open()) {
+            return std::unexpected("No file is open");
+        }
+        
+        // Check if parent module exists
+        if (!xrefTable.contains(parentModuleId)) {
+            return std::unexpected("Parent module does not exist");
+        }
+
+        UUID moduleId = UUID();
+
+        try {
+            moduleGraph.addLinkModule(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
+        } catch (const std::exception& e) {
+            return std::unexpected("Exception adding derived module: " + std::string(e.what()));
+        }
+
+        auto result = addModule(schemaPath, moduleId, module);
+        
+        if (!result.success) {
+            moduleGraph.removeLinkModule(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
+            return std::unexpected(result.message);
+        }
+
+        return moduleId;
+}
+
+
+std::expected<UUID, std::string> Writer::addAnnotation(
+    const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module) {
+
+        // Check if file stream is open
+        if (!fileStream.is_open()) {
+            return std::unexpected("No file is open");
+        }
+            
+        // Check if parent module exists
+        if (!xrefTable.contains(parentModuleId)) {
+            return std::unexpected("Parent module does not exist");
+        }
+
+        UUID moduleId = UUID();
+
+        try {
+            moduleGraph.addLinkModule(parentModuleId, moduleId, ModuleLinkType::ANNOTATES);
+        } catch (const std::exception& e) {
+            return std::unexpected("Exception adding annotation: " + std::string(e.what()));
+        }
+
+        auto result = addModule(schemaPath, moduleId, module);
+        
+        if (!result.success) {
+            moduleGraph.removeLinkModule(parentModuleId, moduleId, ModuleLinkType::ANNOTATES);
+            return std::unexpected(result.message);
+        }
+
+        return moduleId;
+
+
+
+}
+
+// Result Writer::addLink(const UUID& sourceId, const UUID& targetId, ModuleLinkType linkType) {
+
+//     // Check if file stream is open
+//     if (!fileStream.is_open()) {
+//         return Result{false, "No file is open"};
+//     }
+
+//     if (!xrefTable.contains(sourceId)) {
+//         return Result{false, "Source module does not exist"};
+//     }
+
+//     if (!xrefTable.contains(targetId)) {
+//         return Result{false, "Target module does not exist"};
+//     }
+    
+//     try {
+//         moduleGraph.addLink(ModuleLink(sourceId, targetId, linkType));
+//     } catch (const std::exception& e) {
+//         return Result{false, "Exception adding link: " + std::string(e.what())};
+//     }
+
+//     return Result{true, "Link added successfully"};
+// }
+
+/* ======================================================= */
 /* =============== WRITER HELPER FUNCTIONS =============== */
 /* ======================================================= */
 
@@ -737,14 +876,16 @@ bool Writer::writeXref(std::ostream& outfile) {
     return xrefTable.writeXref(outfile);
 }
 
-std::expected<UUID, std::string> Writer::writeModule(
-    std::ostream& outfile, const std::string& schemaPath, const ModuleData& moduleData, EncryptionData encryptionData) {
+Result Writer::writeModule(
+    std::ostream& outfile, const std::string& schemaPath, 
+    UUID moduleId,
+    const ModuleData& moduleData, EncryptionData encryptionData) {
 
     // Load schema from file
     std::ifstream schemaFile(schemaPath);
     if (!schemaFile.is_open()) {
         cerr << "Failed to open schema file: " << schemaPath << endl;
-        return std::unexpected("Failed to open schema file");
+        return Result{false, "Failed to open schema file"};
     }
     
     nlohmann::json schemaJson;
@@ -753,23 +894,21 @@ std::expected<UUID, std::string> Writer::writeModule(
     string moduleType = schemaJson["module_type"];
     ModuleType type = module_type_from_string(moduleType);
 
-    UUID uuid = UUID();
-
     unique_ptr<DataModule> dm;
     
     // CREATE MODULE
     switch (type) {
         case ModuleType::Image: {
-            dm = make_unique<ImageData>(schemaPath, schemaJson, uuid, encryptionData);
+            dm = make_unique<ImageData>(schemaPath, schemaJson, moduleId, encryptionData);
             break;
         }
         case ModuleType::Tabular: {
-            dm = make_unique<TabularData>(schemaPath, schemaJson, uuid, encryptionData);
+            dm = make_unique<TabularData>(schemaPath, schemaJson, moduleId, encryptionData);
             break;
         }
         default:
 
-            return std::unexpected("Unknown module type: " + moduleType);
+            return Result{false, "Unknown module type: " + moduleType};
     }
 
     // ADD DATA TO MODULE
@@ -798,7 +937,7 @@ std::expected<UUID, std::string> Writer::writeModule(
         ZstdCompressor::stopSummaryMode();
     }
 
-    return dm->getModuleID();
+    return Result{true, "Module written successfully"};
 }
 
 void Writer::removeTempFile() {

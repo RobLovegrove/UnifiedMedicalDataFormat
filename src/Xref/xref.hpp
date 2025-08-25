@@ -35,6 +35,8 @@ public:
     const XrefEntry* findEntry(ModuleType);
     std::vector<XrefEntry>& getEntries() { return entries; }
 
+    bool contains(UUID id) const;
+
     void setXrefOffset(uint64_t offset) { xrefOffset = offset; }
     uint64_t getXrefOffset() const { return xrefOffset; }
 

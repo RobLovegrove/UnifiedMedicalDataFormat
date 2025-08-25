@@ -6,7 +6,7 @@
 #include "../stringBuffer.hpp"
 #include "../Header/dataHeader.hpp"
 #include "../../Utility/Compression/ZstdCompressor.hpp"
-#include "../../Utility/Encryption/EncryptionManager.hpp"
+#include "../../Utility/Encryption/encryptionManager.hpp"
 
 #include <fstream>
 #include <iostream>

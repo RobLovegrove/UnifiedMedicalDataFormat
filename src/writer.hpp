@@ -12,7 +12,9 @@
 #include "DataModule/dataModule.hpp"
 #include "DataModule/ModuleData.hpp"
 #include "Utility/uuid.hpp"
-#include "Utility/Encryption/EncryptionManager.hpp"
+#include "Utility/Encryption/encryptionManager.hpp"
+#include "Links/moduleGraph.hpp"
+#include "Links/moduleLink.hpp"
 
 struct Result {
     bool success;
@@ -24,6 +26,7 @@ class Writer {
 private:
     Header header;
     XRefTable xrefTable;
+    ModuleGraph moduleGraph;
 
     std::string filePath;
     std::string tempFilePath;
@@ -34,8 +37,9 @@ private:
 
     bool writeXref(std::ostream& outfile);
 
-    std::expected<UUID, std::string> writeModule(
-        std::ostream& outfile, const std::string& schemaPath, const ModuleData& moduleData, EncryptionData encryptionData);
+    Result writeModule(
+        std::ostream& outfile, const std::string& schemaPath, UUID moduleId, 
+        const ModuleData& moduleData, EncryptionData encryptionData);
 
     void removeTempFile();
     bool renameTempFile(const std::string& newFilename);
@@ -47,16 +51,31 @@ private:
 public:
     Result createNewFile(std::string& filename);
     Result openFile(std::string& filename);
-    std::expected<UUID, std::string> addModule(const std::string& schemaPath, const ModuleData& module);
+
+
+    Result addModule(const std::string& schemaPath, UUID moduleId, const ModuleData& module);
+
     Result updateModule(const std::string& moduleId, const ModuleData& module);
+
+    // ModuleGraph methods
+    // Start a new encounter. The "root" module defines the encounter.
+    std::expected<UUID, std::string> createNewEncounter();
+    std::expected<UUID, std::string> addModuleToEncounter(const UUID& encounterId, const std::string& schemaPath, const ModuleData& module);
+    std::expected<UUID, std::string> addDerivedModule(const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module);
+    std::expected<UUID, std::string> addAnnotation(const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module);
+
+    // // Low level API call available
+    // Result addLink(const UUID& sourceId, const UUID& targetId, ModuleLinkType linkType);
+
+
     Result closeFile();
 
 
-    // Writing operations
-    std::expected<std::vector<UUID>, std::string> writeNewFile(std::string& filename, 
-        std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
-    std::expected<std::vector<UUID>, std::string> addModules(
-        std::string& filename, std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
+    // // Writing operations
+    // std::expected<std::vector<UUID>, std::string> writeNewFile(std::string& filename, 
+    //     std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
+    // std::expected<std::vector<UUID>, std::string> addModules(
+    //     std::string& filename, std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
 
     bool updateModules(
         std::string& filename,

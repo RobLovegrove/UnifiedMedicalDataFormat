@@ -8,30 +8,7 @@
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
 #include "../../Utility/Compression/CompressionType.hpp"
-#include "../../Utility/Encryption/EncryptionManager.hpp"
-
-enum class HeaderFieldType : uint8_t {
-    HeaderSize = 1,
-    StringSize = 2,
-    MetadataSize = 3,
-    DataSize = 4,
-    IsCurrent = 5,
-    PreviousVersion = 6,
-    ModuleType = 7,
-    SchemaPath = 8,
-    MetadataCompression = 9,
-    DataCompression = 10,
-    EncryptionType = 11,
-    BaseSalt = 12,
-    ModuleSalt = 13,
-    MemoryCost = 14,
-    TimeCost = 15,
-    Parallelism = 16,
-    IV = 17,
-    AuthTag = 18,
-    Endianness = 19,
-    ModuleID = 20
-};
+#include "../../Utility/Encryption/encryptionManager.hpp"
 
 struct DataHeader {
 protected:
@@ -65,12 +42,6 @@ protected:
     bool littleEndian;
     UUID moduleID;
 
-
-    void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value) const;
-    void writeTLVBool(std::ostream& out, HeaderFieldType type, bool value) const;
-    std::streampos writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const;
-    
-    std::expected<std::streampos, std::string> findTLVOffset(std::fstream& fileStream, HeaderFieldType type);
     // virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) = 0;
 
 public:

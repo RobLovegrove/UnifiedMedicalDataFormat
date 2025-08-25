@@ -7,7 +7,7 @@
 #include "../dataModule.hpp"
 #include "../../Xref/xref.hpp"
 #include "../ModuleData.hpp"
-#include "../../Utility/Encryption/EncryptionManager.hpp"
+#include "../../Utility/Encryption/encryptionManager.hpp"
 
 #include "string"
 #include <fstream>

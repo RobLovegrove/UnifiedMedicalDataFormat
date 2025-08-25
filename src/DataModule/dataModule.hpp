@@ -6,7 +6,7 @@
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
 #include "ModuleData.hpp"
-#include "../Utility/Encryption/EncryptionManager.hpp"
+#include "../Utility/Encryption/encryptionManager.hpp"
 
 #include <vector>
 #include <unordered_map>

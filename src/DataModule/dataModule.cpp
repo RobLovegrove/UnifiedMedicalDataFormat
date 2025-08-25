@@ -6,7 +6,7 @@
 #include "stringBuffer.hpp"
 #include "SchemaResolver.hpp"
 #include "../Utility/Compression/ZstdCompressor.hpp"
-#include "../Utility/Encryption/EncryptionManager.hpp"
+#include "../Utility/Encryption/encryptionManager.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -178,7 +178,7 @@ unique_ptr<DataModule> DataModule::fromStream(
         std::istringstream decryptedStream = dm->decryptData(in);
         cout << "Data successfully decrypted" << endl;
         cout << "Decrypted stream size: " << decryptedStream.str().size() << endl;
-        
+
         dm->readDecryptedMetadataAndData(decryptedStream);
         
     }

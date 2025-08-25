@@ -25,8 +25,21 @@ public:
 
     const std::array<uint8_t, 16>& data() const;
     void setData(const std::array<uint8_t, 16>& newData);
-
 };
 
+// Hash function specialization for UUID
+namespace std {
+    template<>
+    struct hash<UUID> {
+        size_t operator()(const UUID& uuid) const {
+            const auto& data = uuid.data();
+            size_t hash = 0;
+            for (uint8_t byte : data) {
+                hash = hash * 31 + byte;
+            }
+            return hash;
+        }
+    };
+}
 
 #endif

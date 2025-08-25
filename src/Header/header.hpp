@@ -20,8 +20,6 @@ private:
 
     EncryptionData encryptionData;
 
-    std::streampos writeTLVFixed(std::ostream& out, HeaderFieldType type, const void* data, uint32_t size) const;
-
 public:
     bool writePrimaryHeader(std::ostream& outfile);
     std::expected<EncryptionData, std::string> readPrimaryHeader(std::istream& inFile);
