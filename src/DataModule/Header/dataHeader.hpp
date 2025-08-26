@@ -93,6 +93,8 @@ public:
     EncryptionData getEncryptionData() const { return encryptionData; }
     void setEncryptionData(EncryptionData data) { encryptionData = data; }
 
+    void setEncryptionPassword(std::string password) { encryptionData.masterPassword = password; }
+
 // METHODS
     virtual ~DataHeader() = default;
 

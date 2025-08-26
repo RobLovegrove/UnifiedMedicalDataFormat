@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
         // Creating new UMDF file
         cout << "Creating new UMDF file: " << outputFile << endl;
         try {
-        Result result = writer.createNewFile(outputFile);
+        Result result = writer.createNewFile(outputFile, "password");
         if (!result.success) {
                 cerr << "Failed to create new file: " << result.message << endl;
                 return 1;
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
         cout << "\n=== STEP 2: Reading the file to verify tabular data ===\n";
         
         // Read the file to verify tabular data
-        auto readResult = reader.openFile(outputFile);
+        auto readResult = reader.openFile(outputFile, "password");
         if (!readResult.success) {
             cerr << "Failed to open file for reading: " << outputFile << " " << readResult.message << endl;
             return 1;
@@ -274,7 +274,7 @@ int main(int argc, char** argv) {
         std::pair<std::string, ModuleData> imagePair = {"./schemas/image/v1.0.json", imageModule};
 
         cout << "Reopening file" << endl;
-        auto reopenResult = writer.openFile(outputFile);
+        auto reopenResult = writer.openFile(outputFile, "password");
         if (!reopenResult.success) {
             cerr << "Failed to reopen file: " << reopenResult.message << endl;
             return 1;
@@ -322,7 +322,7 @@ int main(int argc, char** argv) {
         cout << "\n=== STEP 4: Rereading the file to show all data ===\n";
         
         // Close and reopen to get fresh file info
-        reopenResult = reader.openFile(outputFile);
+        reopenResult = reader.openFile(outputFile, "password");
         if (!reopenResult.success) {
             cerr << "Failed to reopen file for final reading: " << outputFile << " " << reopenResult.message << endl;
             return 1;
@@ -338,6 +338,10 @@ int main(int argc, char** argv) {
 
         // Get the patient module data
         auto patientModuleData = reader.getModuleData(tabularUUID);
+        if (!patientModuleData.has_value()) {
+            cerr << "Failed to get patient module data" << " " << patientModuleData.error() << endl;
+            return 1;
+        }
 
         // Update the patient module data
         patientModuleData.value().metadata.push_back({
@@ -352,7 +356,7 @@ int main(int argc, char** argv) {
 
         reader.closeFile();
 
-        auto result = writer.openFile(outputFile);
+        auto result = writer.openFile(outputFile, "password");
         if (!result.success) {
             cerr << "Failed to reopen file: " << result.message << endl;
             return 1;
@@ -392,7 +396,7 @@ int main(int argc, char** argv) {
         cout << "\n=== Final data verification ===\n";
         reader.closeFile();
 
-        result = reader.openFile(outputFile);
+        result = reader.openFile(outputFile, "password");
         if (!result.success) {
             cerr << "Failed to reopen file: " << result.message << endl;
             return 1;
@@ -449,7 +453,7 @@ int main(int argc, char** argv) {
         // Read file using new API
         cout << "Reading from file: " << inputFile << "\n";
         
-        auto result = reader.openFile(inputFile);
+        auto result = reader.openFile(inputFile, "password");
         if (!result.success) {
             cerr << "Failed to open file: " << inputFile << " " << result.message << endl;
             return 1;

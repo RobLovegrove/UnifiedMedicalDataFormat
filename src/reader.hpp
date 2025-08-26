@@ -18,7 +18,10 @@ class Reader {
 private:
     Header header;
     XRefTable xrefTable;
+
     ModuleGraph moduleGraph;
+
+
 
     static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 100 * 1024 * 1024;  // 100MB
 
@@ -39,7 +42,7 @@ public:
     std::optional<std::string> loadModule(const XrefEntry& entry);
 
     // File management
-    Result openFile(const std::string& filename);
+    Result openFile(const std::string& filename, std::string password = "");
     Result closeFile();
 
 };

@@ -26,6 +26,8 @@ public:
 
     void setEncryptionData(EncryptionData data) { encryptionData = data; }
     EncryptionData getEncryptionData() const { return encryptionData; }
+
+    void setEncryptionPassword(std::string password) { encryptionData.masterPassword = password; }
 };
 
 #endif

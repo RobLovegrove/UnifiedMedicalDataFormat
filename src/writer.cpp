@@ -25,7 +25,7 @@ using namespace std;
 /* =============== WRITING OPERATIONS =============== */
 /* ================================================== */
 
-Result Writer::createNewFile(std::string& filename) {
+Result Writer::createNewFile(std::string& filename, string password) {
 
     newFile = true;
 
@@ -43,6 +43,23 @@ Result Writer::createNewFile(std::string& filename) {
     Result result = setUpFileStream(filename);
     if (!result.success) {
         return result;
+    }
+
+    if (password != "") {
+        EncryptionData encryptionData;
+        encryptionData.masterPassword = password;
+        encryptionData.encryptionType = EncryptionType::AES_256_GCM;
+        encryptionData.baseSalt = EncryptionManager::generateSalt(16); // Use correct Argon2id salt size
+        encryptionData.memoryCost = 65536;
+        encryptionData.timeCost = 3;
+        encryptionData.parallelism = 1;
+
+        header.setEncryptionData(encryptionData);
+    }
+    else {
+        EncryptionData encryptionData;
+        encryptionData.encryptionType = EncryptionType::NONE;
+        header.setEncryptionData(encryptionData);
     }
 
     // Ensure at the start of the file
@@ -64,7 +81,7 @@ Result Writer::createNewFile(std::string& filename) {
     return Result{true, "File created successfully"};
 }
 
-Result Writer::openFile(std::string& filename) {
+Result Writer::openFile(std::string& filename, string password) {
 
     // Check if file stream is already open
     if (fileStream.is_open()) {
@@ -91,6 +108,15 @@ Result Writer::openFile(std::string& filename) {
         fileStream.close();
         removeTempFile();
         return Result{false, "Failed to read header from temp file"};
+    }
+
+    if (header.getEncryptionData().encryptionType != EncryptionType::NONE) {
+        if (password == "") {
+            return Result{false, "File is encrypted but no password provided"};
+        }
+        else {
+            header.setEncryptionPassword(password);
+        }
     }
     
     // Load XRef table from temp file
@@ -348,18 +374,6 @@ Result Writer::setUpFileStream(std::string& filename) {
             return Result{false, "Failed to open temp file: " + std::string(std::strerror(errno))};
         }
     }
-
-    // SET ENCRYPTION HEADER
-    EncryptionData encryptionData;
-    encryptionData.masterPassword = "password";
-    encryptionData.encryptionType = EncryptionType::AES_256_GCM;
-    //encryptionData.encryptionType = EncryptionType::NONE;
-    encryptionData.baseSalt = EncryptionManager::generateSalt(16); // Use correct Argon2id salt size
-    encryptionData.memoryCost = 65536;
-    encryptionData.timeCost = 3;
-    encryptionData.parallelism = 1;
-
-    header.setEncryptionData(encryptionData);
 
     return Result{true, "File stream set up successfully"};
 }

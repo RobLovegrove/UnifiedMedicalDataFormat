@@ -38,12 +38,12 @@ ModuleGraph ModuleGraph::readModuleGraph(std::istream& in) {
         throw std::runtime_error("Exception reading links: " + std::string(e.what()));
     }
 
-
-    cout << "Adjacency list size: " << moduleGraph.adjacency.size() << endl;
-    cout << "Reverse adjacency list size: " << moduleGraph.reverseAdjacency.size() << endl;
-
     // Build adjacency lists
     moduleGraph.buildAdjacencyLists();
+
+    if (moduleGraph.hasCycle()) {
+        throw std::runtime_error("Cycle detected when building module graph");
+    }
 
     return moduleGraph;
 }
@@ -164,6 +164,38 @@ void ModuleGraph::buildAdjacencyLists() {
         reverseAdjacency[linkPtr->targetId].push_back(linkPtr);
     }
 }
+
+bool ModuleGraph::hasCycle() const {
+    std::unordered_set<UUID> visited;
+    std::unordered_set<UUID> recursionStack;
+
+    std::function<bool(const UUID&)> dfs = [&](const UUID& node) -> bool {
+        if (recursionStack.count(node)) return true; // back edge → cycle
+        if (visited.count(node)) return false;
+
+        visited.insert(node);
+        recursionStack.insert(node);
+
+        auto it = adjacency.find(node);
+        if (it != adjacency.end()) {
+            for (const auto& link : it->second) {
+                if (dfs(link->targetId)) {
+                    return true;
+                }
+            }
+        }
+
+        recursionStack.erase(node);
+        return false;
+    };
+
+    // Run DFS from every node
+    for (const auto& [node, _] : adjacency) {
+        if (dfs(node)) return true;
+    }
+    return false;
+}
+
 
 // Writing methods
 

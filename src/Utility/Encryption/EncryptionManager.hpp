@@ -15,7 +15,7 @@ enum class EncryptionType {
 struct EncryptionData {
     EncryptionType encryptionType = EncryptionType::NONE;
 
-    std::string masterPassword = "password";
+    std::string masterPassword = "";
     
     // For Argon2id key derivation:
     std::vector<uint8_t> baseSalt;        // Master salt for Argon2id

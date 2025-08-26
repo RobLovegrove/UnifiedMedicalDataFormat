@@ -11,7 +11,7 @@
 
 using namespace std;
 
-Result Reader::openFile(const std::string& filename) {
+Result Reader::openFile(const std::string& filename, std::string password) {
 
     if (fileStream.is_open()) {
         closeFile();
@@ -32,6 +32,15 @@ Result Reader::openFile(const std::string& filename) {
         closeFile();
         return Result{false, "Failed to read header: " + headerResult.error()}; 
     } 
+
+    if (header.getEncryptionData().encryptionType != EncryptionType::NONE) {
+        if (password == "") {
+            return Result{false, "File is encrypted but no password provided"};
+        }
+        else {
+            header.setEncryptionPassword(password);
+        }
+    }
 
     try {
         // Read XREF table
@@ -146,7 +155,6 @@ std::expected<ModuleData, std::string> Reader::getModuleData(
         if (entry.id.toString() == moduleId) {
             auto error = loadModule(entry);
             if (!error) {
-
                 return loadedModules.back()->getModuleData();
             }
             else {

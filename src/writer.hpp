@@ -52,8 +52,8 @@ public:
 
     void printEncounterPath(const UUID& encounterId);
 
-    Result createNewFile(std::string& filename);
-    Result openFile(std::string& filename);
+    Result createNewFile(std::string& filename, std::string password = "");
+    Result openFile(std::string& filename, std::string password = "");
 
 
     Result addModule(const std::string& schemaPath, UUID moduleId, const ModuleData& module);

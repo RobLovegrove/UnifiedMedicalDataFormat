@@ -40,6 +40,8 @@ private:
     void readLinks(std::istream& in);
     void buildAdjacencyLists();
 
+    bool hasCycle() const;
+
 public:
 
     static ModuleGraph readModuleGraph(std::istream& in);
