@@ -52,7 +52,8 @@ protected:
 
 public:
 
-// GETTTERS AND SETTERS
+    // GETTTERS AND SETTERS
+    DataHeader() : createdAt(DateTime()), modifiedAt(DateTime()) {}
 
     ModuleType getModuleType() const { return moduleType; }
     void setModuleType(ModuleType type) { moduleType = type; }
@@ -100,6 +101,18 @@ public:
     void setEncryptionData(EncryptionData data) { encryptionData = data; }
 
     void setEncryptionPassword(std::string password) { encryptionData.masterPassword = password; }
+
+    DateTime getCreatedAt() const { return createdAt; }
+    void setCreatedAt(DateTime date) { createdAt = date; }
+
+    std::string getCreatedBy() const { return createdBy; }
+    void setCreatedBy(std::string name) { createdBy = name; }
+
+    DateTime getModifiedAt() const { return modifiedAt; }
+    void setModifiedAt(DateTime date) { modifiedAt = date; }
+
+    std::string getModifiedBy() const { return modifiedBy; }
+    void setModifiedBy(std::string name) { modifiedBy = name; }
 
 // METHODS
     virtual ~DataHeader() = default;
