@@ -42,19 +42,18 @@ protected:
     EncryptionData encryptionData;
     bool littleEndian;
     UUID moduleID;
+
+
     DateTime createdAt;
     std::string createdBy = "Unknown";
     DateTime modifiedAt;
     std::string modifiedBy = "Unkown";
-    
 
     // virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) = 0;
 
 public:
 
     // GETTTERS AND SETTERS
-    DataHeader() : createdAt(DateTime::now()), modifiedAt(DateTime::now()) {}
-
     ModuleType getModuleType() const { return moduleType; }
     void setModuleType(ModuleType type) { moduleType = type; }
 

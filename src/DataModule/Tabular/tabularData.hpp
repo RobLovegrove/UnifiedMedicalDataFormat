@@ -33,6 +33,8 @@ protected:
     getModuleSpecificData() const override;
 
 public:
+
+    explicit TabularData(const std::string& schemaPath, DataHeader& dataheader);
     explicit TabularData(const std::string& schemaPath, UUID uuid, EncryptionData encryptionData);
     explicit TabularData(
         const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData);

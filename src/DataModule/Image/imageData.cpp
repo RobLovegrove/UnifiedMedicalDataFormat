@@ -19,6 +19,13 @@
 
 using namespace std;
 
+ImageData::ImageData(const string& schemaPath, DataHeader& dataheader) : DataModule(schemaPath, dataheader) {
+    header->setDataCompression(CompressionType::RAW);
+    // Initialize the image encoder
+    encoder = std::make_unique<ImageEncoder>();
+    initialise();
+}
+
 ImageData::ImageData(const string& schemaPath, UUID uuid, EncryptionData encryptionData) : DataModule(schemaPath, uuid, ModuleType::Image, encryptionData) {
     // Initialize encoding to RAW by default (always safe for medical data)
     header->setDataCompression(CompressionType::RAW);
@@ -584,7 +591,7 @@ void ImageData::writeData(std::ostream& out) const {
         }
         
         XRefTable tempXref;
-        frames[i]->writeBinary(absoluteModuleStart, out, tempXref);
+        frames[i]->writeBinary(absoluteModuleStart, out, tempXref, header->getModifiedBy());
     }
     
     streampos endPos = out.tellp();

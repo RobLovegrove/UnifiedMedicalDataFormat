@@ -17,6 +17,7 @@ public:
     mutable std::vector<uint8_t> pixelData; // Allow modification in const methods
     mutable bool needsDecompression = false; // Track if data needs decompression
 
+    explicit FrameData(const std::string& schemaPath, DataHeader& dataheader);
     FrameData(const std::string& schemaPath, UUID uuid, EncryptionData encryptionData);
     
     // No copy/move operations supported due to DataModule design

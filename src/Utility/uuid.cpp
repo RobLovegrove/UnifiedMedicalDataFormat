@@ -39,6 +39,42 @@ string UUID::toString() const {
     return oss.str();
 }
 
+UUID UUID::fromString(const string& str) {
+    // Expected format: 36 chars (32 hex + 4 dashes)
+    if (str.size() != 36) {
+        throw std::runtime_error("Invalid UUID string length");
+    }
+
+    std::array<uint8_t, 16> bytes{};
+    std::string hexStr;
+    hexStr.reserve(32);
+
+    // Remove dashes
+    for (char c : str) {
+        if (c != '-') {
+            hexStr.push_back(c);
+        }
+    }
+
+    if (hexStr.size() != 32) {
+        throw std::runtime_error("Invalid UUID string format");
+    }
+
+    // Parse hex pairs into bytes
+    for (size_t i = 0; i < 16; ++i) {
+        std::string byteStr = hexStr.substr(i * 2, 2);
+        uint8_t byte = static_cast<uint8_t>(std::stoul(byteStr, nullptr, 16));
+        bytes[i] = byte;
+    }
+
+    UUID uuid;
+    uuid.setData(bytes);
+    return uuid;
+}
+
+
+
+
 const array<uint8_t, 16>& UUID::data() const {
     return uuid;
 }

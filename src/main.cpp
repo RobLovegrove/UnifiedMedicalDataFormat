@@ -1,9 +1,11 @@
 #include <iostream>
 #include <string>
-
+#include <thread>
+#include <chrono>
 #include "reader.hpp"
 #include "writer.hpp"
 #include "DataModule/dataModule.hpp"
+
 
 #include "CLI11/CLI11.hpp"
 #include "Utility/utils.hpp"
@@ -135,6 +137,8 @@ int main(int argc, char** argv) {
             cerr << "Failed to close file: " << closeResult.message << endl;
             return 1;
         }
+
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
         cout << "\n=== STEP 2: Reading the file to verify tabular data ===\n";
         
@@ -356,7 +360,7 @@ int main(int argc, char** argv) {
 
         reader.closeFile();
 
-        auto result = writer.openFile(outputFile, "rob", "password");
+        auto result = writer.openFile(outputFile, "bob", "password");
         if (!result.success) {
             cerr << "Failed to reopen file: " << result.message << endl;
             return 1;

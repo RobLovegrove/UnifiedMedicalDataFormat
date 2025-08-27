@@ -15,6 +15,11 @@
 
 using namespace std;
 
+TabularData::TabularData(const string& schemaPath, DataHeader& dataheader) : DataModule(schemaPath, dataheader) {
+    header->setDataCompression(CompressionType::ZSTD);
+    initialise();
+}
+
 TabularData::TabularData(const string& schemaPath, UUID uuid, EncryptionData encryptionData) : DataModule(schemaPath, uuid, ModuleType::Tabular, encryptionData) {
     header->setDataCompression(CompressionType::ZSTD);
     initialise();

@@ -27,8 +27,6 @@ using namespace std;
 
 Result Writer::createNewFile(std::string& filename, string author, string password) {
 
-    this->author = author;
-
     newFile = true;
 
     //Check file stream is not already open
@@ -46,6 +44,8 @@ Result Writer::createNewFile(std::string& filename, string author, string passwo
     if (!result.success) {
         return result;
     }
+
+    this->author = author;
 
     if (password != "") {
         EncryptionData encryptionData;
@@ -85,8 +85,6 @@ Result Writer::createNewFile(std::string& filename, string author, string passwo
 
 Result Writer::openFile(std::string& filename, string author, string password) {
 
-    this->author = author;
-
     // Check if file stream is already open
     if (fileStream.is_open()) {
         return Result{false, "A file is already open"};
@@ -106,6 +104,8 @@ Result Writer::openFile(std::string& filename, string author, string password) {
     if (!result.success) {
         return result;
     }
+
+    this->author = author;
 
     // Read header from temp file
     if (!header.readPrimaryHeader(fileStream)) {
@@ -194,7 +194,8 @@ Result Writer::updateModule(const std::string& moduleId, const ModuleData& modul
             DataHeader dataHeader;
             dataHeader.setEncryptionData(header.getEncryptionData());
             dataHeader.readDataHeader(fileStream);
-    
+            dataHeader.setModuleID(UUID::fromString(moduleId));
+
             // Return to the start of the module
             fileStream.seekg(it->offset);
     
@@ -206,11 +207,11 @@ Result Writer::updateModule(const std::string& moduleId, const ModuleData& modul
     
             switch (dataHeader.getModuleType()) {
                 case ModuleType::Image: {
-                    dm = make_unique<ImageData>(dataHeader.getSchemaPath(), dataHeader.getModuleID(), dataHeader.getEncryptionData());
+                    dm = make_unique<ImageData>(dataHeader.getSchemaPath(), dataHeader);
                     break;
                 }
                 case ModuleType::Tabular: {
-                    dm = make_unique<TabularData>(dataHeader.getSchemaPath(), dataHeader.getModuleID(), dataHeader.getEncryptionData());
+                    dm = make_unique<TabularData>(dataHeader.getSchemaPath(), dataHeader);
                     break;
                 }
                 default:
@@ -221,8 +222,8 @@ Result Writer::updateModule(const std::string& moduleId, const ModuleData& modul
             // Set the previous offset as the offset of the old module 
             dm->setPrevious(it->offset);
     
-            // Delete the old module from the xref table
-            it = entries.erase(it);
+            // // Delete the old module from the xref table - This is now handled in the writeBinary function
+            // it = entries.erase(it);
     
             dm->addMetaData(module.metadata);
             dm->addData(module.data);
@@ -233,7 +234,7 @@ Result Writer::updateModule(const std::string& moduleId, const ModuleData& modul
             streampos moduleStart = fileStream.tellp();
     
             std::stringstream moduleBuffer;
-            dm->writeBinary(moduleStart, moduleBuffer, xrefTable);
+            dm->writeBinary(moduleStart, moduleBuffer, xrefTable, this->author);
 
             string bufferData = moduleBuffer.str();
             fileStream.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());
@@ -349,7 +350,7 @@ void Writer::resetWriter() {
     tempFilePath.clear();
     filePath.clear();
     moduleGraph = ModuleGraph();
-    author.clear();
+    // author.clear();
 }
 
 Result Writer::setUpFileStream(std::string& filename) {
@@ -595,7 +596,7 @@ Result Writer::writeModule(
 
     // WRITE MODULE TO FILE
     std::stringstream moduleBuffer;
-    dm->writeBinary(moduleStart, moduleBuffer, xrefTable);
+    dm->writeBinary(moduleStart, moduleBuffer, xrefTable, this->author);
 
     string bufferData = moduleBuffer.str();
     outfile.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());

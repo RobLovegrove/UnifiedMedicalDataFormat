@@ -56,7 +56,6 @@ public:
     Result createNewFile(std::string& filename, std::string author, std::string password = "");
     Result openFile(std::string& filename, std::string author, std::string password = "");
 
-
     Result addModule(const std::string& schemaPath, UUID moduleId, const ModuleData& module);
 
     Result updateModule(const std::string& moduleId, const ModuleData& module);

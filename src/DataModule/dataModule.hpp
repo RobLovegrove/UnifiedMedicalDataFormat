@@ -45,6 +45,8 @@ protected:
 
     // Constructor and Destructor
     explicit DataModule() {};
+    DataModule(const std::string& schemaPath, DataHeader& header);
+    
     DataModule(const std::string& schemaPath, UUID uuid, ModuleType type, EncryptionData encryptionData);
     DataModule(
         const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type, EncryptionData encryptionData);
@@ -146,7 +148,8 @@ public:
     virtual void addData(const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) = 0;
     virtual void addMetaData(const nlohmann::json& rowData);
 
-    void writeBinary(std::streampos absoluteModuleStart, std::ostream& out, XRefTable& xref);
+    void writeBinary(std::streampos absoluteModuleStart,
+            std::ostream& out, XRefTable& xref, std::string author);
 
     void printMetadata(std::ostream& out) const;
     virtual void printData(std::ostream& out) const = 0;

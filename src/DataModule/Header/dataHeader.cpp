@@ -47,11 +47,9 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     const auto& uuidBytes = moduleID.data();
     writeTLVFixed(out, HeaderFieldType::ModuleID, uuidBytes.data(), uuidBytes.size());
-
     int64_t timestamp = createdAt.getTimestamp(); 
     writeTLVFixed(out, HeaderFieldType::CreatedAt, &timestamp, sizeof(timestamp));
     writeTLVString(out, HeaderFieldType::CreatedBy, createdBy);
-
     timestamp = modifiedAt.getTimestamp();
     writeTLVFixed(out, HeaderFieldType::ModifiedAt, &timestamp, sizeof(timestamp));
     writeTLVString(out, HeaderFieldType::ModifiedBy, modifiedBy);

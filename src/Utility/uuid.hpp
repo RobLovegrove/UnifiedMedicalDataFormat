@@ -10,6 +10,7 @@ private:
 
 public:
     UUID() { uuid = generateUUID(); }
+    static UUID fromString(const std::string& str);
 
     // Overload == operator
     friend bool operator==(const UUID& lhs, const UUID& rhs) {

@@ -16,6 +16,23 @@
 
 using namespace std;
 
+
+DataModule::DataModule(const string& schemaPath, DataHeader& dataheader) {
+
+    header = make_unique<DataHeader>();
+    header->setModuleType(dataheader.getModuleType());
+    header->setSchemaPath(schemaPath);
+    header->setModuleID(dataheader.getModuleID());
+    header->setMetadataCompression(dataheader.getMetadataCompression());
+    header->setEncryptionData(dataheader.getEncryptionData());
+    header->setCreatedAt(dataheader.getCreatedAt());
+    header->setCreatedBy(dataheader.getCreatedBy());
+    
+    ifstream file = openSchemaFile(schemaPath);
+    file >> schemaJson;
+    
+}
+
 DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type, EncryptionData encryptionData) {
 
     header = make_unique<DataHeader>();
@@ -651,8 +668,33 @@ unique_ptr<DataField> DataModule::parseField(const string& name,
     }
 }
 
-void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& out, XRefTable& xref) {
+void DataModule::writeBinary(std:: streampos absoluteModuleStart, 
+    std::ostream& out, XRefTable& xref, std::string author) {
+
+    if (author.empty()) {
+        throw runtime_error("Author is empty");
+    }
+
+    // Determine whether it is a new module or an update using the XRefTable
+    DateTime now = DateTime::now();
+    if (!xref.contains(header->getModuleID())) {
+        // New Module
+        header->setCreatedAt(now);   
+        header->setCreatedBy(author);
+        header->setModifiedAt(now);   
+        header->setModifiedBy(author);
+    }
+    else {
+        header->setModifiedAt(now);
+        header->setModifiedBy(author);
     
+        cout << "Module is being updated" << endl;
+        if (header->getModuleType() != ModuleType::Frame) {
+            cout << *header << endl;
+        }
+    }
+
+
     this->absoluteModuleStart = absoluteModuleStart;
 
     streampos moduleStart = out.tellp();
@@ -723,10 +765,12 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart, std::ostream& 
     out.seekp(moduleEnd);
 
     // Update XrefTable
+    if (xref.contains(header->getModuleID())) {
+        xref.deleteEntry(header->getModuleID());
+    }
     xref.addEntry(
         header->getModuleType(), 
         header->getModuleID(), absoluteModuleStart, header->getModuleSize());
-
 }
 
 void DataModule::writeCompressedMetadata(std::ostream& metadataStream) {
@@ -1020,6 +1064,7 @@ void DataModule::printMetadata(std::ostream& out) const {
 
 // Template method that handles common functionality
 ModuleData DataModule::getModuleData() const {
+
     return {
         getMetadataAsJson(),
         getModuleSpecificData()
