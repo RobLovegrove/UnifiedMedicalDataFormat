@@ -8,7 +8,7 @@
 #include "../Utility/uuid.hpp"
 #include "../Utility/dateTime.hpp"
 #include "../Xref/xref.hpp"
-#include "../DataModule/dataModule.hpp"
+#include "../DataModule/Header/dataHeader.hpp"
 
 struct ModuleTrail {
     uint64_t moduleOffset;
@@ -23,7 +23,8 @@ class AuditTrail {
     private:
     UUID initialModuleID;
     std::vector<ModuleTrail> auditTrail;
-    DataHeader moduleHeader;
+
+    void recursiveTrail(std::istream& auditTrailFile, uint64_t offset);
 
     public:
         AuditTrail(UUID initialModuleID, std::istream& auditTrailFile, XRefTable& xrefTable);

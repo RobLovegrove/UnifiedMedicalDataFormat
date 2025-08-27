@@ -43,7 +43,6 @@ protected:
     bool littleEndian;
     UUID moduleID;
 
-
     DateTime createdAt;
     std::string createdBy = "Unknown";
     DateTime modifiedAt;
@@ -112,6 +111,9 @@ public:
     
     std::string getModifiedBy() const { return modifiedBy; }
     void setModifiedBy(std::string name) { modifiedBy = name; }
+
+    bool getIsCurrent() const { return isCurrent; }
+    void setIsCurrent(bool current) { isCurrent = current; }
 
 // METHODS
     virtual ~DataHeader() = default;

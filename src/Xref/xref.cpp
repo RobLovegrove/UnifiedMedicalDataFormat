@@ -33,15 +33,18 @@ bool XRefTable::deleteEntry(UUID entryId) {
     
 }
 
-const XrefEntry* XRefTable::findEntry(ModuleType type) {
-    for (const XrefEntry& entry : entries) {
-        if (entry.type == static_cast<uint8_t>(type)) return &entry;
-    }
-    return nullptr;
-}
+// const XrefEntry* XRefTable::findEntry(ModuleType type) {
+//     for (const XrefEntry& entry : entries) {
+//         if (entry.type == static_cast<uint8_t>(type)) return &entry;
+//     }
+//     return nullptr;
+// }
 
-const XrefEntry& getEntry(UUID id) const {
-    
+const XrefEntry& XRefTable::getEntry(UUID id) const {
+    for (const XrefEntry& entry : entries) {
+        if (entry.id == id) return entry;
+    }
+    throw std::runtime_error("Entry not found");
 }
 
 bool XRefTable::writeXref(std::ostream& out) const{

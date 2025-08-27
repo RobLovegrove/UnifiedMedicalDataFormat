@@ -35,7 +35,7 @@ public:
     bool deleteEntry(UUID entryId);
     void clear() { entries.clear(); }
 
-    const XrefEntry* findEntry(ModuleType);
+    // const XrefEntry* findEntry(ModuleType);
     const XrefEntry& getEntry(UUID id) const;
 
     std::vector<XrefEntry>& getEntries() { return entries; }
