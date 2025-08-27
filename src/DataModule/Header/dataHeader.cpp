@@ -16,9 +16,9 @@ void DataHeader::writeToFile(std::ostream& out) {
     std::streampos headerStart = out.tellp();
 
     // writeTLVFixed returns the position of the Value in the TLV flag
-    headerSizePos = writeTLVFixed(out, HeaderFieldType::HeaderSize, &headerSize, sizeof(headerSize)); // Placeholder until finished writing header
-    stringBufferSizePos = writeTLVFixed(out, HeaderFieldType::StringSize, &stringBufferSize, sizeof(stringBufferSize));// Updated after write
-    metadataSizePos = writeTLVFixed(out, HeaderFieldType::MetadataSize, &metaDataSize, sizeof(metaDataSize)); // Updated after write
+    headerSizePos = writeTLVFixed(out, HeaderFieldType::HeaderSize, &headerSize, sizeof(headerSize)); 
+    stringBufferSizePos = writeTLVFixed(out, HeaderFieldType::StringSize, &stringBufferSize, sizeof(stringBufferSize));
+    metadataSizePos = writeTLVFixed(out, HeaderFieldType::MetadataSize, &metaDataSize, sizeof(metaDataSize));
     dataSizePos = writeTLVFixed(out, HeaderFieldType::DataSize, &dataSize, sizeof(dataSize)); 
 
     writeTLVBool(out, HeaderFieldType::IsCurrent, isCurrent);
@@ -47,6 +47,14 @@ void DataHeader::writeToFile(std::ostream& out) {
 
     const auto& uuidBytes = moduleID.data();
     writeTLVFixed(out, HeaderFieldType::ModuleID, uuidBytes.data(), uuidBytes.size());
+
+    int64_t timestamp = createdAt.getTimestamp(); 
+    writeTLVFixed(out, HeaderFieldType::CreatedAt, &timestamp, sizeof(timestamp));
+    writeTLVString(out, HeaderFieldType::CreatedBy, createdBy);
+
+    timestamp = modifiedAt.getTimestamp();
+    writeTLVFixed(out, HeaderFieldType::ModifiedAt, &timestamp, sizeof(timestamp));
+    writeTLVString(out, HeaderFieldType::ModifiedBy, modifiedBy);
 
     // Calculate how many bytes we wrote for the header
     std::streampos headerEnd = out.tellp();
