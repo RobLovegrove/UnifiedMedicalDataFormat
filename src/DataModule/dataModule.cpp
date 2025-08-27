@@ -256,15 +256,7 @@ std::istringstream DataModule::decryptData(istream& in) {
         encryptionData.memoryCost, encryptionData.timeCost, encryptionData.parallelism
     );
 
-    cout << "Derived key (" << derivedKey.size() << " bytes): ";
-    for (uint8_t byte : derivedKey) {
-        cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
-    }
-    cout << std::dec << endl;
-
     // Decrypt the data
-    cout << "Decrypting module " << header->getModuleID().toString() << endl;
-    cout << "Encryption password: " << encryptionData.masterPassword << endl;
     std::vector<uint8_t> decryptedData = EncryptionManager::decryptAES256GCM(
         encryptedData,           
         derivedKey,              
@@ -812,12 +804,6 @@ void DataModule::encryptModule(std::stringstream& metadataStream,
     combinedSalt.insert(combinedSalt.end(), encryptionData.baseSalt.begin(), encryptionData.baseSalt.end());
     combinedSalt.insert(combinedSalt.end(), encryptionData.moduleSalt.begin(), encryptionData.moduleSalt.end());
 
-    // Derive key
-
-    cout << "Encrypting Module " << header->getModuleID().toString() << endl;
-    cout << "Deriving key" << endl;
-    cout << "Encryption password: " << encryptionData.masterPassword << endl;
-
     auto derivedKey = EncryptionManager::deriveKeyArgon2id(
     encryptionData.masterPassword, 
     combinedSalt,
@@ -825,12 +811,6 @@ void DataModule::encryptModule(std::stringstream& metadataStream,
     encryptionData.timeCost,
     encryptionData.parallelism
     );
-
-    cout << "Derived key (" << derivedKey.size() << " bytes): ";
-    for (uint8_t byte : derivedKey) {
-        cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
-    }
-    cout << std::dec << endl;
 
     // Encrypt the entire buffer
     std::vector<uint8_t> encryptedData = EncryptionManager::encryptAES256GCM(

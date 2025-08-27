@@ -42,6 +42,8 @@ protected:
     bool littleEndian;
     UUID moduleID;
 
+    
+
     // virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) = 0;
 
 public:

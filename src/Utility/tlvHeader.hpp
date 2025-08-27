@@ -29,7 +29,9 @@ enum class HeaderFieldType : uint8_t {
     Endianness = 19,
     ModuleID = 20,
     EncounterSize = 21,
-    LinkSize = 22
+    LinkSize = 22,
+    CreatedAt = 23,
+    ModifiedAt = 24
 };
 
 void writeTLVString(std::ostream& out, HeaderFieldType type, const std::string& value);
