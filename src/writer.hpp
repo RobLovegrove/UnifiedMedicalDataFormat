@@ -73,17 +73,6 @@ public:
 
     Result closeFile();
 
-
-    // // Writing operations
-    // std::expected<std::vector<UUID>, std::string> writeNewFile(std::string& filename, 
-    //     std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
-    // std::expected<std::vector<UUID>, std::string> addModules(
-    //     std::string& filename, std::vector<std::pair<std::string, ModuleData>>& modulesWithSchemas);
-
-    bool updateModules(
-        std::string& filename,
-        std::vector<std::pair<std::string, ModuleData>>& moduleUpdates);
-
 };
 
 
