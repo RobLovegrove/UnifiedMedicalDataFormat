@@ -111,3 +111,20 @@ TEST_CASE("DateTime comparison operators", "[datetime]") {
         REQUIRE_FALSE(dt1 > dt2);
     }
 }
+
+TEST_CASE("DateTime static methods", "[datetime]") {
+    SECTION("now() returns current time") {
+        DateTime dt1 = DateTime::now();
+        DateTime dt2 = DateTime::now();
+        
+        // Both should be recent
+        int64_t now = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        
+        REQUIRE(dt1.getTimestamp() <= now);
+        REQUIRE(dt2.getTimestamp() <= now);
+        
+        // Should be close in time (within 1 second)
+        REQUIRE(std::abs(dt1.getTimestamp() - dt2.getTimestamp()) <= 1);
+    }
+}
