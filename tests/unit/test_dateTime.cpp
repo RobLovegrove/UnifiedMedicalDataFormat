@@ -63,19 +63,19 @@ TEST_CASE("DateTime binary serialization", "[datetime]") {
         REQUIRE(restored.toISO860String() == original.toISO860String());
     }
     
-    // SECTION("round-trip serialization preserves data") {
-    //     DateTime dt1(1234567890);
-    //     DateTime dt2(9876543210);
+    SECTION("round-trip serialization preserves data") {
+        DateTime dt1(1234567890);
+        DateTime dt2(9876543210);
         
-    //     std::stringstream ss;
-    //     dt1.writeBinary(ss);
-    //     dt2.writeBinary(ss);
+        std::stringstream ss;
+        dt1.writeBinary(ss);
+        dt2.writeBinary(ss);
         
-    //     ss.seekg(0);
-    //     DateTime restored1 = DateTime::readBinary(ss);
-    //     DateTime restored2 = DateTime::readBinary(ss);
+        ss.seekg(0);
+        DateTime restored1 = DateTime::readBinary(ss);
+        DateTime restored2 = DateTime::readBinary(ss);
         
-    //     REQUIRE(restored1.getTimestamp() == dt1.getTimestamp());
-    //     REQUIRE(restored2.getTimestamp() == dt2.getTimestamp());
-    // }
+        REQUIRE(restored1.getTimestamp() == dt1.getTimestamp());
+        REQUIRE(restored2.getTimestamp() == dt2.getTimestamp());
+    }
 }
