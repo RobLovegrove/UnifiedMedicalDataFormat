@@ -50,7 +50,8 @@ TEST_CASE("DateTime binary serialization", "[datetime]") {
     SECTION("readBinary reads back correctly") {
         DateTime original(1234567890);
         std::stringstream ss;
-        original.writeBinary(ss);
+        int64_t timestamp = original.getTimestamp();
+        ss.write(reinterpret_cast<const char*>(&timestamp), sizeof(timestamp));
         
         // Reset stream and read back
         ss.seekg(0);
@@ -67,8 +68,10 @@ TEST_CASE("DateTime binary serialization", "[datetime]") {
         DateTime dt2(9876543210);
         
         std::stringstream ss;
-        dt1.writeBinary(ss);
-        dt2.writeBinary(ss);
+        int64_t timestamp1 = dt1.getTimestamp();
+        int64_t timestamp2 = dt2.getTimestamp();
+        ss.write(reinterpret_cast<const char*>(&timestamp1), sizeof(timestamp1));
+        ss.write(reinterpret_cast<const char*>(&timestamp2), sizeof(timestamp2));
         
         ss.seekg(0);
         DateTime restored1 = DateTime::readBinary(ss);
