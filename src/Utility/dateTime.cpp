@@ -9,7 +9,7 @@
 
 
 int64_t DateTime::getTimestamp() const {
-    //return std::chrono::system_clock::to_time_t(timePoint);
+    return std::chrono::system_clock::to_time_t(timePoint);
 }
 
 void DateTime::writeBinary(std::ostream& out) const {
