@@ -2,6 +2,14 @@
 
 #include <catch2/catch_all.hpp>
 
+TEST_CASE("DateTime timestamp constructor", "[datetime]") {
+    SECTION("Timestamp constructor works") {
+        int64_t knownTimestamp = 1234567890;
+        DateTime dt(knownTimestamp);  // Direct constructor call
+        REQUIRE(dt.getTimestamp() == knownTimestamp);
+    }
+}
+
 TEST_CASE("DateTime constructors", "[datetime]") {
     SECTION("Default constructor sets current time") {
         DateTime dt1;
