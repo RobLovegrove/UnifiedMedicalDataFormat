@@ -36,6 +36,8 @@ public:
     void clear() { entries.clear(); }
 
     const XrefEntry* findEntry(ModuleType);
+    const XrefEntry& getEntry(UUID id) const;
+
     std::vector<XrefEntry>& getEntries() { return entries; }
 
     bool contains(UUID id) const;

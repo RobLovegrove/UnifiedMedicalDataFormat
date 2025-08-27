@@ -40,6 +40,10 @@ const XrefEntry* XRefTable::findEntry(ModuleType type) {
     return nullptr;
 }
 
+const XrefEntry& getEntry(UUID id) const {
+    
+}
+
 bool XRefTable::writeXref(std::ostream& out) const{
     // 1. Write Header Signature
     out.write("XREF", 4);

@@ -1,3 +1,6 @@
+#ifndef AUDIT_TRAIL_HPP
+#define AUDIT_TRAIL_HPP
+
 #include <vector>
 #include <string>
 #include <fstream>
@@ -5,6 +8,7 @@
 #include "../Utility/uuid.hpp"
 #include "../Utility/dateTime.hpp"
 #include "../Xref/xref.hpp"
+#include "../DataModule/dataModule.hpp"
 
 struct ModuleTrail {
     uint64_t moduleOffset;
@@ -19,6 +23,7 @@ class AuditTrail {
     private:
     UUID initialModuleID;
     std::vector<ModuleTrail> auditTrail;
+    DataHeader moduleHeader;
 
     public:
         AuditTrail(UUID initialModuleID, std::istream& auditTrailFile, XRefTable& xrefTable);
@@ -30,3 +35,5 @@ class AuditTrail {
         UUID getInitialModuleID() const { return initialModuleID; }
 
 };
+
+#endif

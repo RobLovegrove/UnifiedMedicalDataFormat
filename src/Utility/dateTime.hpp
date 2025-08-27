@@ -1,3 +1,6 @@
+#ifndef DATE_TIME_HPP
+#define DATE_TIME_HPP
+
 #include <string>
 #include <chrono>
 #include <ctime>
@@ -26,3 +29,5 @@ public:
     bool operator>(const DateTime& other) const { return timeStamp > other.timeStamp; }
     bool operator>=(const DateTime& other) const { return timeStamp >= other.timeStamp; }
 };
+
+#endif
