@@ -48,20 +48,20 @@ TEST_CASE("DateTime binary serialization", "[datetime]") {
         REQUIRE(ss.tellp() == 8);
     }
     
-    // SECTION("readBinary reads back correctly") {
-    //     DateTime original(1234567890);
-    //     std::stringstream ss;
-    //     original.writeBinary(ss);
+    SECTION("readBinary reads back correctly") {
+        DateTime original(1234567890);
+        std::stringstream ss;
+        original.writeBinary(ss);
         
-    //     // Reset stream and read back
-    //     ss.seekg(0);
-    //     DateTime restored = DateTime::readBinary(ss);
+        // Reset stream and read back
+        ss.seekg(0);
+        DateTime restored = DateTime::readBinary(ss);
         
-    //     // Should be equal
-    //     REQUIRE(restored.getTimestamp() == original.getTimestamp());
-    //     REQUIRE(restored.toString() == original.toString());
-    //     REQUIRE(restored.toISO860String() == original.toISO860String());
-    // }
+        // Should be equal
+        REQUIRE(restored.getTimestamp() == original.getTimestamp());
+        REQUIRE(restored.toString() == original.toString());
+        REQUIRE(restored.toISO860String() == original.toISO860String());
+    }
     
     // SECTION("round-trip serialization preserves data") {
     //     DateTime dt1(1234567890);
