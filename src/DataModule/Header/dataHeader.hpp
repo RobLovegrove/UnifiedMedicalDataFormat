@@ -53,7 +53,7 @@ protected:
 public:
 
     // GETTTERS AND SETTERS
-    DataHeader() : createdAt(DateTime()), modifiedAt(DateTime()) {}
+    DataHeader() : createdAt(DateTime::now()), modifiedAt(DateTime::now()) {}
 
     ModuleType getModuleType() const { return moduleType; }
     void setModuleType(ModuleType type) { moduleType = type; }
@@ -110,7 +110,7 @@ public:
 
     DateTime getModifiedAt() const { return modifiedAt; }
     void setModifiedAt(DateTime date) { modifiedAt = date; }
-
+    
     std::string getModifiedBy() const { return modifiedBy; }
     void setModifiedBy(std::string name) { modifiedBy = name; }
 
