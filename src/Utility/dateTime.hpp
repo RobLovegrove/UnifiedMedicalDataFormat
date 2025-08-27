@@ -11,7 +11,7 @@ private:
 public:
     DateTime();
     DateTime(const std::string& dateTimeString);
-    DateTime(int64_t timestamp) : timestamp(std::chrono::system_clock::from_time_t(timestamp));
+    DateTime(int64_t timestamp) : timePoint(std::chrono::system_clock::from_time_t(timestamp)) {}
     
     void writeBinary(std::ostream& out) const;
     static DateTime readBinary(std::istream& in);
@@ -19,5 +19,5 @@ public:
     // Helper Methods
     int64_t getTimestamp() const;
     std::string toString() const; // Human readable format
-    std:string toISO860String() const;
-}
+    std::string toISO860String() const;
+};
