@@ -175,8 +175,6 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
         fileStream.read(buffer.data(), entry.size);
         istringstream stream(string(buffer.begin(), buffer.end()));
 
-
-
         // Start ZSTD summary mode for this module
         ZstdCompressor::startSummaryMode();
 
@@ -235,6 +233,17 @@ std::expected<std::vector<ModuleTrail>, std::string> Reader::getAuditTrail(const
         return std::unexpected("Error getting audit trail: " + string(e.what()));
     }
 }
+
+std::expected<ModuleData, std::string> Reader::getDataWithOffset(const ModuleTrail& module) {
+
+    if (!fileStream.is_open()) {
+        return std::unexpected("No file is currently open");
+    }
+
+    
+
+}
+
 
 void Reader::printEncounterPath(const UUID& encounterId) {
     moduleGraph.printEncounterPath(encounterId);

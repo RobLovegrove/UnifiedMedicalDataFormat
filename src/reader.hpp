@@ -44,6 +44,8 @@ public:
 
     std::expected<std::vector<ModuleTrail>, std::string> getAuditTrail(const UUID& moduleId);
 
+    std::expected<ModuleData, std::string> getDataWithOffset(const ModuleTrail& module);
+    
     // File management
     Result openFile(const std::string& filename, std::string password = "");
     Result closeFile();

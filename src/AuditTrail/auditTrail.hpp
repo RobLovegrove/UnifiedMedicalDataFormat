@@ -17,6 +17,7 @@ struct ModuleTrail {
     DateTime modifiedAt;
     std::string createdBy;
     std::string modifiedBy;
+    uint64_t moduleSize;
 };
 
 class AuditTrail {

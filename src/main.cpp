@@ -410,7 +410,9 @@ int main(int argc, char** argv) {
             << "Created at: " << trail.createdAt.toString() << "\n" 
             << "Modified at: " << trail.modifiedAt.toString() << "\n" 
             << "Created by: " << trail.createdBy << "\n" 
-            << "Modified by: " << trail.modifiedBy << endl << endl;
+            << "Modified by: " << trail.modifiedBy << endl
+            << "Module size: " << trail.moduleSize << endl << endl;
+
         }
 
         // Load all modules to show final state
