@@ -234,9 +234,13 @@ std::expected<ModuleData, std::string> Reader::getDataWithOffset(const ModuleTra
         return std::unexpected("No file is currently open");
     }
 
-    // TODO: Implement reading data from specific module offset
-    (void)module; // Suppress unused parameter warning
-    return std::unexpected("getDataWithOffset not yet implemented");
+    auto moduleResult = loadModule(module.moduleOffset, module.moduleSize, module.moduleType);
+    if (moduleResult) {
+        return moduleResult.value()->getModuleData();
+    }
+    else {
+        return std::unexpected("Error loading module: " + moduleResult.error());
+    }
 }
 
 
