@@ -41,6 +41,7 @@ void AuditTrail::recursiveTrail(std::istream& auditTrailFile, uint64_t offset) {
     moduleTrail.modifiedAt = moduleHeader.getModifiedAt();
     moduleTrail.createdBy = moduleHeader.getCreatedBy();
     moduleTrail.modifiedBy = moduleHeader.getModifiedBy();
+    moduleTrail.moduleType = moduleHeader.getModuleType();
     moduleTrail.moduleSize = (
         moduleHeader.getHeaderSize() 
         + moduleHeader.getStringBufferSize()
