@@ -21,6 +21,7 @@ struct ModuleTrail {
     std::string modifiedBy;
     uint64_t moduleSize;
     ModuleType moduleType;
+    UUID moduleID;
 };
 
 class AuditTrail {

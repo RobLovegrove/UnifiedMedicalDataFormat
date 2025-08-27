@@ -412,8 +412,37 @@ int main(int argc, char** argv) {
             << "Created by: " << trail.createdBy << "\n" 
             << "Modified by: " << trail.modifiedBy << endl
             << "Module size: " << trail.moduleSize << endl << endl;
-
         }
+
+        auto moduleData = reader.getAuditData(auditTrail[auditTrail.size() - 1]);
+        if (!moduleData.has_value()) {
+            cerr << "Failed to get module data: " << moduleData.error() << endl;
+            return 1;
+        }
+        cout << "\n\nOLD MODULE DATA: \n\n" << moduleData.value().metadata.dump(2) << endl;
+        const auto& data = moduleData.value().data;
+        if (std::holds_alternative<nlohmann::json>(data)) {
+            // Tabular data
+            cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
+        } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
+            // Binary data (like image pixels)
+            const auto& binaryData = std::get<std::vector<uint8_t>>(data);
+            cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
+        } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
+            // Nested modules (like image frames)
+            const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
+            cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
+            
+            // Show details of nested modules
+            for (size_t i = 0; i < nestedModules.size() && i < 3; i++) { // Limit to first 3 for readability
+                cout << "  Sub-module " << i << " metadata: " 
+                        << nestedModules[i].metadata.dump(2) << endl;
+            }
+            if (nestedModules.size() > 3) {
+                cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;
+            }
+        }
+        cout << endl;
 
         // Load all modules to show final state
         for (const auto& module : finalFileInfo["modules"]) {

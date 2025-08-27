@@ -36,6 +36,7 @@ void AuditTrail::recursiveTrail(std::istream& auditTrailFile, uint64_t offset) {
     }
 
     ModuleTrail moduleTrail;
+    moduleTrail.moduleID = moduleHeader.getModuleID();
     moduleTrail.moduleOffset = offset;
     moduleTrail.isCurrent = moduleHeader.getIsCurrent();
     moduleTrail.createdAt = moduleHeader.getCreatedAt();

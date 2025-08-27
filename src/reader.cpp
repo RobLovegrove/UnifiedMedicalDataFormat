@@ -234,12 +234,27 @@ std::expected<ModuleData, std::string> Reader::getAuditData(const ModuleTrail& m
         return std::unexpected("No file is currently open");
     }
 
-    auto moduleResult = loadModule(module.moduleOffset, module.moduleSize, module.moduleType);
-    if (moduleResult) {
-        return moduleResult.value()->getModuleData();
+    if (!auditTrail) {
+        return std::unexpected("No audit trail found");
     }
-    else {
-        return std::unexpected("Error loading module: " + moduleResult.error());
+
+    try {
+        optional<ModuleData> moduleData = auditTrail->getModuleData(module.moduleID);
+        if (!moduleData.has_value()) {
+            auto moduleResult = loadModule(module.moduleOffset, module.moduleSize, module.moduleType);
+            if (moduleResult) {
+                return moduleResult.value()->getModuleData();
+            }
+            else {
+                return std::unexpected("Error loading module: " + moduleResult.error());
+            }
+        }
+        else {
+            return moduleData.value();
+        }
+    }
+    catch (const std::exception& e) {
+        return std::unexpected("Error getting audit data: " + string(e.what()));
     }
 }
 
