@@ -79,3 +79,27 @@ TEST_CASE("DateTime binary serialization", "[datetime]") {
         REQUIRE(restored2.getTimestamp() == dt2.getTimestamp());
     }
 }
+
+TEST_CASE("DateTime comparison operators", "[datetime]") {
+    SECTION("Equality operators work") {
+        DateTime dt1(1000);
+        DateTime dt2(1000);
+        DateTime dt3(2000);
+        
+        REQUIRE(dt1 == dt2);
+        REQUIRE(dt1 != dt3);
+    }
+    
+    SECTION("Ordering operators work") {
+        DateTime dt1(1000);   // Earlier
+        DateTime dt2(2000);   // Later
+        DateTime dt3(1000);   // Same as dt1
+        
+        REQUIRE(dt1 < dt2);
+        REQUIRE(dt2 > dt1);
+        REQUIRE(dt1 <= dt3);
+        REQUIRE(dt3 >= dt1);
+        REQUIRE_FALSE(dt2 < dt1);
+        REQUIRE_FALSE(dt1 > dt2);
+    }
+}

@@ -19,4 +19,6 @@ public:
     int64_t getTimestamp() const;
     std::string toString() const; // Human readable format
     std::string toISO860String() const;
+
+
 };
