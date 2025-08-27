@@ -47,15 +47,6 @@ TEST_CASE("DateTime string formatting", "[datetime]") {
 }
 
 TEST_CASE("DateTime binary serialization", "[datetime]") {
-    SECTION("writeBinary writes correct bytes") {
-        DateTime original(1234567890);
-        std::stringstream ss;
-        original.writeBinary(ss);
-        
-        // Should write exactly 8 bytes (int64_t)
-        REQUIRE(ss.tellp() == 8);
-    }
-    
     SECTION("readBinary reads back correctly") {
         DateTime original(1234567890);
         std::stringstream ss;

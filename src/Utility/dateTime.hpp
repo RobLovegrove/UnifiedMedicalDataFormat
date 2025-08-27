@@ -13,8 +13,7 @@ public:
     DateTime(int64_t timestamp) : timeStamp(std::chrono::system_clock::from_time_t(timestamp)) {}
 
     static DateTime now() { return DateTime(); }
-    
-    void writeBinary(std::ostream& out) const;
+
     static DateTime readBinary(std::istream& in);
 
     // Helper Methods
