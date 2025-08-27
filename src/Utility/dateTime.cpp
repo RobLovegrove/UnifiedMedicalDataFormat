@@ -31,4 +31,10 @@ std::string DateTime::toString() const {
 }
 
 std::string DateTime::toISO860String() const {
+    auto time_t = std::chrono::system_clock::to_time_t(timePoint);
+    std::tm* timeinfo = std::gmtime(&time_t);
+    
+    std::ostringstream oss;
+    oss << std::put_time(timeinfo, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
 }
