@@ -6,11 +6,11 @@
 
 class DateTime {
 private:
-    std::chrono::system_clock::time_point timePoint;
+    std::chrono::system_clock::time_point timeStamp;
 
 public:
-    DateTime() : timePoint(std::chrono::system_clock::now()) {}
-    DateTime(int64_t timestamp) : timePoint(std::chrono::system_clock::from_time_t(timestamp)) {}
+    DateTime() : timeStamp(std::chrono::system_clock::now()) {}
+    DateTime(int64_t timestamp) : timeStamp(std::chrono::system_clock::from_time_t(timestamp)) {}
     
     void writeBinary(std::ostream& out) const;
     static DateTime readBinary(std::istream& in);
