@@ -13,7 +13,8 @@ int64_t DateTime::getTimestamp() const {
 }
 
 void DateTime::writeBinary(std::ostream& out) const {
-    
+    int64_t unixTimestamp = getTimestamp();
+    out.write(reinterpret_cast<const char*>(&unixTimestamp), sizeof(int64_t));
 }
 
 DateTime DateTime::readBinary(std::istream& in) {
