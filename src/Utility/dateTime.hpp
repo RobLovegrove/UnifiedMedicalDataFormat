@@ -20,5 +20,10 @@ public:
     std::string toString() const; // Human readable format
     std::string toISO860String() const;
 
-
+    bool operator==(const DateTime& other) const { return timeStamp == other.timeStamp; }
+    bool operator!=(const DateTime& other) const { return timeStamp != other.timeStamp; }
+    bool operator<(const DateTime& other) const { return timeStamp < other.timeStamp; }
+    bool operator<=(const DateTime& other) const { return timeStamp <= other.timeStamp; }
+    bool operator>(const DateTime& other) const { return timeStamp > other.timeStamp; }
+    bool operator>=(const DateTime& other) const { return timeStamp >= other.timeStamp; }
 };
