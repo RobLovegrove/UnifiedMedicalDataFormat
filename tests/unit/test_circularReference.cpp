@@ -40,14 +40,18 @@ TEST_CASE("Circular reference detection during schema parsing", "[circular][pars
         out.close();
         
         // This should throw due to circular reference when TabularData tries to parse the schema
+        DataHeader header;
+        header.setSchemaPath(schemaPath);
         REQUIRE_THROWS_AS(
-            TabularData(schemaPath, UUID(), EncryptionData{}),
+            TabularData(schemaPath, header),
             std::runtime_error
         );
         
         // Verify the error message contains circular reference information
         try {
-            TabularData(schemaPath, UUID(), EncryptionData{});
+            DataHeader header2;
+            header2.setSchemaPath(schemaPath);
+            TabularData(schemaPath, header2);
         } catch (const std::runtime_error& e) {
             std::string errorMsg = e.what();
             std::cout << "Actual error message: " << errorMsg << std::endl;
@@ -103,14 +107,18 @@ TEST_CASE("Circular reference detection during schema parsing", "[circular][pars
         outC << schemaC.dump(2); outC.close();
         
         // This should throw due to circular reference chain
+        DataHeader header;
+        header.setSchemaPath((testDir / "schemaA.json").string());
         REQUIRE_THROWS_AS(
-            TabularData((testDir / "schemaA.json").string(), UUID(), EncryptionData{}),
+            TabularData((testDir / "schemaA.json").string(), header),
             std::runtime_error
         );
         
         // Verify the error message contains circular reference information
         try {
-            TabularData((testDir / "schemaA.json").string(), UUID(), EncryptionData{});
+            DataHeader header2;
+            header2.setSchemaPath((testDir / "schemaA.json").string());
+            TabularData((testDir / "schemaA.json").string(), header2);
         } catch (const std::runtime_error& e) {
             std::string errorMsg = e.what();
             std::cout << "Actual error message: " << errorMsg << std::endl;

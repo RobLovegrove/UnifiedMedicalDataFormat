@@ -80,7 +80,9 @@ TEST_CASE("ImageData frame validation", "[imageData][validation][frames]") {
         std::string imageSchemaPath = writeTempFile("image_schema.json", imageSchema);
 
         // Create ImageData instance
-        ImageData imageData(imageSchemaPath, UUID{}, EncryptionData{});
+        DataHeader header;
+        header.setSchemaPath(imageSchemaPath);
+        ImageData imageData(imageSchemaPath, header);
         
         // Test that frame schema path is set (should be relative path from schema)
         REQUIRE(imageData.getFrameSchemaPath() == "./frame_schema.json");

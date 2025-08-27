@@ -46,11 +46,15 @@ TEST_CASE("TabularData parses schema from file and enforces required fields", "[
 
     // Construct TabularData with real file path -> triggers file IO and parse
     REQUIRE_NOTHROW([&]() {
-        TabularData td(schemaPath, UUID{}, EncryptionData{});
+        DataHeader header;
+        header.setSchemaPath(schemaPath);
+        TabularData td(schemaPath, header);
     }());
 
     // Now use the instance to validate metadata and data enforcement
-    TabularData td(schemaPath, UUID{}, EncryptionData{});
+    DataHeader header;
+    header.setSchemaPath(schemaPath);
+    TabularData td(schemaPath, header);
 
     SECTION("Valid metadata + data passes") {
         json meta = {{"patient_id", "P0001"}, {"name", "Jane Doe"}};
@@ -113,7 +117,9 @@ TEST_CASE("TabularData resolves $ref in schema from file", "[integration][schema
     std::string mainPath = writeTempFile("ref_case/main_schema.json", mainSchema);
 
     // Instantiate -> should resolve $ref relative to main schema path
-    TabularData td(mainPath, UUID{}, EncryptionData{});
+    DataHeader header;
+    header.setSchemaPath(mainPath);
+    TabularData td(mainPath, header);
 
     // Valid case
     json meta = {{"id", "A1"}};
