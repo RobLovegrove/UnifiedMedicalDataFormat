@@ -655,7 +655,7 @@ void ImageData::readData(std::istream& in) {
         
         // Use DataModule::fromStream to read the frame
         auto frame = std::unique_ptr<FrameData>(static_cast<FrameData*>(
-            DataModule::fromStream(frameStream, 0, static_cast<uint8_t>(ModuleType::Frame), header->getEncryptionData()).release()
+            DataModule::fromStream(frameStream, 0, ModuleType::Frame, header->getEncryptionData()).release()
         ));
 
         frame->needsDecompression = needsDecompression;

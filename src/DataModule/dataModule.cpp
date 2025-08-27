@@ -130,11 +130,11 @@ ifstream DataModule::openSchemaFile(const string& schemaPath) {
 }
 
 unique_ptr<DataModule> DataModule::fromStream(
-    istream& in, uint64_t moduleStartOffset, uint8_t moduleType, EncryptionData encryptionData) {
+    istream& in, uint64_t moduleStartOffset, ModuleType moduleType, EncryptionData encryptionData) {
 
     unique_ptr<DataHeader> dmHeader = make_unique<DataHeader>();
 
-    if (moduleType == static_cast<uint8_t>(ModuleType::Frame)) {
+    if (moduleType == ModuleType::Frame) {
         EncryptionData frameEncryptionData;
         frameEncryptionData.encryptionType = EncryptionType::NONE;
         dmHeader->setEncryptionData(frameEncryptionData);

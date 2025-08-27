@@ -40,7 +40,7 @@ public:
     std::expected<ModuleData, std::string> getModuleData(const std::string& moduleId);
     
 
-    std::optional<std::string> loadModule(const XrefEntry& entry);
+    std::expected<std::unique_ptr<DataModule>, std::string> loadModule(uint64_t offset, uint32_t size, ModuleType type);
 
     std::expected<std::vector<ModuleTrail>, std::string> getAuditTrail(const UUID& moduleId);
 

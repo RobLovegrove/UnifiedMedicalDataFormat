@@ -153,13 +153,14 @@ std::expected<ModuleData, std::string> Reader::getModuleData(
     // If the module is not found, load it from the file
     for (const auto& entry : xrefTable.getEntries()) {
         if (entry.id.toString() == moduleId) {
-            auto error = loadModule(entry);
-            if (!error) {
+            auto moduleResult = loadModule(entry.offset, entry.size, static_cast<ModuleType>(entry.type));
+            if (moduleResult) {
+                loadedModules.push_back(std::move(moduleResult.value()));
                 return loadedModules.back()->getModuleData();
             }
             else {
-                cout << "Error loading module: " << error.value() << endl;
-                return std::unexpected("Error loading module: " + error.value());
+                cout << "Error loading module: " << moduleResult.error() << endl;
+                return std::unexpected("Error loading module: " + moduleResult.error());
             }
         }
     }
@@ -167,12 +168,12 @@ std::expected<ModuleData, std::string> Reader::getModuleData(
     return std::unexpected("Module not found: " + moduleId);
 }
 
-std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
+std::expected<unique_ptr<DataModule>, std::string> Reader::loadModule(uint64_t offset, uint32_t size, ModuleType type) {
 
-     if (entry.size <= MAX_IN_MEMORY_MODULE_SIZE) {
-        vector<char> buffer(entry.size);
-        fileStream.seekg(entry.offset);
-        fileStream.read(buffer.data(), entry.size);
+     if (size <= MAX_IN_MEMORY_MODULE_SIZE) {
+        vector<char> buffer(size);
+        fileStream.seekg(offset);
+        fileStream.read(buffer.data(), size);
         istringstream stream(string(buffer.begin(), buffer.end()));
 
         // Reset ZSTD statistics for this module
@@ -180,35 +181,31 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
 
         unique_ptr<DataModule> dm;
         try {
-            dm = DataModule::fromStream(stream, entry.offset, entry.type, header.getEncryptionData());
+            dm = DataModule::fromStream(stream, offset, type, header.getEncryptionData());
             if (!dm) {
-                return "Skipped unknown or unsupported module type: " + to_string(entry.type);
+                return std::unexpected("Skipped unknown or unsupported module type: " + module_type_to_string(type));
             }
 
             // Validate the module before storing it
             try {
                 dm->getModuleData();  // Test if data access works
             } catch (const std::exception& e) {
-                return "Module validation failed: " + string(e.what());
+                return std::unexpected("Module validation failed: " + string(e.what()));
             }
         }
         catch (const std::exception& e) {
-            return "Error reading module: " + string(e.what());
+            return std::unexpected("Error reading module: " + string(e.what()));
         }
         
         // Print ZSTD decompression summary for this module
         std::cout << "Module ZSTD decompression summary:" << std::endl;
         ZstdCompressor::printSummary();
         
-        loadedModules.push_back(std::move(dm));
+        return dm;
     }
     else {
-        //unique_ptr<DataModule> dm = DataModule::fromFile(inFile, entry.offset);
-
-        return "TODO: Handle a large DataModule";
+        return std::unexpected("TODO: Handle a large DataModule");
     }
-
-    return nullopt;
 }
 
 std::expected<std::vector<ModuleTrail>, std::string> Reader::getAuditTrail(const UUID& moduleId) {

@@ -136,7 +136,7 @@ public:
     virtual ~DataModule() = default; 
 
     static std::unique_ptr<DataModule> fromStream(
-        std::istream& in, uint64_t moduleStartOffset, uint8_t moduleType, EncryptionData encryptionData);
+        std::istream& in, uint64_t moduleStartOffset, ModuleType moduleType, EncryptionData encryptionData);
 
     // static std::unique_ptr<DataModule> create(
     //     const std::string& schemaPath, UUID uuid, ModuleType type);
