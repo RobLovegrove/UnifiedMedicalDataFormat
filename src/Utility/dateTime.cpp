@@ -10,17 +10,6 @@ int64_t DateTime::getTimestamp() const {
     return std::chrono::system_clock::to_time_t(timeStamp);
 }
 
-DateTime DateTime::readBinary(std::istream& in) {
-    int64_t unixTimestamp;
-    in.read(reinterpret_cast<char*>(&unixTimestamp), sizeof(int64_t));
-    
-    if (in.fail()) {
-        throw std::runtime_error("Failed to read DateTime from binary stream");
-    }
-    
-    return DateTime(unixTimestamp);
-}
-
 // Helper Methods
 std::string DateTime::toString() const {
     auto time_t = std::chrono::system_clock::to_time_t(timeStamp);

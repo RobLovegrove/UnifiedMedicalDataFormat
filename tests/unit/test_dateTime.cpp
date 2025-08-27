@@ -46,42 +46,6 @@ TEST_CASE("DateTime string formatting", "[datetime]") {
     }
 }
 
-TEST_CASE("DateTime binary serialization", "[datetime]") {
-    SECTION("readBinary reads back correctly") {
-        DateTime original(1234567890);
-        std::stringstream ss;
-        int64_t timestamp = original.getTimestamp();
-        ss.write(reinterpret_cast<const char*>(&timestamp), sizeof(timestamp));
-        
-        // Reset stream and read back
-        ss.seekg(0);
-        DateTime restored = DateTime::readBinary(ss);
-        
-        // Should be equal
-        REQUIRE(restored.getTimestamp() == original.getTimestamp());
-        REQUIRE(restored.toString() == original.toString());
-        REQUIRE(restored.toISO860String() == original.toISO860String());
-    }
-    
-    SECTION("round-trip serialization preserves data") {
-        DateTime dt1(1234567890);
-        DateTime dt2(9876543210);
-        
-        std::stringstream ss;
-        int64_t timestamp1 = dt1.getTimestamp();
-        int64_t timestamp2 = dt2.getTimestamp();
-        ss.write(reinterpret_cast<const char*>(&timestamp1), sizeof(timestamp1));
-        ss.write(reinterpret_cast<const char*>(&timestamp2), sizeof(timestamp2));
-        
-        ss.seekg(0);
-        DateTime restored1 = DateTime::readBinary(ss);
-        DateTime restored2 = DateTime::readBinary(ss);
-        
-        REQUIRE(restored1.getTimestamp() == dt1.getTimestamp());
-        REQUIRE(restored2.getTimestamp() == dt2.getTimestamp());
-    }
-}
-
 TEST_CASE("DateTime comparison operators", "[datetime]") {
     SECTION("Equality operators work") {
         DateTime dt1(1000);

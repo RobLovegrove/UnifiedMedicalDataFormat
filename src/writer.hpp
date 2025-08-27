@@ -33,6 +33,7 @@ private:
 
     std::fstream fileStream;   
 
+    std::string author;
     bool newFile = false;
 
     bool writeXref(std::ostream& outfile);
@@ -52,8 +53,8 @@ public:
 
     void printEncounterPath(const UUID& encounterId);
 
-    Result createNewFile(std::string& filename, std::string password = "");
-    Result openFile(std::string& filename, std::string password = "");
+    Result createNewFile(std::string& filename, std::string author, std::string password = "");
+    Result openFile(std::string& filename, std::string author, std::string password = "");
 
 
     Result addModule(const std::string& schemaPath, UUID moduleId, const ModuleData& module);

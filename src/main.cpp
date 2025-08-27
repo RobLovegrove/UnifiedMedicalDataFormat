@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
         // Creating new UMDF file
         cout << "Creating new UMDF file: " << outputFile << endl;
         try {
-        Result result = writer.createNewFile(outputFile, "password");
+        Result result = writer.createNewFile(outputFile, "rob", "password");
         if (!result.success) {
                 cerr << "Failed to create new file: " << result.message << endl;
                 return 1;
@@ -274,7 +274,7 @@ int main(int argc, char** argv) {
         std::pair<std::string, ModuleData> imagePair = {"./schemas/image/v1.0.json", imageModule};
 
         cout << "Reopening file" << endl;
-        auto reopenResult = writer.openFile(outputFile, "password");
+        auto reopenResult = writer.openFile(outputFile, "rob", "password");
         if (!reopenResult.success) {
             cerr << "Failed to reopen file: " << reopenResult.message << endl;
             return 1;
@@ -356,7 +356,7 @@ int main(int argc, char** argv) {
 
         reader.closeFile();
 
-        auto result = writer.openFile(outputFile, "password");
+        auto result = writer.openFile(outputFile, "rob", "password");
         if (!result.success) {
             cerr << "Failed to reopen file: " << result.message << endl;
             return 1;

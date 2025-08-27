@@ -25,7 +25,9 @@ using namespace std;
 /* =============== WRITING OPERATIONS =============== */
 /* ================================================== */
 
-Result Writer::createNewFile(std::string& filename, string password) {
+Result Writer::createNewFile(std::string& filename, string author, string password) {
+
+    this->author = author;
 
     newFile = true;
 
@@ -81,7 +83,9 @@ Result Writer::createNewFile(std::string& filename, string password) {
     return Result{true, "File created successfully"};
 }
 
-Result Writer::openFile(std::string& filename, string password) {
+Result Writer::openFile(std::string& filename, string author, string password) {
+
+    this->author = author;
 
     // Check if file stream is already open
     if (fileStream.is_open()) {
@@ -345,6 +349,7 @@ void Writer::resetWriter() {
     tempFilePath.clear();
     filePath.clear();
     moduleGraph = ModuleGraph();
+    author.clear();
 }
 
 Result Writer::setUpFileStream(std::string& filename) {

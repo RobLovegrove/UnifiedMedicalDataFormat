@@ -43,9 +43,9 @@ protected:
     bool littleEndian;
     UUID moduleID;
     DateTime createdAt;
-    std::string createdBy;
+    std::string createdBy = "Unknown";
     DateTime modifiedAt;
-    std::string modifiedBy;
+    std::string modifiedBy = "Unkown";
     
 
     // virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) = 0;

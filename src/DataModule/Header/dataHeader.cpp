@@ -222,6 +222,31 @@ void DataHeader::readDataHeader(std::istream& in) {
                 moduleID.setData(id);
                 break;
 
+            case HeaderFieldType::CreatedAt:
+                if (length != sizeof(createdAt.getTimestamp())) {
+                    throw std::runtime_error("Invalid CreatedAt length.");
+                }
+                uint64_t timestamp;
+                std::memcpy(&timestamp, buffer.data(), sizeof(timestamp));
+                createdAt = DateTime(timestamp);
+                break;
+
+            case HeaderFieldType::CreatedBy:
+                createdBy = std::string(buffer.data(), length);
+                break;
+
+            case HeaderFieldType::ModifiedAt:
+                if (length != sizeof(modifiedAt.getTimestamp())) {
+                    throw std::runtime_error("Invalid ModifiedAt length.");
+                }
+                std::memcpy(&timestamp, buffer.data(), sizeof(timestamp));
+                modifiedAt = DateTime(timestamp);
+                break;
+
+            case HeaderFieldType::ModifiedBy:
+                modifiedBy = std::string(buffer.data(), length);
+                break;
+
             default:
                 throw std::runtime_error("Unknown HeaderFieldType: " + std::to_string(typeId));
         }

@@ -14,8 +14,6 @@ public:
 
     static DateTime now() { return DateTime(); }
 
-    static DateTime readBinary(std::istream& in);
-
     // Helper Methods
     int64_t getTimestamp() const;
     std::string toString() const; // Human readable format
