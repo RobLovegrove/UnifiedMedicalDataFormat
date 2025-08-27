@@ -6,8 +6,6 @@
 #include <iomanip>
 #include <iostream>
 
-
-
 int64_t DateTime::getTimestamp() const {
     return std::chrono::system_clock::to_time_t(timeStamp);
 }

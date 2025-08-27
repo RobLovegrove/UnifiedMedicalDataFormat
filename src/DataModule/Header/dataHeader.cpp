@@ -259,6 +259,10 @@ std::ostream& operator<<(std::ostream& os, const DataHeader& header) {
        os 
        << "  littleEndian        : " << std::boolalpha << header.littleEndian << "\n"
        << "  moduleID            : " << header.moduleID.toString() << "\n"
+       << "  createdAt           : " << header.createdAt.toString() << "\n"
+       << "  createdBy           : " << header.createdBy << "\n"
+       << "  modifiedAt          : " << header.modifiedAt.toString() << "\n"
+       << "  modifiedBy          : " << header.modifiedBy << "\n"
        << "}";
 
     return os;

@@ -9,6 +9,7 @@
 #include "../../Utility/moduleType.hpp"
 #include "../../Utility/Compression/CompressionType.hpp"
 #include "../../Utility/Encryption/encryptionManager.hpp"
+#include "../../Utility/dateTime.hpp"
 
 struct DataHeader {
 protected:
@@ -41,7 +42,10 @@ protected:
     EncryptionData encryptionData;
     bool littleEndian;
     UUID moduleID;
-
+    DateTime createdAt;
+    std::string createdBy;
+    DateTime modifiedAt;
+    std::string modifiedBy;
     
 
     // virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) = 0;
