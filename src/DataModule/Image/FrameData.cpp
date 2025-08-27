@@ -1,16 +1,6 @@
 #include "FrameData.hpp"
 #include <cstring>
 
-FrameData::FrameData(const std::string& schemaPath, UUID uuid, EncryptionData encryptionData)
-    : DataModule(schemaPath, uuid, ModuleType::Frame, encryptionData), needsDecompression(false) {
-    
-    // Set the encryption header to NONE
-    encryptionData.encryptionType = EncryptionType::NONE;
-    header->setEncryptionData(encryptionData);
-
-    initialise(); // Parse the schema and set up metadata fields
-}
-
 FrameData::FrameData(const std::string& schemaPath, DataHeader& dataheader) : DataModule(schemaPath, dataheader) {
     // Set the encryption header to NONE
     EncryptionData encryptionData = header->getEncryptionData();    

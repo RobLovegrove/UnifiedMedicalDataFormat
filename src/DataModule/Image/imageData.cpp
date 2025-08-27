@@ -26,16 +26,6 @@ ImageData::ImageData(const string& schemaPath, DataHeader& dataheader) : DataMod
     initialise();
 }
 
-ImageData::ImageData(const string& schemaPath, UUID uuid, EncryptionData encryptionData) : DataModule(schemaPath, uuid, ModuleType::Image, encryptionData) {
-    // Initialize encoding to RAW by default (always safe for medical data)
-    header->setDataCompression(CompressionType::RAW);
-    
-    // Initialize the image encoder
-    encoder = std::make_unique<ImageEncoder>();
-
-    initialise();
-}
-
 ImageData::ImageData(
     const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData) 
     : DataModule(schemaPath, schemaJson, uuid, ModuleType::Image, encryptionData) {
@@ -113,7 +103,7 @@ void ImageData::addData(
 
     for (size_t i = 0; i < data.size(); ++i) {
         const auto& frame = data[i];
-        auto frameModule = std::make_unique<FrameData>(frameSchemaPath, UUID(), header->getEncryptionData());
+        auto frameModule = std::make_unique<FrameData>(frameSchemaPath, *header);
 
         // Validate frame structure against schema
         if (!frame.metadata.contains("position") || !frame.metadata.contains("orientation")) {

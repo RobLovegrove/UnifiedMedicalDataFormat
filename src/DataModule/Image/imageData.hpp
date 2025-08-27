@@ -52,7 +52,6 @@ protected:
 
 public:
     explicit ImageData(const std::string& schemaPath, DataHeader& dataheader);
-    explicit ImageData(const std::string& schemaPath, UUID uuid, EncryptionData encryptionData);
     explicit ImageData(
         const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData);
 

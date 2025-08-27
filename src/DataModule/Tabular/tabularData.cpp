@@ -20,11 +20,6 @@ TabularData::TabularData(const string& schemaPath, DataHeader& dataheader) : Dat
     initialise();
 }
 
-TabularData::TabularData(const string& schemaPath, UUID uuid, EncryptionData encryptionData) : DataModule(schemaPath, uuid, ModuleType::Tabular, encryptionData) {
-    header->setDataCompression(CompressionType::ZSTD);
-    initialise();
-}
-
 TabularData::TabularData(
     const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, EncryptionData encryptionData) 
     : DataModule(schemaPath, schemaJson, uuid, ModuleType::Tabular, encryptionData) {

@@ -33,20 +33,6 @@ DataModule::DataModule(const string& schemaPath, DataHeader& dataheader) {
     
 }
 
-DataModule::DataModule(const string& schemaPath, UUID uuid, ModuleType type, EncryptionData encryptionData) {
-
-    header = make_unique<DataHeader>();
-    header->setModuleType(type);
-    header->setSchemaPath(schemaPath);
-    header->setModuleID(uuid);
-    header->setMetadataCompression(CompressionType::ZSTD);
-    header->setEncryptionData(encryptionData);
-
-    ifstream file = openSchemaFile(schemaPath);
-    file >> schemaJson;
-    
-}
-
 DataModule::DataModule(
     const string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type, EncryptionData encryptionData) 
     : schemaJson(schemaJson) {
@@ -166,13 +152,13 @@ unique_ptr<DataModule> DataModule::fromStream(
     try {
         switch (static_cast<ModuleType>(moduleType)) {
         case ModuleType::Tabular:
-            dm = make_unique<TabularData>(dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getEncryptionData());
+            dm = make_unique<TabularData>(dmHeader->getSchemaPath(), *dmHeader);
             break;
         case ModuleType::Image:
-            dm = make_unique<ImageData>(dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getEncryptionData());
+            dm = make_unique<ImageData>(dmHeader->getSchemaPath(), *dmHeader);
             break;
         case ModuleType::Frame:
-            dm = make_unique<FrameData>(dmHeader->getSchemaPath(), dmHeader->getModuleID(), dmHeader->getEncryptionData());
+            dm = make_unique<FrameData>(dmHeader->getSchemaPath(), *dmHeader);
             break;
         default:
             return nullptr;  // Gracefully skip unknown modules

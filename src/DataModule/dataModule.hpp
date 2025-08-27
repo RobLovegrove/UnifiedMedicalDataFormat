@@ -47,7 +47,6 @@ protected:
     explicit DataModule() {};
     DataModule(const std::string& schemaPath, DataHeader& header);
     
-    DataModule(const std::string& schemaPath, UUID uuid, ModuleType type, EncryptionData encryptionData);
     DataModule(
         const std::string& schemaPath, const nlohmann::json& schemaJson, UUID uuid, ModuleType type, EncryptionData encryptionData);
 
