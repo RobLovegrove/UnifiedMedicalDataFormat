@@ -591,8 +591,8 @@ Result Writer::writeModule(
 
     streampos moduleStart = outfile.tellp();
 
-    // Start ZSTD summary mode for this module
-    ZstdCompressor::startSummaryMode();
+    // Reset ZSTD statistics for this module
+    ZstdCompressor::resetStatistics();
 
     // WRITE MODULE TO FILE
     std::stringstream moduleBuffer;
@@ -601,12 +601,9 @@ Result Writer::writeModule(
     string bufferData = moduleBuffer.str();
     outfile.write(reinterpret_cast<char*>(bufferData.data()), bufferData.size());
 
-    // Print ZSTD compression summary for this module and stop summary mode
-    if (ZstdCompressor::isSummaryMode()) {
-        std::cout << "Module ZSTD compression summary:" << std::endl;
-        ZstdCompressor::printSummary();
-        ZstdCompressor::stopSummaryMode();
-    }
+    // Print ZSTD compression summary for this module
+    std::cout << "Module ZSTD compression summary:" << std::endl;
+    ZstdCompressor::printSummary();
 
     return Result{true, "Module written successfully"};
 }

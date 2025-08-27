@@ -175,8 +175,8 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
         fileStream.read(buffer.data(), entry.size);
         istringstream stream(string(buffer.begin(), buffer.end()));
 
-        // Start ZSTD summary mode for this module
-        ZstdCompressor::startSummaryMode();
+        // Reset ZSTD statistics for this module
+        ZstdCompressor::resetStatistics();
 
         unique_ptr<DataModule> dm;
         try {
@@ -196,12 +196,9 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
             return "Error reading module: " + string(e.what());
         }
         
-        // Print ZSTD decompression summary for this module and stop summary mode
-        if (ZstdCompressor::isSummaryMode()) {
-            std::cout << "Module ZSTD decompression summary:" << std::endl;
-            ZstdCompressor::printSummary();
-            ZstdCompressor::stopSummaryMode();
-        }
+        // Print ZSTD decompression summary for this module
+        std::cout << "Module ZSTD decompression summary:" << std::endl;
+        ZstdCompressor::printSummary();
         
         loadedModules.push_back(std::move(dm));
     }
@@ -240,8 +237,9 @@ std::expected<ModuleData, std::string> Reader::getDataWithOffset(const ModuleTra
         return std::unexpected("No file is currently open");
     }
 
-    
-
+    // TODO: Implement reading data from specific module offset
+    (void)module; // Suppress unused parameter warning
+    return std::unexpected("getDataWithOffset not yet implemented");
 }
 
 

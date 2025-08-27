@@ -11,6 +11,9 @@
  * This class provides static methods for compressing and decompressing data using ZSTD.
  * It's designed to be used for compressing combined metadata and string buffer data
  * in UMDF modules, where cross-pattern recognition can improve compression ratios.
+ * 
+ * The class automatically tracks all compression/decompression operations and provides
+ * summary statistics when requested.
  */
 class ZstdCompressor {
 public:
@@ -77,11 +80,14 @@ public:
      */
     static std::string getVersion();
 
-    // Summary mode methods
-    static void startSummaryMode();
-    static void stopSummaryMode();
+    // Statistics methods - always available
+    static void resetStatistics();
     static void printSummary();
-    static bool isSummaryMode();
+    static size_t getTotalCompressions();
+    static size_t getTotalDecompressions();
+    static size_t getTotalOriginalSize();
+    static size_t getTotalCompressedSize();
+    static int getCompressionLevel();
 
 private:
     // Prevent instantiation - this is a utility class
@@ -90,8 +96,7 @@ private:
     ZstdCompressor(const ZstdCompressor&) = delete;
     ZstdCompressor& operator=(const ZstdCompressor&) = delete;
     
-    // Summary mode static variables
-    static bool summaryMode;
+    // Always track statistics
     static size_t totalCompressions;
     static size_t totalDecompressions;
     static size_t totalOriginalSize;

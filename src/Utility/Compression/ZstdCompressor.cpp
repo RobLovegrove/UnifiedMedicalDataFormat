@@ -7,7 +7,6 @@
 #include <iostream>
 
 // Initialize static variables
-bool ZstdCompressor::summaryMode = false;
 size_t ZstdCompressor::totalCompressions = 0;
 size_t ZstdCompressor::totalDecompressions = 0;
 size_t ZstdCompressor::totalOriginalSize = 0;
@@ -51,21 +50,13 @@ std::vector<uint8_t> ZstdCompressor::compressWithLevel(const std::vector<uint8_t
     // Resize to actual compressed size
     compressed.resize(actualCompressedSize);
     
-    // Handle summary mode vs individual output
-    if (summaryMode) {
-        totalCompressions++;
-        totalOriginalSize += data.size();
-        totalCompressedSize += actualCompressedSize;
-        // Track the compression level used (use the highest level if multiple compressions)
-        if (level > compressionLevel) {
-            compressionLevel = level;
-        }
-    } else {
-        // Output compression statistics
-        double ratio = getCompressionRatio(data.size(), actualCompressedSize);
-        std::cout << "ZSTD Compression: " << std::fixed << std::setprecision(1)
-                  << data.size() << " bytes -> " << actualCompressedSize << " bytes "
-                  << "(" << ratio << "% of original, level " << level << ")" << std::endl;
+    // Always track compression statistics
+    totalCompressions++;
+    totalOriginalSize += data.size();
+    totalCompressedSize += actualCompressedSize;
+    // Track the compression level used (use the highest level if multiple compressions)
+    if (level > compressionLevel) {
+        compressionLevel = level;
     }
     
     return compressed;
@@ -114,16 +105,10 @@ std::vector<uint8_t> ZstdCompressor::decompress(const std::vector<uint8_t>& comp
                                std::to_string(actualDecompressedSize));
     }
     
-    // Handle summary mode vs individual output
-    if (summaryMode) {
-        totalDecompressions++;
-        totalOriginalSize += actualDecompressedSize;
-        totalCompressedSize += compressedData.size();
-    } else {
-        // Output decompression statistics
-        std::cout << "ZSTD Decompression: " << compressedData.size() << " bytes -> " 
-                  << actualDecompressedSize << " bytes" << std::endl;
-    }
+    // Always track decompression statistics
+    totalDecompressions++;
+    totalOriginalSize += actualDecompressedSize;
+    totalCompressedSize += compressedData.size();
     
     return decompressed;
 }
@@ -175,22 +160,13 @@ std::string ZstdCompressor::getVersion() {
     return oss.str();
 }
 
-// Summary mode methods
-void ZstdCompressor::startSummaryMode() {
-    summaryMode = true;
+// Statistics methods - always available
+void ZstdCompressor::resetStatistics() {
     totalCompressions = 0;
     totalDecompressions = 0;
     totalOriginalSize = 0;
     totalCompressedSize = 0;
     compressionLevel = 0;
-}
-
-void ZstdCompressor::stopSummaryMode() {
-    summaryMode = false;
-}
-
-bool ZstdCompressor::isSummaryMode() {
-    return summaryMode;
 }
 
 void ZstdCompressor::printSummary() {
@@ -213,4 +189,24 @@ void ZstdCompressor::printSummary() {
         
         std::cout << "================================" << std::endl;
     }
+}
+
+size_t ZstdCompressor::getTotalCompressions() {
+    return totalCompressions;
+}
+
+size_t ZstdCompressor::getTotalDecompressions() {
+    return totalDecompressions;
+}
+
+size_t ZstdCompressor::getTotalOriginalSize() {
+    return totalOriginalSize;
+}
+
+size_t ZstdCompressor::getTotalCompressedSize() {
+    return totalCompressedSize;
+}
+
+int ZstdCompressor::getCompressionLevel() {
+    return compressionLevel;
 }
