@@ -1,6 +1,7 @@
 #include "auditTrail.hpp"
 #include "../Xref/xref.hpp"
 #include "../DataModule/Header/dataHeader.hpp"
+#include "../reader.hpp"
 
 #include <iostream>
 
@@ -52,4 +53,13 @@ void AuditTrail::recursiveTrail(std::istream& auditTrailFile, uint64_t offset) {
 
     uint64_t nextOffset = moduleHeader.getPrevious();
     recursiveTrail(auditTrailFile, nextOffset);
+}
+
+std::optional<ModuleData> AuditTrail::getModuleData(const UUID& moduleID) {
+    for (const auto& module : loadedModules) {
+        if (module->getModuleID() == moduleID) {
+            return module->getModuleData();
+        }
+    }
+    return std::nullopt;
 }

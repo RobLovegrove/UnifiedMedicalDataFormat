@@ -201,7 +201,7 @@ std::expected<unique_ptr<DataModule>, std::string> Reader::loadModule(uint64_t o
         std::cout << "Module ZSTD decompression summary:" << std::endl;
         ZstdCompressor::printSummary();
         
-        return dm;
+        return std::move(dm);
     }
     else {
         return std::unexpected("TODO: Handle a large DataModule");
@@ -228,7 +228,7 @@ std::expected<std::vector<ModuleTrail>, std::string> Reader::getAuditTrail(const
     }
 }
 
-std::expected<ModuleData, std::string> Reader::getDataWithOffset(const ModuleTrail& module) {
+std::expected<ModuleData, std::string> Reader::getAuditData(const ModuleTrail& module) {
 
     if (!fileStream.is_open()) {
         return std::unexpected("No file is currently open");

@@ -4,11 +4,13 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <memory>
 
 #include "../Utility/uuid.hpp"
 #include "../Utility/dateTime.hpp"
 #include "../Xref/xref.hpp"
 #include "../DataModule/Header/dataHeader.hpp"
+#include "../DataModule/dataModule.hpp"
 
 struct ModuleTrail {
     uint64_t moduleOffset;
@@ -26,6 +28,8 @@ class AuditTrail {
     UUID initialModuleID;
     std::vector<ModuleTrail> auditTrail;
 
+    std::vector<std::unique_ptr<DataModule>> loadedModules;
+
     void recursiveTrail(std::istream& auditTrailFile, uint64_t offset);
 
     public:
@@ -36,6 +40,12 @@ class AuditTrail {
         }
 
         UUID getInitialModuleID() const { return initialModuleID; }
+
+        std::optional<ModuleData> getModuleData(const UUID& moduleId);
+
+        void addLoadedModule(std::unique_ptr<DataModule> module) {
+            loadedModules.push_back(std::move(module));
+        }
 
 };
 
