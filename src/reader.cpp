@@ -216,6 +216,25 @@ std::optional<std::string> Reader::loadModule(const XrefEntry& entry) {
     return nullopt;
 }
 
+std::expected<std::vector<ModuleTrail>, std::string> Reader::getAuditTrail(const UUID& moduleId) {
+
+    if (!fileStream.is_open()) {
+        return std::unexpected("No file is currently open");
+    }
+
+    // Confirm moduleId is in the xrefTable
+    if (!xrefTable.contains(moduleId)) {
+        return std::unexpected("Module not found in XREF table");
+    }
+
+    try {
+        auditTrail = std::make_unique<AuditTrail>(moduleId, fileStream, xrefTable);
+        return auditTrail->getModuleTrail();
+    }
+    catch (const std::exception& e) {
+        return std::unexpected("Error getting audit trail: " + string(e.what()));
+    }
+}
 
 void Reader::printEncounterPath(const UUID& encounterId) {
     moduleGraph.printEncounterPath(encounterId);

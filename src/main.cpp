@@ -5,7 +5,7 @@
 #include "reader.hpp"
 #include "writer.hpp"
 #include "DataModule/dataModule.hpp"
-
+#include "AuditTrail/auditTrail.hpp"
 
 #include "CLI11/CLI11.hpp"
 #include "Utility/utils.hpp"
@@ -354,25 +354,19 @@ int main(int argc, char** argv) {
         });
 
         // Update the patient module data in the file
-        std::vector<std::pair<std::string, ModuleData>> updates = {
-            {tabularUUID, patientModuleData.value()}
-        };
-
         reader.closeFile();
 
-        auto result = writer.openFile(outputFile, "bob", "password");
+        auto result = writer.openFile(outputFile, "Bob", "password");
         if (!result.success) {
             cerr << "Failed to reopen file: " << result.message << endl;
             return 1;
         }
 
         cout << "Updating tabular data" << endl;
-        for (const auto& update : updates) {
-            auto result = writer.updateModule(update.first, update.second);
-            if (!result.success) {
-                cerr << "Failed to update module: " << result.message << endl;
-                return 1;
-            }
+        auto updateResult = writer.updateModule(tabularUUID, patientModuleData.value());
+        if (!updateResult.success) {
+            cerr << "Failed to update module: " << updateResult.message << endl;
+            return 1;
         }
 
         result = writer.closeFile();
@@ -382,11 +376,6 @@ int main(int argc, char** argv) {
         }
 
         cout << "Closing file" << endl;
-
-        // if (!writer.updateModules(outputFile, updates)) {
-        //     cerr << "Failed to update tabular data" << "\n";
-        //     return 1;
-        // }
         
         cout << "Final file opened successfully. Module count: " << finalFileInfo["module_count"] << "\n";
         
@@ -407,6 +396,22 @@ int main(int argc, char** argv) {
         }
 
         finalFileInfo = reader.getFileInfo();
+        auto auditTrailResult = reader.getAuditTrail(UUID::fromString(tabularUUID));
+        if (!auditTrailResult.has_value()) {
+            cerr << "Failed to get audit trail: " << auditTrailResult.error() << endl;
+            return 1;
+        }
+        std::vector<ModuleTrail> auditTrail = auditTrailResult.value(); 
+        cout << endl <<"Audit trail: " << auditTrail.size() << " entries" << endl;
+        for (const auto& trail : auditTrail) {
+            cout << "Audit trail entry: " 
+            << "Module offset: " << trail.moduleOffset << "\n" 
+            << "Is current: " << trail.isCurrent << "\n" 
+            << "Created at: " << trail.createdAt.toString() << "\n" 
+            << "Modified at: " << trail.modifiedAt.toString() << "\n" 
+            << "Created by: " << trail.createdBy << "\n" 
+            << "Modified by: " << trail.modifiedBy << endl << endl;
+        }
 
         // Load all modules to show final state
         for (const auto& module : finalFileInfo["modules"]) {

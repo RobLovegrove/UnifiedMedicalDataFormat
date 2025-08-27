@@ -13,6 +13,7 @@
 #include "DataModule/ModuleData.hpp"
 #include "Utility/uuid.hpp"
 #include "./writer.hpp"
+#include "./AuditTrail/auditTrail.hpp"
 
 class Reader {
 private:
@@ -21,7 +22,7 @@ private:
 
     ModuleGraph moduleGraph;
 
-
+    std::unique_ptr<AuditTrail> auditTrail;
 
     static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 100 * 1024 * 1024;  // 100MB
 
@@ -40,6 +41,8 @@ public:
     
 
     std::optional<std::string> loadModule(const XrefEntry& entry);
+
+    std::expected<std::vector<ModuleTrail>, std::string> getAuditTrail(const UUID& moduleId);
 
     // File management
     Result openFile(const std::string& filename, std::string password = "");
