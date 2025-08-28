@@ -6,6 +6,10 @@ TEST_CASE("Pybind module basic compilation", "[pybind][basic]") {
         // This will fail if there are compilation/linking issues
         REQUIRE_NOTHROW([]() {
             pybind11::scoped_interpreter guard{};
+            
+            // Add pybind directory to Python path
+            pybind11::module_::import("sys").attr("path").attr("append")("pybind");
+            
             auto module = pybind11::module_::import("umdf_reader");
             REQUIRE(module.ptr() != nullptr);
         }());

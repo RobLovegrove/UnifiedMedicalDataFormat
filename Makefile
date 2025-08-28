@@ -39,6 +39,10 @@ CATCH2_LIBS := -L/opt/homebrew/opt/catch2/lib -lCatch2 -lCatch2Main
 PYBIND11_CFLAGS := -I/opt/homebrew/include -I/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/include/python3.11
 PYBIND11_LIBS := -L/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib -lpython3.11
 
+# pybind module target
+PYBIND_MODULE := umdf_reader
+PYBIND_SRC := pybind/pybind11_bridge.cpp
+
 SRC_DIR := src
 TEST_DIR := tests
 BUILD_DIR := build
@@ -66,7 +70,7 @@ TEST_DEPS := $(TEST_OBJS:.o=.d)
 # Tell make where to look for prerequisites (source files)
 VPATH := $(SRC_DIR):$(TEST_DIR)
 
-.PHONY: all debug release clean test test-build
+.PHONY: all debug release clean test test-build pybind
 
 # Default target is release
 all: release
@@ -83,6 +87,12 @@ test: test-build
 	./$(TEST_TARGET)
 
 test-build: $(TEST_TARGET)
+
+# pybind module target
+pybind: $(PYBIND_MODULE).so
+
+$(PYBIND_MODULE).so: $(PYBIND_SRC) $(OBJS)
+	$(CXX) -std=c++23 -fPIC -shared $(PYBIND11_CFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) -Iinclude -Isrc -Wall -Wextra -o $@ $(PYBIND_SRC) $(OBJS) $(PYBIND11_LIBS) $(OPENJPEG_LIBS) $(PNG_LIBS) $(ZSTD_LIBS) $(LIBSODIUM_LIBS)
 
 # Ensure build directory exists before compiling objects
 $(BUILD_DIR):
