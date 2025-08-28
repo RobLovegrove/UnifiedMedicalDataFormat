@@ -35,6 +35,10 @@ LIBSODIUM_LIBS := -L/opt/homebrew/opt/libsodium/lib -lsodium
 CATCH2_INCLUDE := -I/opt/homebrew/opt/catch2/include
 CATCH2_LIBS := -L/opt/homebrew/opt/catch2/lib -lCatch2 -lCatch2Main
 
+# pybind11 and Python paths
+PYBIND11_CFLAGS := -I/opt/homebrew/include -I/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/include/python3.11
+PYBIND11_LIBS := -L/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib -lpython3.11
+
 SRC_DIR := src
 TEST_DIR := tests
 BUILD_DIR := build
@@ -84,20 +88,30 @@ test-build: $(TEST_TARGET)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+# Compile test files to object files (must come before general source rule)
+$(BUILD_DIR)/tests/%.o: tests/%.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
+
+# Compile unit test files to object files
+$(BUILD_DIR)/unit/%.o: tests/unit/%.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
+
+# Compile integration test files to object files
+$(BUILD_DIR)/integration/%.o: tests/integration/%.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
+
 # Compile source files to object files, creating directories as needed
 $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
 
-# Compile test files to object files
-$(BUILD_DIR)/tests/%.o: tests/%.cpp | $(BUILD_DIR)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(CATCH2_INCLUDE) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
-
 # Compile test main file with Catch2 includes
 $(BUILD_DIR)/test_main.o: tests/test_main.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(CATCH2_INCLUDE) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
+	$(CXX) $(CXXFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
 
 # Link all object files into the final executable
 $(TARGET): $(OBJS)
@@ -106,7 +120,7 @@ $(TARGET): $(OBJS)
 # Link test object files into test executable (without main.o)
 TEST_OBJS_FILTERED := $(filter-out build/main.o, $(OBJS))
 $(TEST_TARGET): $(TEST_MAIN_OBJ) $(TEST_OBJS) $(TEST_OBJS_FILTERED)
-	$(CXX) $(CXXFLAGS) $(CATCH2_INCLUDE) -o $@ $^ $(OPENJPEG_LIBS) $(PNG_LIBS) $(ZSTD_LIBS) $(LIBSODIUM_LIBS) $(CATCH2_LIBS)
+	$(CXX) $(CXXFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -o $@ $^ $(OPENJPEG_LIBS) $(PNG_LIBS) $(ZSTD_LIBS) $(LIBSODIUM_LIBS) $(CATCH2_LIBS) $(PYBIND11_LIBS)
 
 # Include dependency files to enable automatic rebuilding
 -include $(DEPS)
