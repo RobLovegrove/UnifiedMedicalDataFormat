@@ -316,7 +316,7 @@ void ModuleGraph::writeLinks(std::ostream& outfile) {
         outfile.write(reinterpret_cast<const char*>(&link->linkType), sizeof(link->linkType));
         outfile.write(reinterpret_cast<const char*>(&link->deleted), sizeof(link->deleted));
 
-        linkSize += sizeof(link->sourceId.data().size()) + sizeof(link->targetId.data().size()) + sizeof(link->linkType) + sizeof(link->deleted);
+        linkSize += link->sourceId.data().size() + link->targetId.data().size() + sizeof(link->linkType) + sizeof(link->deleted);
     }
 }
 
@@ -750,27 +750,51 @@ void ModuleGraph::printEncounterPath(const UUID& encounterId) const {
 
 // JSON export methods
 nlohmann::json ModuleGraph::toJson() const {
+    std::cout << "DEBUG: ModuleGraph::toJson() called!" << std::endl;
+    
+    // Debug: Print all module links
+    std::cout << "DEBUG: All Module Links:" << std::endl;
+    for (const auto& link : links) {
+        if (!link->deleted) {
+            std::cout << "  " << link->sourceId.toString() << " -> " << link->targetId.toString() 
+                      << " (" << static_cast<int>(link->linkType) << ")" << std::endl;
+        }
+    }
+    
+    // Debug: Print adjacency lists
+    std::cout << "DEBUG: Adjacency (outgoing links):" << std::endl;
+    for (const auto& [moduleId, links] : adjacency) {
+        std::cout << "  " << moduleId.toString() << " -> ";
+        for (const auto& link : links) {
+            if (!link->deleted) {
+                std::cout << link->targetId.toString() << "(" << static_cast<int>(link->linkType) << ") ";
+            }
+        }
+        std::cout << std::endl;
+    }
+    
+    // Debug: Print reverse adjacency lists
+    std::cout << "DEBUG: Reverse Adjacency (incoming links):" << std::endl;
+    for (const auto& [moduleId, links] : reverseAdjacency) {
+        std::cout << "  " << moduleId.toString() << " <- ";
+        for (const auto& link : links) {
+            if (!link->deleted) {
+                std::cout << link->sourceId.toString() << "(" << static_cast<int>(link->linkType) << ") ";
+            }
+        }
+        std::cout << std::endl;
+    }
+    
     nlohmann::json result;
     
-    // Build encounters array
+    // Build encounters array using the recursive tree approach
     nlohmann::json encountersArray = nlohmann::json::array();
     for (const auto& [encounterId, encounter] : encounters) {
-        nlohmann::json encounterJson;
-        encounterJson["id"] = encounterId.toString();
-        
-        if (encounter.rootModule.has_value()) {
-            encounterJson["root_module"] = encounter.rootModule.value().toString();
+        // Use the new recursive tree approach for each encounter
+        nlohmann::json encounterTree = encounterToJson(encounterId);
+        if (!encounterTree.empty()) {
+            encountersArray.push_back(encounterTree);
         }
-        if (encounter.lastModule.has_value()) {
-            encounterJson["last_module"] = encounter.lastModule.value().toString();
-        }
-        
-        // Build the module chain for this encounter (linear sequence)
-        if (encounter.rootModule.has_value()) {
-            encounterJson["module_tree"] = buildEncounterModuleChain(encounter);
-        }
-        
-        encountersArray.push_back(encounterJson);
     }
     
     result["encounters"] = encountersArray;
@@ -781,34 +805,105 @@ nlohmann::json ModuleGraph::toJson() const {
     return result;
 }
 
-nlohmann::json ModuleGraph::buildEncounterModuleChain(const Encounter& encounter) const {
-    nlohmann::json moduleChain = nlohmann::json::array();
+// Recursive helper: build JSON for one module and its descendants
+nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
+    std::cout << "DEBUG: moduleToJson called for module: " << moduleId.toString() << std::endl;
     
-    if (!encounter.rootModule.has_value()) {
-        return moduleChain;
+    nlohmann::json j;
+    j["id"] = moduleId.toString();
+
+    nlohmann::json derivedArray = nlohmann::json::array();
+    nlohmann::json annotatesArray = nlohmann::json::array();
+
+    // Find annotations (outgoing links)
+    auto it = adjacency.find(moduleId);
+    if (it != adjacency.end()) {
+        for (const auto& link : it->second) {
+            if (link->deleted) continue;
+
+            if (link->linkType == ModuleLinkType::ANNOTATES) {
+                annotatesArray.push_back(moduleToJson(link->targetId));
+            }
+        }
+    }
+
+    // Find derived modules (incoming links)
+    std::cout << "DEBUG: Looking for DERIVED_FROM links for module: " << moduleId.toString() << std::endl;
+    
+    // Debug: Check if there are any circular references
+    if (reverseAdjacency.find(moduleId) != reverseAdjacency.end()) {
+        std::cout << "DEBUG: reverseAdjacency contains module: " << moduleId.toString() << std::endl;
+        const auto& links = reverseAdjacency.at(moduleId);
+        std::cout << "DEBUG: Number of incoming links: " << links.size() << std::endl;
+        
+        for (size_t i = 0; i < links.size(); i++) {
+            const auto& link = links[i];
+            std::cout << "DEBUG: Link " << i << ": " << link->sourceId.toString() << " -> " << link->targetId.toString() 
+                      << " (type: " << static_cast<int>(link->linkType) << ", deleted: " << link->deleted << ")" << std::endl;
+            
+            // Check for circular reference
+            if (link->sourceId == moduleId) {
+                std::cout << "DEBUG: WARNING - Circular reference detected! Link points to itself!" << std::endl;
+            }
+        }
+    } else {
+        std::cout << "DEBUG: No incoming links found for module: " << moduleId.toString() << std::endl;
     }
     
+    auto reverseIt = reverseAdjacency.find(moduleId);
+    if (reverseIt != reverseAdjacency.end()) {
+        for (const auto& link : reverseIt->second) {
+            if (link->deleted) continue;
+
+            if (link->linkType == ModuleLinkType::DERIVED_FROM) {
+                std::cout << "DEBUG: Found DERIVED_FROM link! Adding to derivedArray" << std::endl;
+                derivedArray.push_back(moduleToJson(link->sourceId));
+            }
+        }
+    }
+
+    if (!derivedArray.empty())
+        j["derives"] = derivedArray;
+    if (!annotatesArray.empty())
+        j["annotated_by"] = annotatesArray;
+
+    return j;
+}
+
+// Public entry: build full tree for an encounter
+nlohmann::json ModuleGraph::encounterToJson(const UUID& encounterId) const {
+    auto it = encounters.find(encounterId);
+    if (it == encounters.end() || !it->second.rootModule.has_value()) {
+        return {}; // no encounter or no root
+    }
+
+    nlohmann::json rootJson;
+    rootJson["encounter_id"] = encounterId.toString();
+    
+    // Build the complete module tree: linear chain + derived modules + annotations
+    nlohmann::json moduleTree = nlohmann::json::array();
+    
     // Start with root module and follow BELONGS_TO chain
-    UUID current = encounter.rootModule.value();
+    UUID current = it->second.rootModule.value();
     std::unordered_set<UUID> visited;
     
     while (true) {
-        // Add current module to chain with its derived data
-        nlohmann::json moduleJson = buildModuleWithDerivedData(current);
-        moduleChain.push_back(moduleJson);
+        // Add current module with its derived data and annotations
+        nlohmann::json moduleJson = moduleToJson(current);
+        moduleTree.push_back(moduleJson);
         visited.insert(current);
         
         // Check if we've reached the last module
-        if (encounter.lastModule.has_value() && current == encounter.lastModule.value()) {
+        if (it->second.lastModule.has_value() && current == it->second.lastModule.value()) {
             break;
         }
         
         // Find next module in BELONGS_TO chain
-        auto it = adjacency.find(current);
-        if (it == adjacency.end()) break;
+        auto adjIt = adjacency.find(current);
+        if (adjIt == adjacency.end()) break;
         
         bool foundNext = false;
-        for (const auto& link : it->second) {
+        for (const auto& link : adjIt->second) {
             if (link->linkType == ModuleLinkType::BELONGS_TO && !link->deleted) {
                 current = link->targetId;
                 foundNext = true;
@@ -819,76 +914,9 @@ nlohmann::json ModuleGraph::buildEncounterModuleChain(const Encounter& encounter
         if (!foundNext || visited.count(current)) break; // Prevent cycles
     }
     
-    return moduleChain;
+    rootJson["module_tree"] = moduleTree;
+    return rootJson;
 }
-
-nlohmann::json ModuleGraph::buildModuleWithDerivedData(const UUID& moduleId) const {
-    nlohmann::json moduleJson;
-    moduleJson["id"] = moduleId.toString();
-    
-    // Find outgoing links from this module
-    auto it = adjacency.find(moduleId);
-    if (it != adjacency.end()) {
-        nlohmann::json derivedModules = nlohmann::json::array();
-        nlohmann::json annotations = nlohmann::json::array();
-        
-        for (const auto& link : it->second) {
-            if (link->deleted) continue;
-            
-            if (link->linkType == ModuleLinkType::DERIVED_FROM) {
-                // This module derives from another module
-                nlohmann::json derivedModule;
-                derivedModule["id"] = link->targetId.toString();
-                
-                // Check if the derived module has its own derived modules or annotations
-                auto derivedIt = adjacency.find(link->targetId);
-                if (derivedIt != adjacency.end()) {
-                    nlohmann::json derivedDerivedModules = nlohmann::json::array();
-                    nlohmann::json derivedAnnotations = nlohmann::json::array();
-                    
-                    for (const auto& derivedLink : derivedIt->second) {
-                        if (derivedLink->deleted) continue;
-                        if (derivedLink->linkType == ModuleLinkType::DERIVED_FROM) {
-                            nlohmann::json nestedDerived;
-                            nestedDerived["id"] = derivedLink->targetId.toString();
-                            derivedDerivedModules.push_back(nestedDerived);
-                        } else if (derivedLink->linkType == ModuleLinkType::ANNOTATES) {
-                            nlohmann::json annotation;
-                            annotation["id"] = derivedLink->targetId.toString();
-                            annotation["type"] = "annotation";
-                            derivedAnnotations.push_back(annotation);
-                        }
-                    }
-                    
-                    if (!derivedDerivedModules.empty()) {
-                        derivedModule["derived_modules"] = derivedDerivedModules;
-                    }
-                    if (!derivedAnnotations.empty()) {
-                        derivedModule["annotations"] = derivedAnnotations;
-                    }
-                }
-                
-                derivedModules.push_back(derivedModule);
-            } else if (link->linkType == ModuleLinkType::ANNOTATES) {
-                // This module is annotated by another module
-                nlohmann::json annotation;
-                annotation["id"] = link->targetId.toString();
-                annotation["type"] = "annotation";
-                annotations.push_back(annotation);
-            }
-        }
-        
-        if (!derivedModules.empty()) {
-            moduleJson["derived_modules"] = derivedModules;
-        }
-        if (!annotations.empty()) {
-            moduleJson["annotations"] = annotations;
-        }
-    }
-    
-    return moduleJson;
-}
-
 
 
 nlohmann::json ModuleGraph::buildGraphSummary() const {

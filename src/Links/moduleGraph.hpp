@@ -43,8 +43,8 @@ private:
     bool hasCycle() const;
 
     // JSON building helper methods
-    nlohmann::json buildEncounterModuleChain(const Encounter& encounter) const;
-    nlohmann::json buildModuleWithDerivedData(const UUID& moduleId) const;
+    nlohmann::json moduleToJson(const UUID& moduleId) const;
+    nlohmann::json encounterToJson(const UUID& encounterId) const;
     nlohmann::json buildGraphSummary() const;
 
 public:

@@ -402,6 +402,9 @@ int main(int argc, char** argv) {
 
         finalFileInfo = reader.getFileInfo();
 
+
+        cout << "Encounter path: " << endl;
+        reader.printEncounterPath(encounterId);
         cout << "finalFileInfo: " << finalFileInfo.dump(2) << endl;
 
 

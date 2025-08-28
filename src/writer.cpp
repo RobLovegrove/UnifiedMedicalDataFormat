@@ -462,7 +462,7 @@ std::expected<UUID, std::string> Writer::addDerivedModule(
         UUID moduleId = UUID();
 
         try {
-            moduleGraph.addModuleLink(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
+            moduleGraph.addModuleLink(moduleId, parentModuleId, ModuleLinkType::DERIVED_FROM);
         } catch (const std::exception& e) {
             return std::unexpected("Exception adding derived module: " + std::string(e.what()));
         }
@@ -494,7 +494,7 @@ std::expected<UUID, std::string> Writer::addAnnotation(
         UUID moduleId = UUID();
 
         try {
-            moduleGraph.addModuleLink(parentModuleId, moduleId, ModuleLinkType::ANNOTATES);
+            moduleGraph.addModuleLink(moduleId, parentModuleId, ModuleLinkType::ANNOTATES);
         } catch (const std::exception& e) {
             return std::unexpected("Exception adding annotation: " + std::string(e.what()));
         }
