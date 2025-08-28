@@ -483,5 +483,8 @@ TEST_CASE("Reader closeFile method functionality", "[pybind][reader][closeFile]"
     // closeFile doesn't return a value, so we just verify it doesn't throw
     REQUIRE_NOTHROW(reader.attr("closeFile"));
     
+    // Clean up
+    std::filesystem::remove(filename);
+    
     std::cout << "DEBUG: closeFile test completed successfully!" << std::endl;
 }

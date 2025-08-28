@@ -126,7 +126,12 @@ int main(int argc, char** argv) {
             return 1;
         }
         moduleId = addResult.value();
-
+        addResult = writer.addAnnotation(moduleId, patientPair.first, patientPair.second);
+        if (!addResult) {
+            cerr << "Failed to add annotation: " << addResult.error() << endl;
+            return 1;
+        }
+        
         cout << "Initial file written with tabular data. Module UUIDs:\n";
         cout << "  - " << moduleId.toString() << endl;
 
@@ -396,6 +401,10 @@ int main(int argc, char** argv) {
         }
 
         finalFileInfo = reader.getFileInfo();
+
+        cout << "finalFileInfo: " << finalFileInfo.dump(2) << endl;
+
+
         auto auditTrailResult = reader.getAuditTrail(UUID::fromString(tabularUUID));
         if (!auditTrailResult.has_value()) {
             cerr << "Failed to get audit trail: " << auditTrailResult.error() << endl;
@@ -508,6 +517,7 @@ int main(int argc, char** argv) {
         
         cout << "File opened successfully. Module count: " << fileInfo["module_count"] << "\n";
         
+
         // List all modules
         if (fileInfo.contains("modules")) {
             cout << "Modules in file:\n";

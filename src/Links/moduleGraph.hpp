@@ -8,7 +8,7 @@
 #include "moduleLink.hpp"
 #include "../Utility/uuid.hpp"
 #include <expected>
-
+#include <nlohmann/json.hpp>
 
 class ModuleGraph {
 private:
@@ -42,6 +42,11 @@ private:
 
     bool hasCycle() const;
 
+    // JSON building helper methods
+    nlohmann::json buildEncounterModuleChain(const Encounter& encounter) const;
+    nlohmann::json buildModuleWithDerivedData(const UUID& moduleId) const;
+    nlohmann::json buildGraphSummary() const;
+
 public:
 
     static ModuleGraph readModuleGraph(std::istream& in);
@@ -73,6 +78,9 @@ public:
     void displayLinks() const;
     void displayEncounters() const;
     void printEncounterPath(const UUID& encounterId) const;
+
+    // JSON export method
+    nlohmann::json toJson() const;
 
     // std::vector<UUID> getEncounterMembers(const UUID& rootId) const;
     // std::vector<UUID> getDerivedData(const UUID& sourceId) const;

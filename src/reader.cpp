@@ -117,6 +117,7 @@ nlohmann::json Reader::getFileInfo() {
     result["success"] = true;
     result["module_count"] = xrefTable.getEntries().size();
     
+    // Add basic module list from XREF table
     nlohmann::json moduleList = nlohmann::json::array();
     for (const auto& entry : xrefTable.getEntries()) {
         nlohmann::json moduleInfo;
@@ -127,11 +128,8 @@ nlohmann::json Reader::getFileInfo() {
     }
     result["modules"] = moduleList;
 
-    cout << "Printing encounter paths" << endl;
-    const auto& encounters = moduleGraph.getEncounters();
-    for (const auto& [encounterId, encounter] : encounters) {
-        moduleGraph.printEncounterPath(encounterId);
-    }
+    // Add complete module graph structure from ModuleGraph
+    result["module_graph"] = moduleGraph.toJson();
 
     return result;
 }
