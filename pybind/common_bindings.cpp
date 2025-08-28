@@ -1,5 +1,6 @@
 #include "common_bindings.hpp"
 #include "../src/reader.hpp"  // For nlohmann::json
+#include "../src/Utility/uuid.hpp"  // For UUID class
 
 void register_common_bindings(py::module_& m) {
     // Register nlohmann::json type
@@ -31,6 +32,31 @@ void register_common_bindings(py::module_& m) {
         })
         .def("contains", [](const nlohmann::json& self, const std::string& key) {
             return self.contains(key);
+        });
+    
+    // Register UUID class
+    py::class_<UUID>(m, "UUID")
+        .def(py::init<>())
+        .def("toString", &UUID::toString, "Convert UUID to string")
+        .def("__str__", &UUID::toString)
+        .def("__repr__", &UUID::toString);
+    
+    // Register std::expected<UUID, std::string> as a simple wrapper
+    py::class_<std::expected<UUID, std::string>>(m, "ExpectedUUID")
+        .def("has_value", [](const std::expected<UUID, std::string>& self) { return self.has_value(); })
+        .def("value", [](const std::expected<UUID, std::string>& self) -> py::object {
+            if (self.has_value()) {
+                return py::cast(self.value());
+            } else {
+                throw std::runtime_error("Expected has no value: " + self.error());
+            }
+        })
+        .def("error", [](const std::expected<UUID, std::string>& self) -> py::object {
+            if (self.has_value()) {
+                throw std::runtime_error("Expected has value, no error");
+            } else {
+                return py::cast(self.error());
+            }
         });
     
     // Register Result struct
