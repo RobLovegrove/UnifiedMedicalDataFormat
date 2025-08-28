@@ -3,6 +3,8 @@
 #include "../src/Utility/uuid.hpp"  // For UUID class
 #include "../src/DataModule/ModuleData.hpp"  // For ModuleData struct
 #include "../src/writer.hpp"  // For Result struct
+#include "../src/AuditTrail/auditTrail.hpp"  // For ModuleTrail struct
+#include "../src/Utility/dateTime.hpp"  // For DateTime class
 #include <iostream>  // For std::cout
 #include <expected>  // For std::expected
 
@@ -101,4 +103,52 @@ void register_common_bindings(py::module_& m) {
     py::class_<Result>(m, "Result")
         .def_readwrite("success", &Result::success)
         .def_readwrite("message", &Result::message);
+    
+    // Register ModuleTrail struct
+    py::class_<ModuleTrail>(m, "ModuleTrail")
+        .def_readwrite("moduleOffset", &ModuleTrail::moduleOffset)
+        .def_readwrite("isCurrent", &ModuleTrail::isCurrent)
+        .def_readwrite("createdAt", &ModuleTrail::createdAt)
+        .def_readwrite("modifiedAt", &ModuleTrail::modifiedAt)
+        .def_readwrite("createdBy", &ModuleTrail::createdBy)
+        .def_readwrite("modifiedBy", &ModuleTrail::modifiedBy)
+        .def_readwrite("moduleSize", &ModuleTrail::moduleSize)
+        .def_readwrite("moduleType", &ModuleTrail::moduleType)
+        .def_readwrite("moduleID", &ModuleTrail::moduleID);
+    
+    // Register std::expected<ModuleData, std::string> wrapper
+    py::class_<std::expected<ModuleData, std::string>>(m, "ExpectedModuleData")
+        .def("has_value", [](const std::expected<ModuleData, std::string>& self) { return self.has_value(); })
+        .def("value", [](const std::expected<ModuleData, std::string>& self) -> py::object {
+            if (self.has_value()) {
+                return py::cast(self.value());
+            } else {
+                throw std::runtime_error("Expected has no value: " + self.error());
+            }
+        })
+        .def("error", [](const std::expected<ModuleData, std::string>& self) -> py::object {
+            if (self.has_value()) {
+                throw std::runtime_error("Expected has value, no error");
+            } else {
+                return py::cast(self.error());
+            }
+        });
+    
+    // Register std::expected<std::vector<ModuleTrail>, std::string> wrapper
+    py::class_<std::expected<std::vector<ModuleTrail>, std::string>>(m, "ExpectedModuleTrail")
+        .def("has_value", [](const std::expected<std::vector<ModuleTrail>, std::string>& self) { return self.has_value(); })
+        .def("value", [](const std::expected<std::vector<ModuleTrail>, std::string>& self) -> py::object {
+            if (self.has_value()) {
+                return py::cast(self.value());
+            } else {
+                throw std::runtime_error("Expected has no value: " + self.error());
+            }
+        })
+        .def("error", [](const std::expected<std::vector<ModuleTrail>, std::string>& self) -> py::object {
+            if (self.has_value()) {
+                throw std::runtime_error("Expected has value, no error");
+            } else {
+                return py::cast(self.error());
+            }
+        });
 }

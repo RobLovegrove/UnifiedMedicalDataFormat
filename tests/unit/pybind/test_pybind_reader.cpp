@@ -193,3 +193,295 @@ TEST_CASE("Reader getFileInfo method functionality with open file", "[pybind][re
     
     std::cout << "DEBUG: getFileInfo test completed" << std::endl;
 }
+
+TEST_CASE("Reader getModuleData method functionality", "[pybind][reader][getModuleData]") {
+    std::cout << "DEBUG: Testing getModuleData method..." << std::endl;
+    
+    // Get the shared module reference
+    auto& module = GET_PYBIND_MODULE();
+    REQUIRE(module.ptr() != nullptr);
+    
+    // Create a Writer to create a test file
+    auto writer = module.attr("Writer")();
+    REQUIRE(writer.ptr() != nullptr);
+    
+    // Create a test file
+    std::string filename = "test_getModuleData_" + std::to_string(std::time(nullptr)) + ".umdf";
+    std::cout << "DEBUG: Creating new file: " << filename << std::endl;
+    auto createResult = writer.attr("createNewFile")(filename, "testauthor", "testpassword");
+    REQUIRE(createResult.attr("success").cast<bool>() == true);
+    
+    // Create an encounter
+    auto encounterResult = writer.attr("createNewEncounter")();
+    REQUIRE(encounterResult.attr("has_value")().cast<bool>() == true);
+    
+    auto encounterId = encounterResult.attr("value")();
+    
+    // Add a module to the encounter
+    auto moduleDataClass = module.attr("ModuleData");
+    auto moduleData = moduleDataClass();
+    REQUIRE(moduleData.ptr() != nullptr);
+    
+    // Set some basic metadata
+    std::string simpleMetadata = "{\"test_key\": \"test_value\", \"module_type\": \"test\"}";
+    REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
+    
+    // Add the module to the encounter
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
+    
+    auto moduleId = addModuleResult.attr("value")();
+    std::string moduleIdStr = moduleId.attr("toString")().cast<std::string>();
+    
+    // Close the file
+    auto closeResult = writer.attr("closeFile")();
+    REQUIRE(closeResult.attr("success").cast<bool>() == true);
+    
+    // Now test Reader getModuleData
+    auto reader = module.attr("Reader")();
+    REQUIRE(reader.ptr() != nullptr);
+    
+    auto openResult = reader.attr("openFile")(filename, "testpassword");
+    REQUIRE(openResult.attr("success").cast<bool>() == true);
+    
+    // Test getModuleData with the module ID
+    std::cout << "DEBUG: Testing getModuleData with module ID: " << moduleIdStr << std::endl;
+    auto retrievedModuleData = reader.attr("getModuleData")(moduleIdStr);
+    
+    // getModuleData returns an optional ModuleData, so we need to check if it has a value
+    REQUIRE_NOTHROW(retrievedModuleData.attr("has_value"));
+    bool hasValue = retrievedModuleData.attr("has_value")().cast<bool>();
+    REQUIRE(hasValue == true);
+    
+    if (hasValue) {
+        auto actualModuleData = retrievedModuleData.attr("value")();
+        REQUIRE(actualModuleData.ptr() != nullptr);
+        
+        // Test that we can access the metadata
+        auto metadata = actualModuleData.attr("get_metadata")();
+        REQUIRE(metadata.ptr() != nullptr);
+        
+        std::cout << "DEBUG: Successfully retrieved module data" << std::endl;
+    }
+    
+    // Clean up
+    std::filesystem::remove(filename);
+    
+    std::cout << "DEBUG: getModuleData test completed successfully!" << std::endl;
+}
+
+TEST_CASE("Reader getAuditTrail method functionality", "[pybind][reader][getAuditTrail]") {
+    std::cout << "DEBUG: Testing getAuditTrail method..." << std::endl;
+    
+    // Get the shared module reference
+    auto& module = GET_PYBIND_MODULE();
+    REQUIRE(module.ptr() != nullptr);
+    
+    // Create a Writer to create a test file
+    auto writer = module.attr("Writer")();
+    REQUIRE(writer.ptr() != nullptr);
+    
+    // Create a test file
+    std::string filename = "test_getAuditTrail_" + std::to_string(std::time(nullptr)) + ".umdf";
+    std::cout << "DEBUG: Creating new file: " << filename << std::endl;
+    auto createResult = writer.attr("createNewFile")(filename, "testauthor", "testpassword");
+    REQUIRE(createResult.attr("success").cast<bool>() == true);
+    
+    // Create an encounter
+    auto encounterResult = writer.attr("createNewEncounter")();
+    REQUIRE(encounterResult.attr("has_value")().cast<bool>() == true);
+    
+    auto encounterId = encounterResult.attr("value")();
+    
+    // Add a module to the encounter
+    auto moduleDataClass = module.attr("ModuleData");
+    auto moduleData = moduleDataClass();
+    REQUIRE(moduleData.ptr() != nullptr);
+    
+    // Set some basic metadata
+    std::string simpleMetadata = "{\"test_key\": \"test_value\", \"module_type\": \"test\"}";
+    REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
+    
+    // Add the module to the encounter
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
+    
+    auto moduleId = addModuleResult.attr("value")();
+    std::string moduleIdStr = moduleId.attr("toString")().cast<std::string>();
+    
+    // Close the file
+    auto closeResult = writer.attr("closeFile")();
+    REQUIRE(closeResult.attr("success").cast<bool>() == true);
+    
+    // Now test Reader getAuditTrail
+    auto reader = module.attr("Reader")();
+    REQUIRE(reader.ptr() != nullptr);
+    
+    auto openResult = reader.attr("openFile")(filename, "testpassword");
+    REQUIRE(openResult.attr("success").cast<bool>() == true);
+    
+    // Test getAuditTrail with the module ID
+    std::cout << "DEBUG: Testing getAuditTrail with module ID: " << moduleIdStr << std::endl;
+    auto auditTrailResult = reader.attr("getAuditTrail")(moduleId);
+    
+    // getAuditTrail returns an expected<ModuleTrail>, so we need to check if it has a value
+    REQUIRE_NOTHROW(auditTrailResult.attr("has_value"));
+    bool hasValue = auditTrailResult.attr("has_value")().cast<bool>();
+    REQUIRE(hasValue == true);
+    
+    if (hasValue) {
+        auto auditTrail = auditTrailResult.attr("value")();
+        REQUIRE(auditTrail.ptr() != nullptr);
+        
+        std::cout << "DEBUG: Successfully retrieved audit trail" << std::endl;
+    }
+    
+    // Clean up
+    std::filesystem::remove(filename);
+    
+    std::cout << "DEBUG: getAuditTrail test completed successfully!" << std::endl;
+}
+
+TEST_CASE("Reader getAuditData method functionality", "[pybind][reader][getAuditData]") {
+    std::cout << "DEBUG: Testing getAuditData method..." << std::endl;
+    
+    // Get the shared module reference
+    auto& module = GET_PYBIND_MODULE();
+    REQUIRE(module.ptr() != nullptr);
+    
+    // Create a Writer to create a test file
+    auto writer = module.attr("Writer")();
+    REQUIRE(writer.ptr() != nullptr);
+    
+    // Create a test file
+    std::string filename = "test_getAuditData_" + std::to_string(std::time(nullptr)) + ".umdf";
+    std::cout << "DEBUG: Creating new file: " << filename << std::endl;
+    auto createResult = writer.attr("createNewFile")(filename, "testauthor", "testpassword");
+    REQUIRE(createResult.attr("success").cast<bool>() == true);
+    
+    // Create an encounter
+    auto encounterResult = writer.attr("createNewEncounter")();
+    REQUIRE(encounterResult.attr("has_value")().cast<bool>() == true);
+    
+    auto encounterId = encounterResult.attr("value")();
+    
+    // Add a module to the encounter
+    auto moduleDataClass = module.attr("ModuleData");
+    auto moduleData = moduleDataClass();
+    REQUIRE(moduleData.ptr() != nullptr);
+    
+    // Set some basic metadata
+    std::string simpleMetadata = "{\"test_key\": \"test_value\", \"module_type\": \"test\"}";
+    REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
+    
+    // Add the module to the encounter
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
+    
+    auto moduleId = addModuleResult.attr("value")();
+    std::string moduleIdStr = moduleId.attr("toString")().cast<std::string>();
+    
+    // Close the file
+    auto closeResult = writer.attr("closeFile")();
+    REQUIRE(closeResult.attr("success").cast<bool>() == true);
+    
+    // Now test Reader getAuditData
+    auto reader = module.attr("Reader")();
+    REQUIRE(reader.ptr() != nullptr);
+    
+    auto openResult = reader.attr("openFile")(filename, "testpassword");
+    REQUIRE(openResult.attr("success").cast<bool>() == true);
+    
+    // First get the audit trail to get a ModuleTrail object
+    auto auditTrailResult = reader.attr("getAuditTrail")(moduleId);
+    REQUIRE(auditTrailResult.attr("has_value")().cast<bool>() == true);
+    
+    auto auditTrailVector = auditTrailResult.attr("value")();
+    REQUIRE(auditTrailVector.ptr() != nullptr);
+    
+    // getAuditTrail returns a vector, so we need to get the first element
+    auto firstTrail = auditTrailVector.attr("__getitem__")(0);
+    REQUIRE(firstTrail.ptr() != nullptr);
+    
+    // Test getAuditData with the first ModuleTrail
+    std::cout << "DEBUG: Testing getAuditData with first ModuleTrail" << std::endl;
+    auto auditDataResult = reader.attr("getAuditData")(firstTrail);
+    
+    // getAuditData returns an expected<ModuleData>, so we need to check if it has a value
+    REQUIRE_NOTHROW(auditDataResult.attr("has_value"));
+    bool hasValue = auditDataResult.attr("has_value")().cast<bool>();
+    REQUIRE(hasValue == true);
+    
+    if (hasValue) {
+        auto retrievedModuleData = auditDataResult.attr("value")();
+        REQUIRE(retrievedModuleData.ptr() != nullptr);
+        
+        // Test that we can access the metadata
+        auto metadata = retrievedModuleData.attr("get_metadata")();
+        REQUIRE(metadata.ptr() != nullptr);
+        
+        std::cout << "DEBUG: Successfully retrieved audit data" << std::endl;
+    }
+    
+    // Clean up
+    std::filesystem::remove(filename);
+    
+    std::cout << "DEBUG: getAuditData test completed successfully!" << std::endl;
+}
+
+TEST_CASE("Reader closeFile method functionality", "[pybind][reader][closeFile]") {
+    std::cout << "DEBUG: Testing closeFile method..." << std::endl;
+    
+    // Get the shared module reference
+    auto& module = GET_PYBIND_MODULE();
+    REQUIRE(module.ptr() != nullptr);
+    
+    // Create a Writer to create a test file
+    auto writer = module.attr("Writer")();
+    REQUIRE(writer.ptr() != nullptr);
+    
+    // Create a test file
+    std::string filename = "test_closeFile_" + std::to_string(std::time(nullptr)) + ".umdf";
+    std::cout << "DEBUG: Creating new file: " << filename << std::endl;
+    auto createResult = writer.attr("createNewFile")(filename, "testauthor", "testpassword");
+    REQUIRE(createResult.attr("success").cast<bool>() == true);
+    
+    // Create an encounter
+    auto encounterResult = writer.attr("createNewEncounter")();
+    REQUIRE(encounterResult.attr("has_value")().cast<bool>() == true);
+    
+    auto encounterId = encounterResult.attr("value")();
+    
+    // Add a module to the encounter
+    auto moduleDataClass = module.attr("ModuleData");
+    auto moduleData = moduleDataClass();
+    REQUIRE(moduleData.ptr() != nullptr);
+    
+    // Set some basic metadata
+    std::string simpleMetadata = "{\"test_key\": \"test_value\", \"module_type\": \"test\"}";
+    REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
+    
+    // Add the module to the encounter
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
+    
+    // Close the writer file
+    auto closeResult = writer.attr("closeFile")();
+    REQUIRE(closeResult.attr("success").cast<bool>() == true);
+    
+    // Now test Reader closeFile
+    auto reader = module.attr("Reader")();
+    REQUIRE(reader.ptr() != nullptr);
+    
+    auto openResult = reader.attr("openFile")(filename, "testpassword");
+    REQUIRE(openResult.attr("success").cast<bool>() == true);
+    
+    // Test closeFile
+    std::cout << "DEBUG: Testing closeFile method" << std::endl;
+    auto readerCloseResult = reader.attr("closeFile")();
+    
+    // closeFile doesn't return a value, so we just verify it doesn't throw
+    REQUIRE_NOTHROW(reader.attr("closeFile"));
+    
+    std::cout << "DEBUG: closeFile test completed successfully!" << std::endl;
+}

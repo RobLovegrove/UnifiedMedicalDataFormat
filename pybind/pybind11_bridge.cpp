@@ -2,6 +2,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
+#include <pybind11/functional.h>  // For std::expected
+#include <pybind11/chrono.h>      // For DateTime
 
 #include "common_bindings.hpp"
 #include "reader_bindings.hpp"
