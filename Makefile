@@ -60,7 +60,24 @@ TEST_MAIN := $(TEST_DIR)/test_main.cpp
 OBJS := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
 # Map test files to corresponding object files in build/
-TEST_OBJS := $(patsubst tests/%.cpp,build/%.o,$(TEST_SRCS))
+TEST_OBJS = build/unit/test_circularReference.o \
+            build/unit/test_dataModule.o \
+            build/unit/test_dataField.o \
+            build/unit/test_schema.o \
+            build/unit/test_dateTime.o \
+            build/unit/test_imageEncoder.o \
+            build/unit/test_schemaResolver.o \
+            build/unit/test_imageData.o \
+            build/unit/pybind/pybind_test_fixture.o \
+            build/unit/pybind/test_pybind_writer.o \
+            build/unit/pybind/test_pybind_reader.o \
+            build/unit/pybind/test_pybind.o \
+            build/unit/pybind/test_pybind_moduledata.o \
+            build/unit/test_schemaValidation.o \
+            build/integration/test_schemaParsing.o \
+            build/integration/test_endToEnd.o \
+            build/integration/test_fileWorkflow.o
+
 TEST_MAIN_OBJ := $(BUILD_DIR)/test_main.o
 
 # Dependency files (.d) for each object
@@ -82,7 +99,7 @@ release: CXXFLAGS += -O3 -DNDEBUG $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS
 release: $(TARGET)
 
 # Test targets
-test: test-build
+test: test-build pybind
 	@echo "Running tests..."
 	./$(TEST_TARGET)
 

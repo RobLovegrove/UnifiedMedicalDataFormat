@@ -1,6 +1,9 @@
 #include "writer_bindings.hpp"
 #include "../src/writer.hpp"
 
+#include "writer_bindings.hpp"
+#include "../src/writer.hpp"
+
 void register_writer_bindings(py::module_& m) {
     // Expose the Writer class with basic methods
     py::class_<Writer>(m, "Writer")

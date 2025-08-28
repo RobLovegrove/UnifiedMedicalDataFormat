@@ -1,4 +1,5 @@
 #include "reader_bindings.hpp"
+#include "json_type_caster.hpp"  // For nlohmann::json type casting
 #include "../src/reader.hpp"
 
 void register_reader_bindings(py::module_& m) {
