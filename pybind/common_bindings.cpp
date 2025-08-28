@@ -9,6 +9,15 @@ void register_common_bindings(py::module_& m) {
         })
         .def("__str__", [](const nlohmann::json& self) {
             return self.dump();
+        })
+        .def("__getitem__", [](const nlohmann::json& self, const std::string& key) {
+            if (self.contains(key)) {
+                return self[key];
+            }
+            throw std::out_of_range("Key '" + key + "' not found in JSON object");
+        })
+        .def("contains", [](const nlohmann::json& self, const std::string& key) {
+            return self.contains(key);
         });
     
     // Register Result struct
