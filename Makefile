@@ -113,6 +113,11 @@ $(BUILD_DIR)/integration/%.o: tests/integration/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
 
+# Compile nested test files to object files (e.g., tests/unit/pybind/*.cpp)
+$(BUILD_DIR)/tests/%.o: tests/%.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
+
 # Compile source files to object files, creating directories as needed
 $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
