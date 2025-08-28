@@ -10,9 +10,22 @@ void register_common_bindings(py::module_& m) {
         .def("__str__", [](const nlohmann::json& self) {
             return self.dump();
         })
-        .def("__getitem__", [](const nlohmann::json& self, const std::string& key) {
+        .def("__getitem__", [](const nlohmann::json& self, const std::string& key) -> py::object {
             if (self.contains(key)) {
-                return self[key];
+                const auto& value = self[key];
+                // Return the actual value based on its type
+                if (value.is_boolean()) {
+                    return py::cast(value.get<bool>());
+                } else if (value.is_string()) {
+                    return py::cast(value.get<std::string>());
+                } else if (value.is_number_integer()) {
+                    return py::cast(value.get<int64_t>());
+                } else if (value.is_number_float()) {
+                    return py::cast(value.get<double>());
+                } else {
+                    // For other types (arrays, objects), return the JSON object itself
+                    return py::cast(value);
+                }
             }
             throw std::out_of_range("Key '" + key + "' not found in JSON object");
         })
