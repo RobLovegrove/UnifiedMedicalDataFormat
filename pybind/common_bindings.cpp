@@ -1,6 +1,7 @@
 #include "common_bindings.hpp"
 #include "../src/reader.hpp"  // For nlohmann::json
 #include "../src/Utility/uuid.hpp"  // For UUID class
+#include "../src/DataModule/ModuleData.hpp"  // For ModuleData class
 
 void register_common_bindings(py::module_& m) {
     // Register nlohmann::json type
@@ -40,6 +41,12 @@ void register_common_bindings(py::module_& m) {
         .def("toString", &UUID::toString, "Convert UUID to string")
         .def("__str__", &UUID::toString)
         .def("__repr__", &UUID::toString);
+    
+    // Register ModuleData struct
+    py::class_<ModuleData>(m, "ModuleData")
+        .def(py::init<>())
+        .def_readwrite("metadata", &ModuleData::metadata)
+        .def_readwrite("data", &ModuleData::data);
     
     // Register std::expected<UUID, std::string> as a simple wrapper
     py::class_<std::expected<UUID, std::string>>(m, "ExpectedUUID")
