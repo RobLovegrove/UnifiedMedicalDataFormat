@@ -1,6 +1,7 @@
 #include "dataModule.hpp"
 #include "./Image/imageData.hpp"
 #include "./Tabular/tabularData.hpp"
+#include "./Unknown/unknownData.hpp"
 #include "../Utility/uuid.hpp"
 #include "../Xref/xref.hpp"
 #include "stringBuffer.hpp"
@@ -161,7 +162,8 @@ unique_ptr<DataModule> DataModule::fromStream(
             dm = make_unique<FrameData>(dmHeader->getSchemaPath(), *dmHeader);
             break;
         default:
-            return nullptr;  // Gracefully skip unknown modules
+            dm = make_unique<UnknownData>(dmHeader->getSchemaPath(), *dmHeader);
+            break; // Gracefully skip unknown modules
         }
     } catch (const std::exception& e) {
         std::cerr << "Error parsing module type " << static_cast<int>(moduleType)

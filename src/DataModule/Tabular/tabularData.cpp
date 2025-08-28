@@ -74,8 +74,6 @@ void TabularData::writeData(ostream& out) const {
 
         writeTableRows(buffer, rows);
 
-
-
         std::vector<uint8_t> dataBytes {
             std::istreambuf_iterator<char>(buffer),
             std::istreambuf_iterator<char>()
