@@ -39,39 +39,27 @@ py::object variant_to_py(const std::variant<
 }
 
 void register_common_bindings(py::module_& m) {
-    std::cout << "DEBUG: Starting to register common bindings..." << std::endl;
-    
     // Note: nlohmann::json is handled by type_caster, no custom class binding needed
-    std::cout << "DEBUG: Json type_caster active, no custom class binding needed" << std::endl;
     
     // Register UUID class
-    std::cout << "DEBUG: About to register UUID class..." << std::endl;
     py::class_<UUID>(m, "UUID")
         .def(py::init<>())
         .def("toString", &UUID::toString, "Convert UUID to string")
         .def("__str__", &UUID::toString)
         .def("__repr__", &UUID::toString);
-    std::cout << "DEBUG: UUID class registered successfully!" << std::endl;
     
     // Register ModuleData struct with method-based approach
-    std::cout << "DEBUG: About to register ModuleData class..." << std::endl;
     py::class_<ModuleData>(m, "ModuleData")
         .def(py::init<>())
         .def("get_metadata", [](const ModuleData& self) -> py::object {
-            std::cout << "DEBUG: get_metadata called" << std::endl;
             return py::cast(self.metadata);
         }, "Get metadata")
         .def("set_metadata", [](ModuleData& self, const py::object& metadata) {
-            std::cout << "DEBUG: set_metadata called with type: " << py::str(metadata.get_type()).cast<std::string>() << std::endl;
-            std::cout << "DEBUG: About to try casting to nlohmann::json..." << std::endl;
             try {
                 // Use the type_caster to convert directly
                 auto json_data = py::cast<nlohmann::json>(metadata);
-                std::cout << "DEBUG: Successfully cast to nlohmann::json" << std::endl;
                 self.metadata = json_data;
-                std::cout << "DEBUG: Successfully assigned to self.metadata" << std::endl;
             } catch (const std::exception& e) {
-                std::cout << "DEBUG: Exception during conversion: " << e.what() << std::endl;
                 throw;
             }
         }, "Set metadata")
@@ -90,10 +78,8 @@ void register_common_bindings(py::module_& m) {
         .def("set_nested_data", [](ModuleData& self, const std::vector<ModuleData>& data) {
             self.data = data;
         }, "Set nested ModuleData");
-    std::cout << "DEBUG: ModuleData class registered successfully!" << std::endl;
     
     // Register std::expected<UUID, std::string> as a simple wrapper
-    std::cout << "DEBUG: About to register ExpectedUUID class..." << std::endl;
     py::class_<std::expected<UUID, std::string>>(m, "ExpectedUUID")
         .def("has_value", [](const std::expected<UUID, std::string>& self) { return self.has_value(); })
         .def("value", [](const std::expected<UUID, std::string>& self) -> py::object {
@@ -110,14 +96,9 @@ void register_common_bindings(py::module_& m) {
                 return py::cast(self.error());
             }
         });
-    std::cout << "DEBUG: ExpectedUUID class registered successfully!" << std::endl;
     
     // Register Result struct
-    std::cout << "DEBUG: About to register Result class..." << std::endl;
     py::class_<Result>(m, "Result")
         .def_readwrite("success", &Result::success)
         .def_readwrite("message", &Result::message);
-    std::cout << "DEBUG: Result class registered successfully!" << std::endl;
-    
-    std::cout << "DEBUG: All common bindings registered successfully!" << std::endl;
 }
