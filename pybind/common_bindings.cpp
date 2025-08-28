@@ -10,4 +10,9 @@ void register_common_bindings(py::module_& m) {
         .def("__str__", [](const nlohmann::json& self) {
             return self.dump();
         });
+    
+    // Register Result struct
+    py::class_<Result>(m, "Result")
+        .def_readwrite("success", &Result::success)
+        .def_readwrite("message", &Result::message);
 }
