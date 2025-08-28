@@ -60,7 +60,7 @@ TEST_MAIN := $(TEST_DIR)/test_main.cpp
 OBJS := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
 # Map test files to corresponding object files in build/
-TEST_OBJS := $(patsubst $(TEST_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(TEST_SRCS))
+TEST_OBJS := $(patsubst tests/%.cpp,build/%.o,$(TEST_SRCS))
 TEST_MAIN_OBJ := $(BUILD_DIR)/test_main.o
 
 # Dependency files (.d) for each object
@@ -98,8 +98,8 @@ $(PYBIND_MODULE).so: pybind/pybind11_bridge.cpp pybind/common_bindings.cpp pybin
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-# Compile test files to object files (must come before general source rule)
-$(BUILD_DIR)/tests/%.o: tests/%.cpp | $(BUILD_DIR)
+# Compile nested test files to object files (e.g., tests/unit/pybind/*.cpp)
+$(BUILD_DIR)/unit/pybind/%.o: tests/unit/pybind/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
 
@@ -110,11 +110,6 @@ $(BUILD_DIR)/unit/%.o: tests/unit/%.cpp | $(BUILD_DIR)
 
 # Compile integration test files to object files
 $(BUILD_DIR)/integration/%.o: tests/integration/%.cpp | $(BUILD_DIR)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
-
-# Compile nested test files to object files (e.g., tests/unit/pybind/*.cpp)
-$(BUILD_DIR)/tests/%.o: tests/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) $(CATCH2_INCLUDE) $(PYBIND11_CFLAGS) -c $< -o $@ -MMD -MP -MF $(@:.o=.d)
 
