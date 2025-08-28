@@ -635,7 +635,7 @@ void ModuleGraph::displayEncounters() const {
 
         // Follow BelongsTo chain until lastModule
         while (current != encounter.lastModule) {
-            auto it = adjacency.find(current);
+        auto it = adjacency.find(current);
             if (it == adjacency.end()) break; // no outgoing links
 
             // Look for the BelongsTo chain link

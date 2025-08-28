@@ -91,8 +91,8 @@ test-build: $(TEST_TARGET)
 # pybind module target
 pybind: $(PYBIND_MODULE).so
 
-$(PYBIND_MODULE).so: $(PYBIND_SRC) $(OBJS)
-	$(CXX) -std=c++23 -fPIC -shared $(PYBIND11_CFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) -Iinclude -Isrc -Wall -Wextra -o $@ $(PYBIND_SRC) $(OBJS) $(PYBIND11_LIBS) $(OPENJPEG_LIBS) $(PNG_LIBS) $(ZSTD_LIBS) $(LIBSODIUM_LIBS)
+$(PYBIND_MODULE).so: pybind/pybind11_bridge.cpp pybind/common_bindings.cpp pybind/reader_bindings.cpp pybind/writer_bindings.cpp $(OBJS)
+	$(CXX) -std=c++23 -fPIC -shared $(PYBIND11_CFLAGS) $(OPENJPEG_CFLAGS) $(PNG_CFLAGS) $(ZSTD_CFLAGS) $(LIBSODIUM_CFLAGS) -Iinclude -Isrc -Ipybind -Wall -Wextra -o $@ pybind/pybind11_bridge.cpp pybind/common_bindings.cpp pybind/reader_bindings.cpp pybind/writer_bindings.cpp $(OBJS) $(PYBIND11_LIBS) $(OPENJPEG_LIBS) $(PNG_LIBS) $(ZSTD_LIBS) $(LIBSODIUM_LIBS)
 
 # Ensure build directory exists before compiling objects
 $(BUILD_DIR):
