@@ -15,6 +15,7 @@ struct XrefEntry {
     uint8_t type;
     uint64_t size;
     uint64_t offset;
+    std::string schemaPath;
 };
 
 class XRefTable {
@@ -31,7 +32,10 @@ private:
     //std::map<int, std::streampos> references;
 
 public:
-    void addEntry(ModuleType type, UUID uuid, uint64_t offset, uint32_t size);
+    void addEntry(
+        ModuleType type, 
+        UUID uuid, uint64_t offset, uint32_t size, std::string schemaPath);
+        
     bool deleteEntry(UUID entryId);
     void clear() { entries.clear(); }
 

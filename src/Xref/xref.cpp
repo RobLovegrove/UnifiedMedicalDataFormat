@@ -14,13 +14,19 @@ using namespace std;
 char XRefTable::xrefMarker[12] = "xrefoffset\n";
 char XRefTable::EOFmarker[8] = "#EOUMDF";
 
-void XRefTable::addEntry(ModuleType type, UUID uuid, uint64_t offset, uint32_t size) {
+void XRefTable::addEntry(
+    ModuleType type, 
+    UUID uuid, 
+    uint64_t offset, 
+    uint32_t size, 
+    std::string schemaPath) {
+        
     XrefEntry newEntry;
     newEntry.id = uuid;
     newEntry.type = static_cast<uint8_t>(type);
     newEntry.offset = offset;
     newEntry.size = size;
-    
+    newEntry.schemaPath = schemaPath;
     entries.push_back(newEntry);
 }
 
@@ -33,12 +39,6 @@ bool XRefTable::deleteEntry(UUID entryId) {
     
 }
 
-// const XrefEntry* XRefTable::findEntry(ModuleType type) {
-//     for (const XrefEntry& entry : entries) {
-//         if (entry.type == static_cast<uint8_t>(type)) return &entry;
-//     }
-//     return nullptr;
-// }
 
 const XrefEntry& XRefTable::getEntry(UUID id) const {
     for (const XrefEntry& entry : entries) {
@@ -73,6 +73,9 @@ bool XRefTable::writeXref(std::ostream& out) const{
         out.write(reinterpret_cast<const char*>(&entry.type), sizeof(entry.type));
         out.write(reinterpret_cast<const char*>(&entry.size), sizeof(entry.size));
         out.write(reinterpret_cast<const char*>(&entry.offset), sizeof(entry.offset));
+        uint32_t schemaPathLength = static_cast<uint32_t>(entry.schemaPath.size());
+        out.write(reinterpret_cast<const char*>(&schemaPathLength), sizeof(schemaPathLength));
+        out.write(entry.schemaPath.c_str(), schemaPathLength);
     }
 
     // 7. Write footer
@@ -170,6 +173,10 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
         in.read(reinterpret_cast<char*>(&entry.type), sizeof(entry.type));
         in.read(reinterpret_cast<char*>(&entry.size), sizeof(entry.size));
         in.read(reinterpret_cast<char*>(&entry.offset), sizeof(entry.offset));
+        uint32_t schemaPathLength = 0;
+        in.read(reinterpret_cast<char*>(&schemaPathLength), sizeof(schemaPathLength));
+        entry.schemaPath.resize(schemaPathLength);
+        in.read(entry.schemaPath.data(), schemaPathLength);
         table.entries.push_back(entry);
     }
 
@@ -184,6 +191,7 @@ ostream& operator<<(ostream& os, const XRefTable& table) {
            << " | Type: " << static_cast<ModuleType>(entry.type)
            << " | Size: " << entry.size
            << " | Offset: 0x" << std::hex << std::setw(16) << std::setfill('0') << entry.offset
+           << " | Schema Path: " << entry.schemaPath
            << std::dec << '\n';
     }
 
