@@ -36,6 +36,8 @@ private:
     nlohmann::json buildModuleWithDerivatives(const UUID& moduleId, int depth = 0) const;
     nlohmann::json buildModuleGraphSummary() const;
     std::string getModuleTypeString(const UUID& moduleId) const;
+    std::expected<std::unique_ptr<DataModule>, std::string> loadModule
+        (uint64_t offset, uint32_t size, ModuleType type);
 
 public:
 
@@ -44,10 +46,6 @@ public:
     // Reading operations 
     nlohmann::json getFileInfo();
     std::expected<ModuleData, std::string> getModuleData(const std::string& moduleId);
-    
-
-    std::expected<std::unique_ptr<DataModule>, std::string> loadModule(uint64_t offset, uint32_t size, ModuleType type);
-
     std::expected<std::vector<ModuleTrail>, std::string> getAuditTrail(const UUID& moduleId);
 
     std::expected<ModuleData, std::string> getAuditData(const ModuleTrail& module);

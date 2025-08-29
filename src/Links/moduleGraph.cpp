@@ -815,14 +815,14 @@ nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
     nlohmann::json derivedArray = nlohmann::json::array();
     nlohmann::json annotatesArray = nlohmann::json::array();
 
-    // Find annotations (outgoing links)
-    auto it = adjacency.find(moduleId);
-    if (it != adjacency.end()) {
+    // Find annotations (incoming links)
+    auto it = reverseAdjacency.find(moduleId);
+    if (it != reverseAdjacency.end()) {
         for (const auto& link : it->second) {
             if (link->deleted) continue;
 
             if (link->linkType == ModuleLinkType::ANNOTATES) {
-                annotatesArray.push_back(moduleToJson(link->targetId));
+                annotatesArray.push_back(moduleToJson(link->sourceId));
             }
         }
     }

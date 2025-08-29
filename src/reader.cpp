@@ -124,6 +124,7 @@ nlohmann::json Reader::getFileInfo() {
         ModuleType type = static_cast<ModuleType>(entry.type);
         moduleInfo["type"] = module_type_to_string(type);
         moduleInfo["uuid"] = entry.id.toString();
+        moduleInfo["schema_path"] = entry.schemaPath;
         moduleList.push_back(moduleInfo);
     }
     result["modules"] = moduleList;

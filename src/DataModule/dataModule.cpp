@@ -758,7 +758,10 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart,
     }
     xref.addEntry(
         header->getModuleType(), 
-        header->getModuleID(), absoluteModuleStart, header->getModuleSize());
+        header->getModuleID(), 
+        absoluteModuleStart, 
+        header->getModuleSize(),
+        header->getSchemaPath());
 }
 
 void DataModule::writeCompressedMetadata(std::ostream& metadataStream) {
