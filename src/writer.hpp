@@ -70,7 +70,7 @@ public:
     // // Low level API call available
     // Result addLink(const UUID& sourceId, const UUID& targetId, ModuleLinkType linkType);
 
-
+    Result cancelThenClose();
     Result closeFile();
 
 };

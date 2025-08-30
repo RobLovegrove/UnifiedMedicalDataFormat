@@ -102,6 +102,7 @@ Result Writer::openFile(std::string& filename, string author, string password) {
 
     Result result = setUpFileStream(filename);
     if (!result.success) {
+        cancelThenClose();
         return result;
     }
 
@@ -109,13 +110,13 @@ Result Writer::openFile(std::string& filename, string author, string password) {
 
     // Read header from temp file
     if (!header.readPrimaryHeader(fileStream)) {
-        fileStream.close();
-        removeTempFile();
+        cancelThenClose();
         return Result{false, "Failed to read header from temp file"};
     }
 
     if (header.getEncryptionData().encryptionType != EncryptionType::NONE) {
         if (password == "") {
+            cancelThenClose();
             return Result{false, "File is encrypted but no password provided"};
         }
         else {
@@ -128,8 +129,7 @@ Result Writer::openFile(std::string& filename, string author, string password) {
     try {
         xrefTable = XRefTable::loadXrefTable(fileStream);
     } catch (const std::exception& e) {
-        fileStream.close();
-        removeTempFile();
+        cancelThenClose();
         return Result{false, "Failed to load XRef table from temp file: " + std::string(e.what())};
     }
 
@@ -149,7 +149,8 @@ Result Writer::openFile(std::string& filename, string author, string password) {
         moduleGraph.displayEncounters();
     }
     catch (const std::exception& e) {
-        closeFile();
+        cancelThenClose();
+
         return Result{false, "Failed to read ModuleGraph: " + string(e.what())};
     }
 
@@ -247,6 +248,20 @@ Result Writer::updateModule(const std::string& moduleId, const ModuleData& modul
     }
 
     return Result{true, "Module updated successfully"};
+
+}
+
+Result Writer::cancelThenClose() {
+
+    // Check if file stream is open
+    if (!fileStream.is_open()) {
+        return Result{false, "No file is open"};
+    }
+
+    removeTempFile();
+
+    resetWriter();
+    return Result{true, "File closed successfully"};
 
 }
 

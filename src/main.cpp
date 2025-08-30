@@ -308,6 +308,8 @@ int main(int argc, char** argv) {
         cout << "  - " << imageModuleId.toString() << endl;
 
 
+        imagePair.second.metadata["modality"] = "CT2";
+
         // Add derived module
         cout << "Adding derived module" << endl;
         auto derivedModuleResult = writer.addDerivedModule(imageModuleId, imagePair.first, imagePair.second);
