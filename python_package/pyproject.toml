@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=65.0.0", "wheel>=0.37.0", "pybind11>=2.10.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umdf"
+version = "1.0.0"
+description = "Unified Medical Data Format Python bindings"
+readme = "../README.md"
+authors = [
+    {name = "Rob Lovegrove", email = "rob@example.com"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Healthcare Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = ["medical", "data", "format", "compression", "encryption", "healthcare"]
+requires-python = ">=3.8"
+dependencies = ["pybind11>=2.10.0"]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/umdf"
+Repository = "https://github.com/yourusername/umdf"
+Issues = "https://github.com/yourusername/umdf/issues"

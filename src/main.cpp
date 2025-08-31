@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
         patientModule.metadata = nlohmann::json::array();
         patientModule.metadata.push_back({
             {"clinician", "Dr. Jane Doe"},
-            {"encounter_time", "2025-07-28"}
+            {"encounter_date", "2025-07-28"}
         });
         
         // Add patient data
@@ -357,7 +357,7 @@ int main(int argc, char** argv) {
         // Update the patient module data
         patientModuleData.value().metadata.push_back({
             {"clinician", "Dr. John Doe"},
-            {"encounter_time", "2025-07-29"}
+            {"encounter_date", "2025-07-29"}
         });
 
         // Update the patient module data in the file

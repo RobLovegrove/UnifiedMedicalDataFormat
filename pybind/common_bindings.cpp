@@ -46,6 +46,7 @@ void register_common_bindings(py::module_& m) {
     // Register UUID class
     py::class_<UUID>(m, "UUID")
         .def(py::init<>())
+        .def_static("fromString", &UUID::fromString, "Create UUID from string")
         .def("toString", &UUID::toString, "Convert UUID to string")
         .def("__str__", &UUID::toString)
         .def("__repr__", &UUID::toString);

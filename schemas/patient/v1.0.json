@@ -9,10 +9,10 @@
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["clinician", "encounter_time"],
+      "required": ["clinician", "encounter_date"],
       "properties": {
         "clinician": { "type": "string", "length": 32 },
-        "encounter_time": { "type": "string", "format": "date", "length": 10 }
+        "encounter_date": { "type": "string", "format": "date", "length": 10 }
       }
     },
     "data": {
