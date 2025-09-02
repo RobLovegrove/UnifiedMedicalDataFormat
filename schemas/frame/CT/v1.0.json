@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "./schemas/frame/CT/v1.0.json",
+  "title": "CT Frame",
+  "description": "Schema for individual CT frame metadata with only frame-specific DICOM information. Contains metadata that varies between frames.",
+  "type": "object",
+  "module_type": "frame",
+  "endianness": "little",
+  "required": ["metadata"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["frameNumber"],
+      "properties": {
+        "frameNumber": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 1,
+          "description": "Frame number in the sequence (mapped from DICOM InstanceNumber)"
+        },
+        "sopInstanceUID": {
+          "type": "string",
+          "description": "DICOM SOP Instance UID - unique identifier for this frame"
+        },
+        "imagePositionPatient": {
+          "type": "array",
+          "items": { "type": "number", "format": "float32" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "3D position of this frame in patient coordinates (mm)"
+        },
+        "imageOrientationPatient": {
+          "type": "array",
+          "items": { "type": "number", "format": "float32" },
+          "minItems": 6,
+          "maxItems": 6,
+          "description": "Image orientation in patient coordinates for this frame"
+        },
+        "sliceLocation": {
+          "type": "number",
+          "format": "float32",
+          "description": "Z-position of this slice in patient coordinates (mm)"
+        },
+        "acquisitionTime": {
+          "type": "string",
+          "description": "DICOM Acquisition Time for this specific frame"
+        },
+        "acquisitionDate": {
+          "type": "string",
+          "description": "DICOM Acquisition Date for this specific frame"
+        },
+        "contentTime": {
+          "type": "string",
+          "description": "DICOM Content Time for this specific frame"
+        },
+        "contentDate": {
+          "type": "string",
+          "description": "DICOM Content Date for this specific frame"
+        },
+        "largestImagePixelValue": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Largest pixel value in this frame (varies by slice content)"
+        },
+        "smallestImagePixelValue": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Smallest pixel value in this frame (varies by slice content)"
+        }
+      }
+    }
+  }
+}

@@ -99,56 +99,9 @@ void ImageData::addData(
     // Start timing for total compression
     auto compressionStart = std::chrono::high_resolution_clock::now();
 
-
-
     for (size_t i = 0; i < data.size(); ++i) {
         const auto& frame = data[i];
         auto frameModule = std::make_unique<FrameData>(frameSchemaPath, *header);
-
-        // Validate frame structure against schema
-        if (!frame.metadata.contains("position") || !frame.metadata.contains("orientation")) {
-            throw std::runtime_error("Frame " + std::to_string(i) + " missing required metadata (position/orientation)");
-        }
-
-        // Validate position array dimensions match image dimensions
-        const auto& position = frame.metadata["position"];
-        if (position.size() != dimensions.size()) {
-            throw std::runtime_error("Frame " + std::to_string(i) + 
-                " position dimensions (" + std::to_string(position.size()) + 
-                ") don't match image dimensions (" + std::to_string(dimensions.size()) + ")");
-        }
-
-        // Validate orientation vectors are 3D for 2D images
-        if (dimensions.size() == 2) {
-            if (!frame.metadata["orientation"].contains("row_cosine") || 
-                !frame.metadata["orientation"].contains("column_cosine")) {
-                throw std::runtime_error("Frame " + std::to_string(i) + " missing required orientation vectors");
-            }
-            
-            const auto& rowCos = frame.metadata["orientation"]["row_cosine"];
-            const auto& colCos = frame.metadata["orientation"]["column_cosine"];
-            
-            if (rowCos.size() != 3 || colCos.size() != 3) {
-                throw std::runtime_error("Frame " + std::to_string(i) + " orientation vectors must be 3D");
-            }
-        }
-
-        // Validate timestamp format (basic ISO 8601 check)
-        if (frame.metadata.contains("timestamp")) {
-            const std::string& timestamp = frame.metadata["timestamp"];
-            if (timestamp.length() != 20) {
-                throw std::runtime_error("Frame " + std::to_string(i) + " timestamp must be 20 characters (ISO 8601)");
-            }
-        }
-
-        // Validate frame number is sequential
-        if (frame.metadata.contains("frame_number")) {
-            int frameNum = frame.metadata["frame_number"];
-            if (frameNum < 0 || frameNum >= static_cast<int>(data.size())) {
-                throw std::runtime_error("Frame " + std::to_string(i) + 
-                    " frame_number out of range: " + std::to_string(frameNum));
-            }
-        }
 
         // Extract frame-specific data (assuming it's binary pixel data)
         if (!std::holds_alternative<std::vector<uint8_t>>(frame.data)) {

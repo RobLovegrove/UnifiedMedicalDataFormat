@@ -244,7 +244,6 @@ void DataHeader::readDataHeader(std::istream& in) {
             case HeaderFieldType::ModifiedBy:
                 modifiedBy = std::string(buffer.data(), length);
                 break;
-
             default:
                 throw std::runtime_error("Unknown HeaderFieldType: " + std::to_string(typeId));
         }

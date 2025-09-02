@@ -559,6 +559,30 @@ int main(int argc, char** argv) {
                     for (size_t i = 0; i < nestedModules.size() && i < 3; i++) { // Limit to first 3 for readability
                         cout << "  Sub-module " << i << " metadata: " 
                              << nestedModules[i].metadata.dump(2) << endl;
+                        
+                        // Print pixel data for each frame
+                        const auto& frameData = nestedModules[i].data;
+                        if (std::holds_alternative<std::vector<uint8_t>>(frameData)) {
+                            const auto& pixelData = std::get<std::vector<uint8_t>>(frameData);
+                            cout << "  Frame " << i << " pixel data: " << pixelData.size() << " pixels" << endl;
+                            
+                            // Print first 10,000 pixel values for preview
+                            cout << "  First 100,000 pixel values: ";
+                            for (size_t j = 0; j < min(pixelData.size(), (size_t)100000); j++) {
+                                cout << (int)pixelData[j] << " ";
+                            }
+                            if (pixelData.size() > 100000) {
+                                cout << "... (and " << (pixelData.size() - 100000) << " more)";
+                            }
+                            cout << endl;
+                            
+                            // Print pixel statistics
+                            if (!pixelData.empty()) {
+                                uint8_t minVal = *min_element(pixelData.begin(), pixelData.end());
+                                uint8_t maxVal = *max_element(pixelData.begin(), pixelData.end());
+                                cout << "  Pixel range: [" << (int)minVal << "-" << (int)maxVal << "]" << endl;
+                            }
+                        }
                     }
                     if (nestedModules.size() > 3) {
                         cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;

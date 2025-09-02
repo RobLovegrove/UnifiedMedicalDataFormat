@@ -39,6 +39,7 @@
             "memory_order": {
               "type": "string",
               "enum": ["row_major", "column_major"],
+              "storage": { "type": "uint8", "format": "enum" },
               "description": "Memory layout order for pixel data"
             },
             "origin": {

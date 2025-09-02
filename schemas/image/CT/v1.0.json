@@ -1,0 +1,360 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "./schemas/image/CT/v1.0.json",
+  "title": "CT Image",
+  "description": "Schema for CT image modules with comprehensive metadata and data structure.",
+  "type": "object",
+  "module_type": "image",
+  "endianness": "little",
+  "required": ["metadata", "data"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["image_structure", "modality"],
+      "properties": {
+        "image_structure": {
+          "type": "object",
+          "required": ["channels", "bit_depth", "encoding", "memory_order", "origin", "layout", "dimensions", "dimension_names"],
+          "properties": {
+            "channels": { 
+              "type": "integer", 
+              "format": "uint8",
+              "description": "Number of image channels (1 for grayscale CT, 3 for RGB overlay, etc.)"
+            },
+            "bit_depth": { 
+              "type": "integer", 
+              "format": "uint8",
+              "description": "Bits per pixel per channel (typically 12 or 16 for CT)"
+            },
+            "encoding": { 
+              "type": "string", 
+              "enum": ["raw", "jpeg2000-lossless", "png"],
+              "description": "Image encoding format. Medical data requires lossless encoding only."
+            },
+            "memory_order": {
+              "type": "string",
+              "enum": ["row_major", "column_major"],
+              "description": "Memory layout order for pixel data (typically row_major for DICOM)"
+            },
+            "origin": {
+              "type": "string",
+              "enum": ["top_left", "bottom_left", "top_right", "bottom_right"],
+              "description": "Origin of the image in the coordinate system (typically top_left for DICOM)"
+            },
+            "layout": {
+              "type": "string", 
+              "enum": ["interleaved", "planar"],
+              "description": "Channel layout format. Required for multichannel images (channels > 1)"
+            },
+            "dimensions": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1, "format": "uint16" },
+              "minItems": 2,
+              "maxItems": 10,
+              "description": "Size of each dimension [width, height, slices, time]"
+            },
+            "dimension_names": {
+              "type": "array", 
+              "items": { "type": "string" },
+              "minItems": 2,
+              "maxItems": 10,
+              "description": "Names of each dimension (x, y, z, time, etc.)"
+            }
+          }
+        },
+        "modality": {
+          "type": "string",
+          "enum": ["CT"],
+          "description": "Imaging modality - must be CT for this schema"
+        },
+        "patientName": {
+          "type": "string",
+          "description": "Patient's name (anonymized for privacy)"
+        },
+        "patientID": {
+          "type": "string",
+          "description": "Patient's unique identifier"
+        },
+        "patientAge": {
+          "type": "string",
+          "description": "Patient's age at time of study"
+        },
+        "patientSex": {
+          "type": "string",
+          "enum": ["M", "F", "O"],
+          "description": "Patient's sex"
+        },
+        "patientPosition": {
+          "type": "string",
+          "description": "Patient position on table (e.g., FFS, HFS)"
+        },
+        "patientSize": {
+          "type": "number",
+          "format": "float32",
+          "description": "Patient size in meters"
+        },
+        "patientWeight": {
+          "type": "number",
+          "format": "float32",
+          "description": "Patient weight in kg"
+        },
+        "studyDate": {
+          "type": "string",
+          "description": "Study date from DICOM"
+        },
+        "studyTime": {
+          "type": "string",
+          "description": "Study time from DICOM"
+        },
+        "studyDescription": {
+          "type": "string",
+          "description": "Study description from DICOM"
+        },
+        "studyID": {
+          "type": "string",
+          "description": "DICOM Study ID"
+        },
+        "studyInstanceUID": {
+          "type": "string",
+          "description": "DICOM Study Instance UID"
+        },
+        "seriesDate": {
+          "type": "string",
+          "description": "Series date from DICOM"
+        },
+        "seriesTime": {
+          "type": "string",
+          "description": "Series time from DICOM"
+        },
+        "seriesDescription": {
+          "type": "string",
+          "description": "Series description from DICOM"
+        },
+        "seriesNumber": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Series number from DICOM"
+        },
+        "seriesInstanceUID": {
+          "type": "string",
+          "description": "DICOM Series Instance UID"
+        },
+        "institutionName": {
+          "type": "string",
+          "description": "Institution where the scan was performed"
+        },
+        "manufacturer": {
+          "type": "string",
+          "description": "Scanner manufacturer"
+        },
+        "manufacturerModelName": {
+          "type": "string",
+          "description": "Scanner model name"
+        },
+        "softwareVersions": {
+          "type": "string",
+          "description": "Scanner software version"
+        },
+        "protocolName": {
+          "type": "string",
+          "description": "Name of the CT scanning protocol used"
+        },
+        "referringPhysicianName": {
+          "type": "string",
+          "description": "Name of referring physician"
+        },
+        "operatorsName": {
+          "type": "string",
+          "description": "Names of operators"
+        },
+        "bodyPartExamined": {
+          "type": "string",
+          "description": "Anatomical region being scanned"
+        },
+        "sliceThickness": {
+          "type": "number",
+          "format": "float32",
+          "description": "Thickness of each CT slice in millimeters"
+        },
+        "pixelSpacing": {
+          "type": "array",
+          "items": { "type": "number", "format": "float32", "minimum": 0.1, "maximum": 5.0 },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Physical spacing between pixels [x, y] in millimeters"
+        },
+        "rescaleIntercept": {
+          "type": "number",
+          "format": "float32",
+          "description": "Rescale intercept for converting pixel values to Hounsfield units"
+        },
+        "rescaleSlope": {
+          "type": "number",
+          "format": "float32",
+          "description": "Rescale slope for converting pixel values to Hounsfield units"
+        },
+        "rescaleType": {
+          "type": "string",
+          "description": "Type of rescaling applied (typically 'HU')"
+        },
+        "windowCenter": {
+          "type": "array",
+          "items": { "type": "number", "format": "float32" },
+          "minItems": 1,
+          "maxItems": 5,
+          "description": "Window center for display (Hounsfield units)"
+        },
+        "windowWidth": {
+          "type": "array",
+          "items": { "type": "number", "format": "float32" },
+          "minItems": 1,
+          "maxItems": 5,
+          "description": "Window width for display (Hounsfield units)"
+        },
+        "photometricInterpretation": {
+          "type": "string",
+          "description": "Photometric interpretation of pixel data (typically 'MONOCHROME2')"
+        },
+        "pixelRepresentation": {
+          "type": "integer",
+          "format": "uint8",
+          "description": "Pixel representation (0=unsigned, 1=signed)"
+        },
+        "bitsAllocated": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Number of bits allocated per pixel"
+        },
+        "bitsStored": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Number of bits stored per pixel"
+        },
+        "highBit": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Highest bit number in pixel data"
+        },
+        "samplesPerPixel": {
+          "type": "integer",
+          "format": "uint8",
+          "description": "Number of samples per pixel"
+        },
+        "rows": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Number of rows in image"
+        },
+        "columns": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "Number of columns in image"
+        },
+        "kvp": {
+          "type": "number",
+          "format": "float32",
+          "minimum": 80,
+          "maximum": 150,
+          "description": "Peak kilovoltage used for the scan"
+        },
+        "exposureTime": {
+          "type": "string",
+          "description": "Exposure time in milliseconds"
+        },
+        "exposure": {
+          "type": "number",
+          "format": "float32",
+          "description": "Exposure in mAs"
+        },
+        "xRayTubeCurrent": {
+          "type": "integer",
+          "format": "uint16",
+          "description": "X-ray tube current in mA"
+        },
+        "filterType": {
+          "type": "string",
+          "description": "Type of filter used"
+        },
+        "convolutionKernel": {
+          "type": "array", 
+          "items": { "type": "string" },
+          "minItems": 2,
+          "maxItems": 10,
+          "description": "Convolution kernel used for image reconstruction"
+        },
+        "reconstructionDiameter": {
+          "type": "number",
+          "format": "float32",
+          "description": "Reconstruction diameter in mm"
+        },
+        "exposureModulationType": {
+          "type": "string",
+          "description": "Type of exposure modulation used"
+        },
+        "contrastBolusAgent": {
+          "type": "string",
+          "description": "Contrast agent used"
+        },
+        "contrastBolusVolume": {
+          "type": "number",
+          "format": "float32",
+          "description": "Volume of contrast agent in ml"
+        },
+        "contrastBolusStartTime": {
+          "type": "string",
+          "description": "Start time of contrast injection"
+        },
+        "contrastBolusStopTime": {
+          "type": "string",
+          "description": "Stop time of contrast injection"
+        },
+        "imageComments": {
+          "type": "string",
+          "description": "Comments about the image series"
+        },
+        "imageType": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "maxItems": 10,
+          "description": "Image type classification"
+        },
+        "sopClassUID": {
+          "type": "string",
+          "description": "DICOM SOP Class UID"
+        },
+        "transferSyntaxUID": {
+          "type": "string",
+          "description": "DICOM transfer syntax UID"
+        },
+        "specificCharacterSet": {
+          "type": "string",
+          "description": "Character set used for text encoding"
+        },
+        "lossyImageCompression": {
+          "type": "string",
+          "description": "Lossy image compression method used"
+        },
+        "lossyImageCompressionMethod": {
+          "type": "string",
+          "description": "Method of lossy image compression"
+        },
+        "lossyImageCompressionRatio": {
+          "type": "number",
+          "format": "float32",
+          "description": "Compression ratio for lossy compression"
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "required": ["frames"],
+      "properties": {
+        "frames": {
+          "$ref": "./schemas/frame/CT/v1.0.json",
+          "description": "Reference to CT frame schema for frame-specific metadata"
+        }
+      }
+    }
+  }
+}

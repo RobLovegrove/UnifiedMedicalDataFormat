@@ -10,7 +10,6 @@
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["position", "orientation"],
       "properties": {
         "position": {
           "type": "array",
