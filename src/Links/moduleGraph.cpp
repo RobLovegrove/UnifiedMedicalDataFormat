@@ -37,14 +37,6 @@ ModuleGraph ModuleGraph::readModuleGraph(std::istream& in) {
     } catch (const std::exception& e) {
         throw std::runtime_error("Exception reading links: " + std::string(e.what()));
     }
-
-    // // Build adjacency lists
-    // moduleGraph.buildAdjacencyLists();
-
-    // if (moduleGraph.hasCycle()) {
-    //     throw std::runtime_error("Cycle detected when building module graph");
-    // }
-
     return moduleGraph;
 }
 
@@ -144,7 +136,7 @@ void ModuleGraph::readLinks(std::istream& in) {
         in.read(reinterpret_cast<char*>(&deleted), sizeof(deleted));
         bytesRead += temp.size() * 2 + sizeof(linkType) + sizeof(deleted);
 
-        // Skip deleted links early
+        // Skip deleted links early - no need to add to adjacency list
         if (deleted) {
             continue;
         }
@@ -167,53 +159,6 @@ void ModuleGraph::readLinks(std::istream& in) {
         reverseAdjacency[targetId].push_back(linkPtr);
     }
 }
-
-// void ModuleGraph::buildAdjacencyLists() {
-//     adjacency.clear();
-//     reverseAdjacency.clear();
-
-//     for (const auto& linkPtr : links) {
-//         if (linkPtr->deleted) continue; // skip deleted links
-
-//         // Forward adjacency: source -> target(s)
-//         adjacency[linkPtr->sourceId].push_back(linkPtr);
-
-//         // Reverse adjacency: target -> source(s)
-//         reverseAdjacency[linkPtr->targetId].push_back(linkPtr);
-//     }
-// }
-
-// bool ModuleGraph::hasCycle() const {
-//     std::unordered_set<UUID> visited;
-//     std::unordered_set<UUID> recursionStack;
-
-//     std::function<bool(const UUID&)> dfs = [&](const UUID& node) -> bool {
-//         if (recursionStack.count(node)) return true; // back edge → cycle
-//         if (visited.count(node)) return false;
-
-//         visited.insert(node);
-//         recursionStack.insert(node);
-
-//         auto it = adjacency.find(node);
-//         if (it != adjacency.end()) {
-//             for (const auto& link : it->second) {
-//                 if (dfs(link->targetId)) {
-//                     return true;
-//                 }
-//             }
-//         }
-
-//         recursionStack.erase(node);
-//         return false;
-//     };
-
-//     // Run DFS from every node
-//     for (const auto& [node, _] : adjacency) {
-//         if (dfs(node)) return true;
-//     }
-//     return false;
-// }
-
 
 // Writing methods
 

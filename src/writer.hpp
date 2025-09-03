@@ -6,6 +6,7 @@
 #include <fstream>
 #include <expected>
 #include <vector>
+#include <boost/interprocess/sync/file_lock.hpp>
 
 #include "Header/header.hpp"
 #include "Xref/xref.hpp"
@@ -15,6 +16,8 @@
 #include "Utility/Encryption/encryptionManager.hpp"
 #include "Links/moduleGraph.hpp"
 #include "Links/moduleLink.hpp"
+
+
 
 struct Result {
     bool success;
@@ -28,6 +31,8 @@ private:
     XRefTable xrefTable;
     ModuleGraph moduleGraph;
 
+    std::unique_ptr<boost::interprocess::file_lock> fileLock;
+
     std::string filePath;
     std::string tempFilePath;
 
@@ -35,6 +40,8 @@ private:
 
     std::string author;
     bool newFile = false;
+
+    void releaseFileLock();
 
     bool writeXref(std::ostream& outfile);
 
@@ -52,6 +59,8 @@ private:
     Result addModule(const std::string& schemaPath, UUID moduleId, const ModuleData& module);
 
 public:
+
+    ~Writer();
 
     void printEncounterPath(const UUID& encounterId);
 

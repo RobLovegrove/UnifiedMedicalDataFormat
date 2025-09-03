@@ -18,6 +18,7 @@
 #include <expected>
 #include <nlohmann/json.hpp>
 #include <filesystem>
+#include <boost/interprocess/sync/file_lock.hpp>
 
 using namespace std;
 
@@ -37,6 +38,11 @@ Result Writer::createNewFile(std::string& filename, string author, string passwo
     // Check if file exists and is not empty or currently open
     if (std::filesystem::exists(filename)) {
         return Result{false, "Trying to create new file, but file already exists"};
+    }
+
+    // Create the file so it can be locked in set up file stream
+    {
+    std::ofstream touch(filename, std::ios::app);
     }
 
     // Set up file stream
@@ -259,8 +265,8 @@ Result Writer::cancelThenClose() {
     }
 
     removeTempFile();
-
     resetWriter();
+    releaseFileLock();
     return Result{true, "File closed successfully"};
 
 }
@@ -275,8 +281,7 @@ Result Writer::closeFile() {
     // Check XrefTable is not empty
     if (xrefTable.getEntries().empty()) {
         // No modules to write so delete temp file
-        std::filesystem::remove(tempFilePath);
-
+        removeTempFile();
         resetWriter();
         return Result{true, "File closed successfully"};
     }
@@ -288,7 +293,8 @@ Result Writer::closeFile() {
 
     // Check temp file is not empty
     if (std::filesystem::is_empty(tempFilePath)) {
-        return Result{false, "Temp file is empty"};
+        removeTempFile();
+        return Result{false, "Empty temp file, so removed"};
     }
 
     streampos moduleGraphOffset = fileStream.tellp();
@@ -303,7 +309,7 @@ Result Writer::closeFile() {
 
     } catch (const std::exception& e) {
         fileStream.close();
-        std::filesystem::remove(tempFilePath);
+        removeTempFile();
         return Result{false, "Exception writing module graph: " + std::string(e.what())};
     }
 
@@ -321,7 +327,7 @@ Result Writer::closeFile() {
         }
     } catch (const std::exception& e) {
         fileStream.close();
-        std::filesystem::remove(tempFilePath);
+        removeTempFile();
         return Result{false, "Exception writing XREF table: " + std::string(e.what())};
     }
 
@@ -348,13 +354,14 @@ Result Writer::closeFile() {
         std::filesystem::rename(tempFilePath, filePath);
         cout << "File renamed successfully" << endl;
     } catch (const std::exception& e) {
-        std::filesystem::remove(tempFilePath);
+        removeTempFile();
         return Result{false, "Exception renaming temp file: " + std::string(e.what())};
     }
 
     // Reset writer
     newFile = false;
 
+    releaseFileLock();
     return Result{true, "File closed successfully"};
 }
 
@@ -372,8 +379,19 @@ Result Writer::setUpFileStream(std::string& filename) {
 
     resetWriter();
 
+    // Acquire a lock on the main file
+    try {
+        fileLock = std::make_unique<boost::interprocess::file_lock>(filename.c_str());
+        if (!fileLock->try_lock()) {
+            return Result{false, "File is already locked by another process"};
+        }
+    } catch (const std::exception& e) {
+        return Result{false, "Failed to acquire file lock: " + std::string(e.what())};
+    }
+
     filePath = filename;
     tempFilePath = filename + ".tmp";
+
 
     // Create new temp file
     if (!newFile) {
@@ -525,30 +543,6 @@ std::expected<UUID, std::string> Writer::addAnnotation(
 
 }
 
-// Result Writer::addLink(const UUID& sourceId, const UUID& targetId, ModuleLinkType linkType) {
-
-//     // Check if file stream is open
-//     if (!fileStream.is_open()) {
-//         return Result{false, "No file is open"};
-//     }
-
-//     if (!xrefTable.contains(sourceId)) {
-//         return Result{false, "Source module does not exist"};
-//     }
-
-//     if (!xrefTable.contains(targetId)) {
-//         return Result{false, "Target module does not exist"};
-//     }
-    
-//     try {
-//         moduleGraph.addLink(ModuleLink(sourceId, targetId, linkType));
-//     } catch (const std::exception& e) {
-//         return Result{false, "Exception adding link: " + std::string(e.what())};
-//     }
-
-//     return Result{true, "Link added successfully"};
-// }
-
 /* ======================================================= */
 /* =============== WRITER HELPER FUNCTIONS =============== */
 /* ======================================================= */
@@ -627,6 +621,9 @@ void Writer::removeTempFile() {
     if (std::filesystem::exists(tempFilePath)) {
         std::filesystem::remove(tempFilePath);
     }
+    if (std::filesystem::exists(filePath) && std::filesystem::is_empty(filePath)) {
+    std::filesystem::remove(filePath);
+    }
     tempFilePath.clear();
 }
 
@@ -691,4 +688,17 @@ Result Writer::validateTempFile(size_t moduleCount) {
     }
 
     return Result{true, "Temp file validated successfully"};
+}
+
+void Writer::releaseFileLock() { 
+    if (fileLock) {
+        fileLock->unlock();
+        fileLock.reset();
+    }
+}
+
+Writer::~Writer() {
+    if (fileLock && fileLock->try_lock()) {
+        fileLock->unlock();
+    }
 }
