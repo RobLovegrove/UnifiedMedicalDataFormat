@@ -460,7 +460,7 @@ std::expected<UUID, std::string> Writer::addModuleToEncounter(
     return moduleId;
 }
 
-std::expected<UUID, std::string> Writer::addDerivedModule(
+std::expected<UUID, std::string> Writer::addVariantModule(
     const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module) {
 
 
@@ -477,7 +477,7 @@ std::expected<UUID, std::string> Writer::addDerivedModule(
         UUID moduleId = UUID();
 
         try {
-            moduleGraph.addModuleLink(moduleId, parentModuleId, ModuleLinkType::DERIVED_FROM);
+            moduleGraph.addModuleLink(moduleId, parentModuleId, ModuleLinkType::VARIANT_OF);
         } catch (const std::exception& e) {
             return std::unexpected("Exception adding derived module: " + std::string(e.what()));
         }
@@ -485,7 +485,7 @@ std::expected<UUID, std::string> Writer::addDerivedModule(
         auto result = addModule(schemaPath, moduleId, module);
         
         if (!result.success) {
-            moduleGraph.removeModuleLink(parentModuleId, moduleId, ModuleLinkType::DERIVED_FROM);
+            moduleGraph.removeModuleLink(parentModuleId, moduleId, ModuleLinkType::VARIANT_OF);
             return std::unexpected(result.message);
         }
 

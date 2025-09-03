@@ -64,7 +64,7 @@ public:
     // Start a new encounter. The "root" module defines the encounter.
     std::expected<UUID, std::string> createNewEncounter();
     std::expected<UUID, std::string> addModuleToEncounter(const UUID& encounterId, const std::string& schemaPath, const ModuleData& module);
-    std::expected<UUID, std::string> addDerivedModule(const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module);
+    std::expected<UUID, std::string> addVariantModule(const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module);
     std::expected<UUID, std::string> addAnnotation(const UUID& parentModuleId, const std::string& schemaPath, const ModuleData& module);
 
     // // Low level API call available

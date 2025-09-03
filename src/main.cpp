@@ -310,17 +310,17 @@ int main(int argc, char** argv) {
 
         imagePair.second.metadata["modality"] = "CT2";
 
-        // Add derived module
-        cout << "Adding derived module" << endl;
-        auto derivedModuleResult = writer.addDerivedModule(imageModuleId, imagePair.first, imagePair.second);
-        if (!derivedModuleResult) {
-            cerr << "Failed to add derived module: " << derivedModuleResult.error() << endl;
+        // Add variant module
+        cout << "Adding variant module" << endl;
+        auto variantModuleResult = writer.addVariantModule(imageModuleId, imagePair.first, imagePair.second);
+        if (!variantModuleResult) {
+            cerr << "Failed to add variant module: " << variantModuleResult.error() << endl;
             return 1;
         }
-        UUID derivedModuleId = derivedModuleResult.value();
+        UUID variantModuleId = variantModuleResult.value();
 
-        cout << "Derived module added successfully. New module UUID:\n";
-        cout << "  - " << derivedModuleId.toString() << endl;
+        cout << "Variant module added successfully. New module UUID:\n";
+        cout << "  - " << variantModuleId.toString() << endl;
 
         // Close the file
         cout << "Closing file" << endl;

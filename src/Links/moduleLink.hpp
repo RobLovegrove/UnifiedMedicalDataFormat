@@ -15,7 +15,7 @@ struct Encounter {
 
 enum class ModuleLinkType {
     BELONGS_TO,
-    DERIVED_FROM,
+    VARIANT_OF,
     ANNOTATES
 };
 

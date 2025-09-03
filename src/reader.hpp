@@ -31,11 +31,6 @@ private:
 
     bool isOpen() const { return fileStream.is_open(); }
 
-    // Helper methods for building enhanced JSON structure
-    nlohmann::json buildEncounterModuleChain(const UUID& encounterId) const;
-    nlohmann::json buildModuleWithDerivatives(const UUID& moduleId, int depth = 0) const;
-    nlohmann::json buildModuleGraphSummary() const;
-    std::string getModuleTypeString(const UUID& moduleId) const;
     std::expected<std::unique_ptr<DataModule>, std::string> loadModule
         (uint64_t offset, uint32_t size, ModuleType type);
 

@@ -38,12 +38,12 @@ ModuleGraph ModuleGraph::readModuleGraph(std::istream& in) {
         throw std::runtime_error("Exception reading links: " + std::string(e.what()));
     }
 
-    // Build adjacency lists
-    moduleGraph.buildAdjacencyLists();
+    // // Build adjacency lists
+    // moduleGraph.buildAdjacencyLists();
 
-    if (moduleGraph.hasCycle()) {
-        throw std::runtime_error("Cycle detected when building module graph");
-    }
+    // if (moduleGraph.hasCycle()) {
+    //     throw std::runtime_error("Cycle detected when building module graph");
+    // }
 
     return moduleGraph;
 }
@@ -125,10 +125,8 @@ void ModuleGraph::readEncounters(std::istream& in) {
 }
 
 void ModuleGraph::readLinks(std::istream& in) {
-
     size_t bytesRead = 0;
     while (bytesRead < linkSize) {
-
         UUID sourceId;
         UUID targetId;
         ModuleLinkType linkType;
@@ -146,55 +144,75 @@ void ModuleGraph::readLinks(std::istream& in) {
         in.read(reinterpret_cast<char*>(&deleted), sizeof(deleted));
         bytesRead += temp.size() * 2 + sizeof(linkType) + sizeof(deleted);
 
-        links.push_back(std::make_shared<ModuleLink>(sourceId, targetId, linkType));
-    }
-}
-
-void ModuleGraph::buildAdjacencyLists() {
-    adjacency.clear();
-    reverseAdjacency.clear();
-
-    for (const auto& linkPtr : links) {
-        if (linkPtr->deleted) continue; // skip deleted links
-
-        // Forward adjacency: source -> target(s)
-        adjacency[linkPtr->sourceId].push_back(linkPtr);
-
-        // Reverse adjacency: target -> source(s)
-        reverseAdjacency[linkPtr->targetId].push_back(linkPtr);
-    }
-}
-
-bool ModuleGraph::hasCycle() const {
-    std::unordered_set<UUID> visited;
-    std::unordered_set<UUID> recursionStack;
-
-    std::function<bool(const UUID&)> dfs = [&](const UUID& node) -> bool {
-        if (recursionStack.count(node)) return true; // back edge → cycle
-        if (visited.count(node)) return false;
-
-        visited.insert(node);
-        recursionStack.insert(node);
-
-        auto it = adjacency.find(node);
-        if (it != adjacency.end()) {
-            for (const auto& link : it->second) {
-                if (dfs(link->targetId)) {
-                    return true;
-                }
-            }
+        // Skip deleted links early
+        if (deleted) {
+            continue;
         }
 
-        recursionStack.erase(node);
-        return false;
-    };
+        // Before inserting, check for cycles
+        if (wouldCreateCycle(sourceId, targetId)) {
+            throw std::runtime_error(
+                "Cycle detected while reading links: " +
+                sourceId.toString() + " -> " + targetId.toString()
+            );
+        }
 
-    // Run DFS from every node
-    for (const auto& [node, _] : adjacency) {
-        if (dfs(node)) return true;
+        // Create and store link
+        auto linkPtr = std::make_shared<ModuleLink>(sourceId, targetId, linkType);
+        linkPtr->deleted = deleted;
+        links.push_back(linkPtr);
+
+        // Update adjacency maps immediately
+        adjacency[sourceId].push_back(linkPtr);
+        reverseAdjacency[targetId].push_back(linkPtr);
     }
-    return false;
 }
+
+// void ModuleGraph::buildAdjacencyLists() {
+//     adjacency.clear();
+//     reverseAdjacency.clear();
+
+//     for (const auto& linkPtr : links) {
+//         if (linkPtr->deleted) continue; // skip deleted links
+
+//         // Forward adjacency: source -> target(s)
+//         adjacency[linkPtr->sourceId].push_back(linkPtr);
+
+//         // Reverse adjacency: target -> source(s)
+//         reverseAdjacency[linkPtr->targetId].push_back(linkPtr);
+//     }
+// }
+
+// bool ModuleGraph::hasCycle() const {
+//     std::unordered_set<UUID> visited;
+//     std::unordered_set<UUID> recursionStack;
+
+//     std::function<bool(const UUID&)> dfs = [&](const UUID& node) -> bool {
+//         if (recursionStack.count(node)) return true; // back edge → cycle
+//         if (visited.count(node)) return false;
+
+//         visited.insert(node);
+//         recursionStack.insert(node);
+
+//         auto it = adjacency.find(node);
+//         if (it != adjacency.end()) {
+//             for (const auto& link : it->second) {
+//                 if (dfs(link->targetId)) {
+//                     return true;
+//                 }
+//             }
+//         }
+
+//         recursionStack.erase(node);
+//         return false;
+//     };
+
+//     // Run DFS from every node
+//     for (const auto& [node, _] : adjacency) {
+//         if (dfs(node)) return true;
+//     }
+//     return false;
+// }
 
 
 // Writing methods
@@ -523,103 +541,6 @@ std::vector<UUID> ModuleGraph::getRootModules() const {
     return roots;
 }
 
-// std::vector<UUID> ModuleGraph::getEncounterMembers(const UUID& rootId) const {
-//     std::vector<UUID> members;
-//     std::unordered_set<UUID> visited;
-//     std::queue<UUID> toVisit;
-    
-//     // Start with the root
-//     toVisit.push(rootId);
-//     visited.insert(rootId);
-    
-//     while (!toVisit.empty()) {
-//         UUID current = toVisit.front();
-//         toVisit.pop();
-//         members.push_back(current);
-        
-//         // Find all modules that belong to the current module
-//         // Look for incoming BELONGS_TO links TO the current module
-//         auto reverseIt = reverseAdjacency.find(current);
-//         if (reverseIt != reverseAdjacency.end()) {
-//             for (const auto& link : reverseIt->second) {
-//                 if (link->linkType == ModuleLinkType::BELONGS_TO && !link->deleted) {
-//                     UUID source = link->sourceId;  // The module that belongs to current
-//                     if (visited.find(source) == visited.end()) {
-//                         toVisit.push(source);
-//                         visited.insert(source);
-//                     }
-//                 }
-//             }
-//         }
-        
-//         // Also find modules that the current module belongs to
-//         // Look for outgoing BELONGS_TO links FROM the current module
-//         auto it = adjacency.find(current);
-//         if (it != adjacency.end()) {
-//             for (const auto& link : it->second) {
-//                 if (link->linkType == ModuleLinkType::BELONGS_TO && !link->deleted) {
-//                     UUID target = link->targetId;  // The module that current belongs to
-//                     if (visited.find(target) == visited.end()) {
-//                         toVisit.push(target);
-//                         visited.insert(target);
-//                     }
-//                 }
-//             }
-//         }
-//     }
-    
-//     return members;
-// }
-
-// std::vector<UUID> ModuleGraph::getDerivedData(const UUID& sourceId) const {
-//     std::vector<UUID> derived;
-//     std::unordered_set<UUID> visited;
-//     std::queue<UUID> toVisit;
-    
-//     // Start with the source
-//     toVisit.push(sourceId);
-//     visited.insert(sourceId);
-    
-//     while (!toVisit.empty()) {
-//         UUID current = toVisit.front();
-//         toVisit.pop();
-        
-//         // Find all modules that are derived from the current module
-//         // Look for incoming DERIVED_FROM links TO the current module
-//         auto reverseIt = reverseAdjacency.find(current);
-//         if (reverseIt != reverseAdjacency.end()) {
-//             for (const auto& link : reverseIt->second) {
-//                 if (link->linkType == ModuleLinkType::DERIVED_FROM && !link->deleted) {
-//                     UUID source = link->sourceId;  // The module that is derived from current
-//                     if (visited.find(source) == visited.end()) {
-//                         derived.push_back(source);
-//                         toVisit.push(source);
-//                         visited.insert(source);
-//                     }
-//                 }
-//             }
-//         }
-//     }
-    
-//     return derived;
-// }
-
-// std::vector<UUID> ModuleGraph::getAnnotations(const UUID& sourceId) const {
-//     std::vector<UUID> annotations;
-    
-//     // Find all modules that annotate this one
-//     auto it = reverseAdjacency.find(sourceId);
-//     if (it != reverseAdjacency.end()) {
-//         for (const auto& link : it->second) {
-//             if (link->linkType == ModuleLinkType::ANNOTATES && !link->deleted) {
-//                 annotations.push_back(link->sourceId);
-//             }
-//         }
-//     }
-    
-//     return annotations;
-// }
-
 void ModuleGraph::displayEncounters() const {
     for (const auto& [encounterId, encounter] : encounters) {
         if (!encounter.rootModule.has_value()) {
@@ -697,26 +618,26 @@ void ModuleGraph::printEncounterPath(const UUID& encounterId) const {
     std::cout << "Printing Encounter:\n";
     std::cout << "Encounter ID: " << encounterId.toString() << "\n\n";
 
-    // Recursive helper to print a module and its derived/annotated children
+    // Recursive helper to print a module and its variant/annotated children
     std::function<void(const UUID&, int)> printModule;
     printModule = [&](const UUID& moduleId, int indent) {
         // Print module ID with indentation
         for (int i = 0; i < indent; ++i) std::cout << "    ";
         std::cout << moduleId.toString() << "\n";
 
-        // Print derived modules (indented)
-        auto derivedIt = adjacency.find(moduleId);
-        if (derivedIt != adjacency.end()) {
-            for (const auto& link : derivedIt->second) {
-                if (link->linkType == ModuleLinkType::DERIVED_FROM) {
+        // Print variant modules (indented)
+        auto variantIt = adjacency.find(moduleId);
+        if (variantIt != adjacency.end()) {
+            for (const auto& link : variantIt->second) {
+                if (link->linkType == ModuleLinkType::VARIANT_OF) {
                     printModule(link->targetId, indent + 1);
                 }
             }
         }
 
         // Print annotations (with arrow)
-        if (derivedIt != adjacency.end()) {
-            for (const auto& link : derivedIt->second) {
+        if (variantIt != adjacency.end()) {
+            for (const auto& link : variantIt->second) {
                 if (link->linkType == ModuleLinkType::ANNOTATES) {
                     for (int i = 0; i < indent; ++i) std::cout << "    ";
                     std::cout << "-> " << link->targetId.toString() << "\n";
@@ -812,7 +733,7 @@ nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
     nlohmann::json j;
     j["id"] = moduleId.toString();
 
-    nlohmann::json derivedArray = nlohmann::json::array();
+    nlohmann::json variantArray = nlohmann::json::array();
     nlohmann::json annotatesArray = nlohmann::json::array();
 
     // Find annotations (incoming links)
@@ -827,8 +748,8 @@ nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
         }
     }
 
-    // Find derived modules (incoming links)
-    std::cout << "DEBUG: Looking for DERIVED_FROM links for module: " << moduleId.toString() << std::endl;
+    // Find variant modules (incoming links)
+    std::cout << "DEBUG: Looking for VARIANT_OF links for module: " << moduleId.toString() << std::endl;
     
     // Debug: Check if there are any circular references
     if (reverseAdjacency.find(moduleId) != reverseAdjacency.end()) {
@@ -855,15 +776,15 @@ nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
         for (const auto& link : reverseIt->second) {
             if (link->deleted) continue;
 
-            if (link->linkType == ModuleLinkType::DERIVED_FROM) {
-                std::cout << "DEBUG: Found DERIVED_FROM link! Adding to derivedArray" << std::endl;
-                derivedArray.push_back(moduleToJson(link->sourceId));
+            if (link->linkType == ModuleLinkType::VARIANT_OF) {
+                std::cout << "DEBUG: Found VARIANT_OF link! Adding to variantArray" << std::endl;
+                variantArray.push_back(moduleToJson(link->sourceId));
             }
         }
     }
 
-    if (!derivedArray.empty())
-        j["derives"] = derivedArray;
+    if (!variantArray.empty())
+        j["variant"] = variantArray;
     if (!annotatesArray.empty())
         j["annotated_by"] = annotatesArray;
 
@@ -880,7 +801,7 @@ nlohmann::json ModuleGraph::encounterToJson(const UUID& encounterId) const {
     nlohmann::json rootJson;
     rootJson["encounter_id"] = encounterId.toString();
     
-    // Build the complete module tree: linear chain + derived modules + annotations
+    // Build the complete module tree: linear chain + variant modules + annotations
     nlohmann::json moduleTree = nlohmann::json::array();
     
     // Start with root module and follow BELONGS_TO chain
@@ -888,7 +809,7 @@ nlohmann::json ModuleGraph::encounterToJson(const UUID& encounterId) const {
     std::unordered_set<UUID> visited;
     
     while (true) {
-        // Add current module with its derived data and annotations
+        // Add current module with its variant data and annotations
         nlohmann::json moduleJson = moduleToJson(current);
         moduleTree.push_back(moduleJson);
         visited.insert(current);
@@ -940,7 +861,7 @@ nlohmann::json ModuleGraph::buildGraphSummary() const {
         std::string typeName;
         switch (linkType) {
             case ModuleLinkType::BELONGS_TO: typeName = "belongs_to"; break;
-            case ModuleLinkType::DERIVED_FROM: typeName = "derived_from"; break;
+            case ModuleLinkType::VARIANT_OF: typeName = "variant_of"; break;
             case ModuleLinkType::ANNOTATES: typeName = "annotates"; break;
         }
         linkTypeSummary[typeName] = count;

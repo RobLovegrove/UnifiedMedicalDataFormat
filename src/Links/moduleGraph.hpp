@@ -38,9 +38,6 @@ private:
     void readGraphHeader(std::istream& in);
     void readEncounters(std::istream& in);
     void readLinks(std::istream& in);
-    void buildAdjacencyLists();
-
-    bool hasCycle() const;
 
     // JSON building helper methods
     nlohmann::json moduleToJson(const UUID& moduleId) const;
@@ -81,10 +78,6 @@ public:
 
     // JSON export method
     nlohmann::json toJson() const;
-
-    // std::vector<UUID> getEncounterMembers(const UUID& rootId) const;
-    // std::vector<UUID> getDerivedData(const UUID& sourceId) const;
-    // std::vector<UUID> getAnnotations(const UUID& sourceId) const;
 };
 
 
