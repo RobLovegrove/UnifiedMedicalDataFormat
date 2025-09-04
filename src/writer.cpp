@@ -60,7 +60,7 @@ Result Writer::createNewFile(std::string& filename, string author, string passwo
         encryptionData.baseSalt = EncryptionManager::generateSalt(16); // Use correct Argon2id salt size
         encryptionData.memoryCost = 65536;
         encryptionData.timeCost = 3;
-        encryptionData.parallelism = 1;
+        encryptionData.parallelism = 2;
 
         header.setEncryptionData(encryptionData);
     }
