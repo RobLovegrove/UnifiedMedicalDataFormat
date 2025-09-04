@@ -68,19 +68,12 @@ Result Reader::openFile(const std::string& filename, std::string password) {
 
         // Read the module graph from the buffer
         moduleGraph = ModuleGraph::readModuleGraph(buffer);
-
-        cout << "Displaying encounters" << endl << endl;
-        moduleGraph.displayEncounters();
     }
     catch (const std::exception& e) {
         closeFile();
         return Result{false, "Failed to read ModuleGraph: " + string(e.what())};
     }
-
-
-
     return Result{true, "File opened successfully"};
-
 }
 
 Result Reader::closeFile() {

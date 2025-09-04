@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "pybind_test_fixture.hpp"
+#include "test_cleanup.hpp"
 #include <iostream>
 #include <filesystem>
 #include <cstdlib> // For std::time
@@ -155,7 +156,7 @@ TEST_CASE("Reader getFileInfo method functionality with open file", "[pybind][re
     REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
     
     // Add the module to the encounter
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     std::cout << "DEBUG: Module added to encounter successfully" << std::endl;
     
@@ -227,7 +228,7 @@ TEST_CASE("Reader getModuleData method functionality", "[pybind][reader][getModu
     REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
     
     // Add the module to the encounter
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     
     auto moduleId = addModuleResult.attr("value")();
@@ -303,7 +304,7 @@ TEST_CASE("Reader getAuditTrail method functionality", "[pybind][reader][getAudi
     REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
     
     // Add the module to the encounter
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     
     auto moduleId = addModuleResult.attr("value")();
@@ -375,7 +376,7 @@ TEST_CASE("Reader getAuditData method functionality", "[pybind][reader][getAudit
     REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
     
     // Add the module to the encounter
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     
     auto moduleId = addModuleResult.attr("value")();
@@ -462,7 +463,7 @@ TEST_CASE("Reader closeFile method functionality", "[pybind][reader][closeFile]"
     REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
     
     // Add the module to the encounter
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     
     // Close the writer file
@@ -488,3 +489,4 @@ TEST_CASE("Reader closeFile method functionality", "[pybind][reader][closeFile]"
     
     std::cout << "DEBUG: closeFile test completed successfully!" << std::endl;
 }
+

@@ -69,6 +69,7 @@ TEST_OBJS = build/unit/test_circularReference.o \
             build/unit/test_schemaResolver.o \
             build/unit/test_imageData.o \
             build/unit/pybind/pybind_test_fixture.o \
+            build/unit/pybind/test_cleanup.o \
             build/unit/pybind/test_pybind_writer.o \
             build/unit/pybind/test_pybind_reader.o \
             build/unit/pybind/test_pybind.o \
@@ -87,7 +88,7 @@ TEST_DEPS := $(TEST_OBJS:.o=.d)
 # Tell make where to look for prerequisites (source files)
 VPATH := $(SRC_DIR):$(TEST_DIR)
 
-.PHONY: all debug release clean test test-build pybind
+.PHONY: all debug release clean test test-build pybind cleanup-test-files
 
 # Default target is release
 all: release
@@ -155,3 +156,10 @@ $(TEST_TARGET): $(TEST_MAIN_OBJ) $(TEST_OBJS) $(TEST_OBJS_FILTERED)
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET) $(TEST_TARGET)
+
+# Clean up test files
+cleanup-test-files:
+	@echo "Cleaning up test files..."
+	@find . -name "test_*.umdf" -type f -delete
+	@find . -name "*.umdf.tmp" -type f -delete
+	@echo "Test files cleaned up."

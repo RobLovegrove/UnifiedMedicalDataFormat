@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "pybind_test_fixture.hpp"
+#include "test_cleanup.hpp"
 #include <iostream>
 #include <filesystem>
 #include <cstdlib> // For std::time
@@ -92,7 +93,19 @@ TEST_CASE("Writer createNewFile basic functionality", "[pybind][writer][createNe
     REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
     
     // Add the module to the encounter
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
+    
+    // Debug: Print the error message if it fails
+    if (!addModuleResult.attr("has_value")().cast<bool>()) {
+        try {
+            auto error = addModuleResult.attr("error")();
+            std::string errorMsg = error.cast<std::string>();
+            std::cout << "DEBUG: addModuleToEncounter failed with error: " << errorMsg << std::endl;
+        } catch (const std::exception& e) {
+            std::cout << "DEBUG: Could not get error message: " << e.what() << std::endl;
+        }
+    }
+    
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     
     // Close the file - it should be finalized since we have a module
@@ -158,7 +171,7 @@ TEST_CASE("Writer createNewEncounter functionality", "[pybind][writer][createNew
     REQUIRE_NOTHROW(moduleData.attr("set_metadata")(simpleMetadata));
     
     // Add the module to the encounter (this will populate the xrefTable)
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     std::cout << "DEBUG: Module added to encounter successfully" << std::endl;
     
@@ -235,7 +248,7 @@ TEST_CASE("Writer complete workflow test", "[pybind][writer][workflow]") {
     
     // Add the module to the encounter so the file gets finalized
     std::cout << "DEBUG: Adding module to encounter..." << std::endl;
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", moduleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", moduleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     std::cout << "DEBUG: Module added to encounter successfully" << std::endl;
     
@@ -288,7 +301,7 @@ TEST_CASE("Writer updateModule functionality", "[pybind][writer][updateModule]")
     
     // Add the initial module to the encounter - this ensures it's properly set up
     std::cout << "DEBUG: Adding initial module to encounter..." << std::endl;
-    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", initialModuleData);
+    auto addModuleResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", initialModuleData);
     REQUIRE(addModuleResult.attr("has_value")().cast<bool>() == true);
     
     // Get the module ID from the result
@@ -346,8 +359,8 @@ TEST_CASE("Writer updateModule functionality", "[pybind][writer][updateModule]")
     std::cout << "DEBUG: updateModule test completed successfully!" << std::endl;
 }
 
-TEST_CASE("Writer addDerivedModule functionality", "[pybind][writer][addDerivedModule]") {
-    std::cout << "DEBUG: Testing addDerivedModule functionality..." << std::endl;
+TEST_CASE("Writer addVariantModule functionality", "[pybind][writer][addVariantModule]") {
+    std::cout << "DEBUG: Testing addVariantModule functionality..." << std::endl;
     
     // Get the shared module reference
     auto& module = GET_PYBIND_MODULE();
@@ -378,7 +391,7 @@ TEST_CASE("Writer addDerivedModule functionality", "[pybind][writer][addDerivedM
     REQUIRE_NOTHROW(parentModuleData.attr("set_metadata")(parentMetadata));
     
     // Add the parent module to the encounter
-    auto addParentResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", parentModuleData);
+    auto addParentResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", parentModuleData);
     REQUIRE(addParentResult.attr("has_value")().cast<bool>() == true);
     
     // Get the parent module ID
@@ -393,9 +406,9 @@ TEST_CASE("Writer addDerivedModule functionality", "[pybind][writer][addDerivedM
     std::string derivedMetadata = "{\"type\": \"derived\", \"parent\": \"derived_from_parent\", \"processed\": true}";
     REQUIRE_NOTHROW(derivedModuleData.attr("set_metadata")(derivedMetadata));
     
-    // Test adding the derived module
-    std::cout << "DEBUG: About to add derived module..." << std::endl;
-    auto derivedResult = writer.attr("addDerivedModule")(parentModuleId, "test_schema.json", derivedModuleData);
+    // Test adding the variant module
+    std::cout << "DEBUG: About to add variant module..." << std::endl;
+    auto derivedResult = writer.attr("addVariantModule")(parentModuleId, "tests/fixtures/test_schema.json", derivedModuleData);
     REQUIRE_NOTHROW(derivedResult.attr("has_value"));
     REQUIRE_NOTHROW(derivedResult.attr("value"));
     
@@ -405,7 +418,7 @@ TEST_CASE("Writer addDerivedModule functionality", "[pybind][writer][addDerivedM
     auto derivedModuleId = derivedResult.attr("value")();
     REQUIRE(derivedModuleId.ptr() != nullptr);
     
-    std::cout << "DEBUG: Derived module created successfully with ID: " << derivedModuleId.attr("toString")().cast<std::string>() << std::endl;
+    std::cout << "DEBUG: Variant module created successfully with ID: " << derivedModuleId.attr("toString")().cast<std::string>() << std::endl;
     
     // Close the file
     auto closeResult = writer.attr("closeFile")();
@@ -418,7 +431,7 @@ TEST_CASE("Writer addDerivedModule functionality", "[pybind][writer][addDerivedM
     // Clean up
     std::filesystem::remove(filename);
     
-    std::cout << "DEBUG: addDerivedModule test completed successfully!" << std::endl;
+    std::cout << "DEBUG: addVariantModule test completed successfully!" << std::endl;
 }
 
 TEST_CASE("Writer addAnnotation functionality", "[pybind][writer][addAnnotation]") {
@@ -453,7 +466,7 @@ TEST_CASE("Writer addAnnotation functionality", "[pybind][writer][addAnnotation]
     REQUIRE_NOTHROW(targetModuleData.attr("set_metadata")(targetMetadata));
     
     // Add the target module to the encounter
-    auto addTargetResult = writer.attr("addModuleToEncounter")(encounterId, "test_schema.json", targetModuleData);
+    auto addTargetResult = writer.attr("addModuleToEncounter")(encounterId, "tests/fixtures/test_schema.json", targetModuleData);
     REQUIRE(addTargetResult.attr("has_value")().cast<bool>() == true);
     
     // Get the target module ID
@@ -470,7 +483,7 @@ TEST_CASE("Writer addAnnotation functionality", "[pybind][writer][addAnnotation]
     
     // Test adding the annotation
     std::cout << "DEBUG: About to add annotation..." << std::endl;
-    auto annotationResult = writer.attr("addAnnotation")(targetModuleId, "test_schema.json", annotationModuleData);
+    auto annotationResult = writer.attr("addAnnotation")(targetModuleId, "tests/fixtures/test_schema.json", annotationModuleData);
     REQUIRE_NOTHROW(annotationResult.attr("has_value"));
     REQUIRE_NOTHROW(annotationResult.attr("value"));
     
@@ -494,4 +507,11 @@ TEST_CASE("Writer addAnnotation functionality", "[pybind][writer][addAnnotation]
     std::filesystem::remove(filename);
     
     std::cout << "DEBUG: addAnnotation test completed successfully!" << std::endl;
+}
+
+// Test case that runs cleanup at the end
+TEST_CASE("Cleanup test files", "[cleanup]") {
+    std::cout << "DEBUG: Running test file cleanup..." << std::endl;
+    test_cleanup::cleanup_all_test_files();
+    std::cout << "DEBUG: Test file cleanup completed." << std::endl;
 }

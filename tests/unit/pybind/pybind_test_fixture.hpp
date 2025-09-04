@@ -3,6 +3,7 @@
 #include <pybind11/embed.h>
 #include <catch2/catch_test_macros.hpp>
 #include <iostream>
+#include "test_cleanup.hpp"
 
 namespace py = pybind11;
 
@@ -25,6 +26,9 @@ public:
     
     // Check if initialized
     static bool isInitialized();
+    
+    // Global test file cleanup
+    static void cleanupTestFiles();
 };
 
 // RAII wrapper for automatic cleanup
@@ -39,3 +43,9 @@ public:
 
 // Macro to easily get the module in tests
 #define GET_PYBIND_MODULE() PybindTestFixture::getModule()
+
+// Macro for test file cleanup
+#define CLEANUP_TEST_FILES() test_cleanup::cleanup_all_test_files()
+
+// Macro for tracking test files
+#define TRACK_TEST_FILE(filename) test_cleanup::TestFileManager::getInstance().add_file(filename)

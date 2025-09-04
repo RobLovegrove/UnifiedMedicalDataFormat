@@ -50,6 +50,11 @@ bool PybindTestFixture::isInitialized() {
     return g_initialized;
 }
 
+// Global test file cleanup
+void PybindTestFixture::cleanupTestFiles() {
+    test_cleanup::cleanup_all_test_files();
+}
+
 // RAII wrapper implementation
 PybindTestFixtureRAII::PybindTestFixtureRAII() {
     PybindTestFixture::initialize();

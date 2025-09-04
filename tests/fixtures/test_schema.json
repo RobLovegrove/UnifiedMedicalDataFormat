@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://localhost:8080/schemas/test/v1.0.json",
+  "title": "test",
+  "description": "Simple test schema for unit tests",
+  "type": "object",
+  "module_type": "tabular",
+  "endianness": "little",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "test_key": { "type": "string", "length": 32 },
+        "version": { "type": "string", "length": 10 },
+        "status": { "type": "string", "length": 20 },
+        "type": { "type": "string", "length": 20 },
+        "data": { "type": "string", "length": 50 },
+        "parent": { "type": "string", "length": 50 },
+        "processed": { "type": "string", "length": 10 },
+        "content": { "type": "string", "length": 50 },
+        "target": { "type": "string", "length": 50 },
+        "note": { "type": "string", "length": 100 },
+        "priority": { "type": "string", "length": 10 },
+        "modified": { "type": "string", "length": 10 }
+      }
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "test_value": { "type": "string", "length": 50 }
+      }
+    }
+  }
+}

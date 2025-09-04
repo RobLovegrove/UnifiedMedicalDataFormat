@@ -38,16 +38,17 @@ public:
 
     void printEncounterPath(const UUID& encounterId);
 
-    // Reading operations 
-    nlohmann::json getFileInfo();
     std::expected<ModuleData, std::string> getModuleData(const std::string& moduleId);
+    
     std::expected<std::vector<ModuleTrail>, std::string> getAuditTrail(const UUID& moduleId);
-
     std::expected<ModuleData, std::string> getAuditData(const ModuleTrail& module);
     
     // File management
     Result openFile(const std::string& filename, std::string password = "");
     Result closeFile();
+
+    // Reading operations 
+    nlohmann::json getFileInfo();
 
 };
 
