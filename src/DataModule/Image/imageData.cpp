@@ -1,5 +1,5 @@
 #include "imageData.hpp"
-#include "ImageEncoder.hpp"
+#include "Encoding/ImageEncoder.hpp"
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/Compression/CompressionType.hpp"
 #include "../../Utility/Compression/ZstdCompressor.hpp"
@@ -57,14 +57,6 @@ void ImageData::parseDataSchema(const nlohmann::json& schemaJson) {
     }
 }
 
-// struct ModuleData {
-//     nlohmann::json metadata;
-//     std::variant<
-//         nlohmann::json,                    // For tabular data
-//         std::vector<uint8_t>,              // For frame pixel data
-//         std::vector<ModuleData>            // For N-dimensional data
-//     > data;
-// };
 
 void ImageData::addData(
     const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>& moduleData) {

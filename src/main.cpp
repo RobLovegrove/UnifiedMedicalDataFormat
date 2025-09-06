@@ -187,6 +187,8 @@ int main(int argc, char** argv) {
                 {"channels", 3},
                 {"dimension_names", {"x", "y", "z", "time"}},
                 {"dimensions", {256, 256, 12, 5}},
+                //{"encoding", "raw"},
+                //{"encoding", "png"},
                 {"encoding", "jpeg2000-lossless"},
                 {"layout", "interleaved"},
                 {"memory_order", "row_major"},

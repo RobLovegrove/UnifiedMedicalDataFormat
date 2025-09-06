@@ -16,7 +16,7 @@
 #include "../../Utility/uuid.hpp"
 #include "../../Utility/moduleType.hpp"
 #include "FrameData.hpp"
-#include "ImageEncoder.hpp"
+#include "Encoding/ImageEncoder.hpp"
 #include "../../Utility/Compression/CompressionType.hpp"
 
 
