@@ -1,5 +1,5 @@
 #include <catch2/catch_all.hpp>
-#include "DataModule/Image/ImageEncoder.hpp"
+#include "DataModule/Image/Encoding/ImageEncoder.hpp"
 #include <vector>
 #include <cstdint>
 
