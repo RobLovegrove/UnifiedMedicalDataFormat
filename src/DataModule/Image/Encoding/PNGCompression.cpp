@@ -47,10 +47,12 @@ std::vector<uint8_t> PNGCompression::compress(const std::vector<uint8_t>& rawDat
         // Write header
         png_write_info(png_ptr, info_ptr);
         
-        // Prepare row pointers
+        // Prepare row pointers (account for bit depth)
+        size_t bytesPerPixel = (bitDepth + 7) / 8;
+        size_t rowStride = width * channels * bytesPerPixel;
         std::vector<png_bytep> row_pointers(height);
         for (int y = 0; y < height; y++) {
-            row_pointers[y] = const_cast<png_bytep>(&rawData[y * width * channels]);
+            row_pointers[y] = const_cast<png_bytep>(&rawData[y * rowStride]);
         }
         
         // Write image data

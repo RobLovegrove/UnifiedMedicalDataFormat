@@ -2,15 +2,25 @@
 #include <iostream>
 #include <algorithm>
 #include <stdexcept>
+#include <iomanip>
 
 std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& rawData, 
                                                    int width, int height,
                                                    uint8_t channels, uint8_t bitDepth) const {
-    // Validate input data size
-    size_t expectedSize = static_cast<size_t>(width) * height * channels;
+    // Validate input data size based on bit depth
+    size_t bytesPerPixel = (bitDepth + 7) / 8; // Round up for non-byte-aligned bit depths
+    size_t expectedSize = static_cast<size_t>(width) * height * channels * bytesPerPixel;
     if (rawData.size() != expectedSize) {
+        std::cerr << "JPEG2000: Input size mismatch. Expected: " << expectedSize 
+                  << ", Got: " << rawData.size() << " (bitDepth: " << static_cast<int>(bitDepth) 
+                  << ", bytesPerPixel: " << bytesPerPixel << ")" << std::endl;
         return rawData;
     }
+    
+    std::cerr << "JPEG2000: Starting compression. Size: " << rawData.size() 
+              << ", Dimensions: " << width << "x" << height 
+              << ", Channels: " << static_cast<int>(channels) 
+              << ", BitDepth: " << static_cast<int>(bitDepth) << std::endl;
     
     try {
         // Set up compression parameters
@@ -52,6 +62,7 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
         // Create image
         opj_image_t* image = opj_image_create(channels, cmptparm.data(), color_space);
         if (!image) {
+            std::cerr << "JPEG2000: Failed to create image" << std::endl;
             return rawData;
         }
 
@@ -64,12 +75,13 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
         // Check if image data is allocated for all components
         for (int c = 0; c < channels; ++c) {
             if (!image->comps[c].data) {
+                std::cerr << "JPEG2000: Image component " << c << " data not allocated" << std::endl;
                 opj_image_destroy(image);
                 return rawData;
             }
         }
         
-        // Copy pixel data to image (interleaved for multi-channel)
+        // Copy pixel data to image based on bit depth (interleaved for multi-channel)
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 size_t pixel_index = static_cast<size_t>(y * width + x);
@@ -79,16 +91,35 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
                 }
                 
                 if (channels == 1) {
-                    // Single channel (grayscale) - direct copy
-                    if (pixel_index < rawData.size()) {
-                        image->comps[0].data[pixel_index] = rawData[pixel_index];
+                    // Single channel (grayscale)
+                    size_t data_index = pixel_index * bytesPerPixel;
+                    if (data_index + bytesPerPixel <= rawData.size()) {
+                        if (bitDepth == 8) {
+                            image->comps[0].data[pixel_index] = rawData[data_index];
+                        } else if (bitDepth == 16) {
+                            // Combine two bytes into 16-bit value (little-endian)
+                            uint16_t value = rawData[data_index] | (rawData[data_index + 1] << 8);
+                            image->comps[0].data[pixel_index] = value;
+                        } else {
+                            std::cerr << "JPEG2000: Unsupported bit depth: " << static_cast<int>(bitDepth) << std::endl;
+                            return rawData;
+                        }
                     }
                 } else {
                     // Multi-channel (interleaved) - RGBRGB... format
                     for (int c = 0; c < channels; c++) {
-                        size_t data_index = pixel_index * channels + c;
-                        if (data_index < rawData.size()) {
-                            image->comps[c].data[pixel_index] = rawData[data_index];
+                        size_t data_index = (pixel_index * channels + c) * bytesPerPixel;
+                        if (data_index + bytesPerPixel <= rawData.size()) {
+                            if (bitDepth == 8) {
+                                image->comps[c].data[pixel_index] = rawData[data_index];
+                            } else if (bitDepth == 16) {
+                                // Combine two bytes into 16-bit value (little-endian)
+                                uint16_t value = rawData[data_index] | (rawData[data_index + 1] << 8);
+                                image->comps[c].data[pixel_index] = value;
+                            } else {
+                                std::cerr << "JPEG2000: Unsupported bit depth: " << static_cast<int>(bitDepth) << std::endl;
+                                return rawData;
+                            }
                         }
                     }
                 }
@@ -129,6 +160,7 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
 
         // Set up codec
         if (!opj_setup_encoder(codec, &parameters, image)) {
+            std::cerr << "JPEG2000: Failed to setup encoder" << std::endl;
             opj_stream_destroy(stream);
             opj_image_destroy(image);
             opj_destroy_codec(codec);
@@ -137,6 +169,7 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
         
         // Start compression
         if (!opj_start_compress(codec, image, stream)) {
+            std::cerr << "JPEG2000: Failed to start compression" << std::endl;
             opj_stream_destroy(stream);
             opj_image_destroy(image);
             opj_destroy_codec(codec);
@@ -144,6 +177,7 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
         }
         
         if (!opj_encode(codec, stream)) {
+            std::cerr << "JPEG2000: Failed to encode" << std::endl;
             opj_stream_destroy(stream);
             opj_image_destroy(image);
             opj_destroy_codec(codec);
@@ -151,6 +185,7 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
         }
         
         if (!opj_end_compress(codec, stream)) {
+            std::cerr << "JPEG2000: Failed to end compression" << std::endl;
             opj_stream_destroy(stream);
             opj_image_destroy(image);
             opj_destroy_codec(codec);
@@ -166,9 +201,15 @@ std::vector<uint8_t> JPEG2000Compression::compress(const std::vector<uint8_t>& r
         std::vector<uint8_t> compressed_data(ms_data.output_buffer, 
                                            ms_data.output_buffer + ms_data.output_size);
         
+        std::cerr << "JPEG2000: Compression successful. Original: " << rawData.size() 
+                  << " bytes, Compressed: " << compressed_data.size() 
+                  << " bytes (ratio: " << std::fixed << std::setprecision(2) 
+                  << (100.0 * compressed_data.size() / rawData.size()) << "%)" << std::endl;
+        
         return compressed_data;
         
     } catch (const std::exception& e) {
+        std::cerr << "JPEG2000: Exception during compression: " << e.what() << std::endl;
         return rawData;
     }
 }

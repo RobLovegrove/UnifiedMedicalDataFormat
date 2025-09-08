@@ -26,6 +26,8 @@ void addWriteOptions(CLI::App* writeCmd, string& outputFile, bool& overwrite, bo
 
 int main(int argc, char** argv) {
 
+    string firstTabularUUID;
+
     string tabularUUID;
 
     UUID uuid;
@@ -126,13 +128,14 @@ int main(int argc, char** argv) {
             return 1;
         }
         moduleId = addResult.value();
+        firstTabularUUID = moduleId.toString();
         addResult = writer.addAnnotation(moduleId, patientPair.first, patientPair.second);
         if (!addResult) {
             cerr << "Failed to add annotation: " << addResult.error() << endl;
             return 1;
         }
         
-        cout << "Initial file written with tabular data. Module UUIDs:\n";
+        cout << "Initial file written with tabular data. Module UUID:\n";
         cout << "  - " << moduleId.toString() << endl;
 
         // Close the file
@@ -188,8 +191,8 @@ int main(int argc, char** argv) {
                 {"dimension_names", {"x", "y", "z", "time"}},
                 {"dimensions", {256, 256, 12, 5}},
                 //{"encoding", "raw"},
-                //{"encoding", "png"},
-                {"encoding", "jpeg2000-lossless"},
+                {"encoding", "png"},
+                //{"encoding", "jpeg2000-lossless"},
                 {"layout", "interleaved"},
                 {"memory_order", "row_major"},
                 {"origin", "top_left"}
@@ -372,7 +375,7 @@ int main(int argc, char** argv) {
         }
 
         cout << "Updating tabular data" << endl;
-        auto updateResult = writer.updateModule(tabularUUID, patientModuleData.value());
+        auto updateResult = writer.updateModule(firstTabularUUID, patientModuleData.value());
         if (!updateResult.success) {
             cerr << "Failed to update module: " << updateResult.message << endl;
             return 1;
@@ -412,7 +415,7 @@ int main(int argc, char** argv) {
         cout << "finalFileInfo: " << finalFileInfo.dump(2) << endl;
 
 
-        auto auditTrailResult = reader.getAuditTrail(UUID::fromString(tabularUUID));
+        auto auditTrailResult = reader.getAuditTrail(UUID::fromString(firstTabularUUID));
         if (!auditTrailResult.has_value()) {
             cerr << "Failed to get audit trail: " << auditTrailResult.error() << endl;
             return 1;
@@ -501,7 +504,7 @@ int main(int argc, char** argv) {
         cout << "File: " << outputFile << " now contains both tabular and image data.\n";
 
         // Remove the file
-        std::filesystem::remove(outputFile);
+        //std::filesystem::remove(outputFile);
     }
 
     else if (*readCmd) {
@@ -567,16 +570,6 @@ int main(int argc, char** argv) {
                         if (std::holds_alternative<std::vector<uint8_t>>(frameData)) {
                             const auto& pixelData = std::get<std::vector<uint8_t>>(frameData);
                             cout << "  Frame " << i << " pixel data: " << pixelData.size() << " pixels" << endl;
-                            
-                            // Print first 10,000 pixel values for preview
-                            cout << "  First 100,000 pixel values: ";
-                            for (size_t j = 0; j < min(pixelData.size(), (size_t)100000); j++) {
-                                cout << (int)pixelData[j] << " ";
-                            }
-                            if (pixelData.size() > 100000) {
-                                cout << "... (and " << (pixelData.size() - 100000) << " more)";
-                            }
-                            cout << endl;
                             
                             // Print pixel statistics
                             if (!pixelData.empty()) {

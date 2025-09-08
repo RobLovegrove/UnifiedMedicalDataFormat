@@ -278,7 +278,7 @@
         "convolutionKernel": {
           "type": "array", 
           "items": { "type": "string" },
-          "minItems": 2,
+          "minItems": 1,
           "maxItems": 10,
           "description": "Convolution kernel used for image reconstruction"
         },

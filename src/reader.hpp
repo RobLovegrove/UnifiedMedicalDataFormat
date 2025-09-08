@@ -24,7 +24,7 @@ private:
 
     std::unique_ptr<AuditTrail> auditTrail;
 
-    static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 100 * 1024 * 1024;  // 100MB
+    static constexpr size_t MAX_IN_MEMORY_MODULE_SIZE = 2000 * 1024 * 1024;  // 100MB
 
     std::ifstream fileStream;
     std::vector<std::unique_ptr<DataModule>> loadedModules;

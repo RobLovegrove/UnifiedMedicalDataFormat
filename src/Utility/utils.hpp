@@ -3,8 +3,6 @@
 
 #include <string>
 
-std::string getCurrentTimestampUTC();
-
 struct Version {
     int major;
     int minor;

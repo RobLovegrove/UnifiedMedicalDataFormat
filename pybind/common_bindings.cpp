@@ -107,6 +107,7 @@ void register_common_bindings(py::module_& m) {
     
     // Register ModuleTrail struct
     py::class_<ModuleTrail>(m, "ModuleTrail")
+        .def(py::init<>())
         .def_readwrite("moduleOffset", &ModuleTrail::moduleOffset)
         .def_readwrite("isCurrent", &ModuleTrail::isCurrent)
         .def_readwrite("createdAt", &ModuleTrail::createdAt)
@@ -152,4 +153,15 @@ void register_common_bindings(py::module_& m) {
                 return py::cast(self.error());
             }
         });
+    
+    // Register DateTime class
+    py::class_<DateTime>(m, "DateTime")
+        .def(py::init<>())
+        .def(py::init<int64_t>())
+        .def_static("now", &DateTime::now, "Create DateTime for current time")
+        .def("getTimestamp", &DateTime::getTimestamp, "Get timestamp as int64")
+        .def("toString", &DateTime::toString, "Get human readable string")
+        .def("toISO860String", &DateTime::toISO860String, "Get ISO8601 string")
+        .def("__str__", &DateTime::toString)
+        .def("__repr__", &DateTime::toString);
 }

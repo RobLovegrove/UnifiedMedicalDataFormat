@@ -102,6 +102,9 @@ XRefTable XRefTable::loadXrefTable(std::istream& in) {
     // 1. Seek to end minus footer size
     in.seekg(0, std::ios::end);
     size_t fileSize = static_cast<size_t>(in.tellg());
+
+    cout << "THE FILE SIZE IS **********************" << endl;
+    cout << "File size: " << fileSize << endl;
     
     if (fileSize < FOOTER_SIZE) {
         throw runtime_error("File too small to contain valid footer.");

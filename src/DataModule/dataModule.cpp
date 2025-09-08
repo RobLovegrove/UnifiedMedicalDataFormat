@@ -146,8 +146,6 @@ unique_ptr<DataModule> DataModule::fromStream(
     
     dmHeader->readDataHeader(in);
 
-
-
     unique_ptr<DataModule> dm;
 
     try {
@@ -177,7 +175,6 @@ unique_ptr<DataModule> DataModule::fromStream(
 
     if (dm->header->getEncryptionData().encryptionType != EncryptionType::NONE) {
 
-
         // Decrypt the data
         std::istringstream decryptedStream = dm->decryptData(in);
 
@@ -188,6 +185,10 @@ unique_ptr<DataModule> DataModule::fromStream(
         dm->readDecryptedMetadataAndData(in);
     }
 
+
+    if (dm->header->getModuleType() == ModuleType::Image) {
+        cout << *dm->header << endl;
+    }        
     return dm;
 }
 
@@ -240,8 +241,6 @@ std::istringstream DataModule::decryptData(istream& in) {
     std::vector<uint8_t> encryptedData(header->getDataSize());
 
     in.read(reinterpret_cast<char*>(encryptedData.data()), encryptedData.size());
-
-
 
     if (in.gcount() != static_cast<std::streamsize>(encryptedData.size())) {
         throw std::runtime_error("Failed to read full data block");

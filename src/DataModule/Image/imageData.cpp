@@ -252,8 +252,10 @@ void ImageData::addMetaData(const nlohmann::json& data) {
         // Extract encoding from image_structure and store in C++ member
         if (imageStruct.contains("encoding")) {
             std::string enc_str = imageStruct["encoding"];
+            std::cerr << "DEBUG: Found encoding in image_structure: '" << enc_str << "'" << std::endl;
             auto encoding_opt = stringToCompression(enc_str);
             if (encoding_opt.has_value()) {
+                std::cerr << "DEBUG: Successfully converted to CompressionType: " << static_cast<int>(encoding_opt.value()) << std::endl;
                 header->setDataCompression(encoding_opt.value());
             } else {
                 // Invalid encoding - log warning and use default
@@ -261,6 +263,9 @@ void ImageData::addMetaData(const nlohmann::json& data) {
                           << "' in image_structure, using RAW encoding" << std::endl;
                 header->setDataCompression(CompressionType::RAW);
             }
+        } else {
+            std::cerr << "DEBUG: No encoding found in image_structure, using default RAW" << std::endl;
+            header->setDataCompression(CompressionType::RAW);
         }
         
         // Extract bit depth from image_structure
@@ -510,20 +515,17 @@ void ImageData::writeData(std::ostream& out) const {
     
     // Write each frame as embedded data (not as separate modules)
     for (size_t i = 0; i < frames.size(); i++) {
-        // Check if we need to compress this frame
-        if (header->getDataCompression() != CompressionType::RAW) {
-            // Compress the frame's pixel data
-            // Get width and height from dimensions array
-            int frameWidth = dimensions.size() > 0 ? dimensions[0] : 16;
-            int frameHeight = dimensions.size() > 1 ? dimensions[1] : 16;
-            
-            // Use the encoder to compress the frame
-            frames[i]->pixelData = encoder->compress(frames[i]->pixelData, header->getDataCompression(), 
-                                                   frameWidth, frameHeight, channels, bitDepth);
-            
-            // Update the frame's data size after compression
-            frames[i]->header->setDataSize(frames[i]->pixelData.size());
-        }
+        // Always use the encoder to handle compression (including RAW)
+        // Get width and height from dimensions array
+        int frameWidth = dimensions.size() > 0 ? dimensions[0] : 16;
+        int frameHeight = dimensions.size() > 1 ? dimensions[1] : 16;
+        
+        // Use the encoder to compress the frame (RAW will just return data unchanged)
+        frames[i]->pixelData = encoder->compress(frames[i]->pixelData, header->getDataCompression(), 
+                                               frameWidth, frameHeight, channels, bitDepth);
+        
+        // Update the frame's data size after compression
+        frames[i]->header->setDataSize(frames[i]->pixelData.size());
         
         XRefTable tempXref;
         frames[i]->writeBinary(absoluteModuleStart, out, tempXref, header->getModifiedBy());
