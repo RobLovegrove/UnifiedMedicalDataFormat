@@ -2,6 +2,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <filesystem>
 #include "reader.hpp"
 #include "writer.hpp"
 #include "DataModule/dataModule.hpp"
@@ -18,6 +19,7 @@ using namespace std;
 
 /* -------------------------- DECLARATIONS -------------------------- */
 void addWriteOptions(CLI::App* writeCmd, string& outputFile, bool& overwrite, bool& update);
+void addDemoOptions(CLI::App* demoCmd, string& outputFile);
 
 /* -------------------------- MOCK DATA -------------------------- */
 
@@ -43,6 +45,10 @@ int main(int argc, char** argv) {
     bool overwrite = false;
     bool update = false;
 
+    // DEMO subcommand
+    CLI::App* demoCmd = app.add_subcommand("demo", "Run a demonstration of UMDF capabilities");
+    addDemoOptions(demoCmd, outputFile);
+
     // WRITE subcommand
     CLI::App* writeCmd = app.add_subcommand("write", "Write data to a UMDF file");
     addWriteOptions(writeCmd, outputFile, overwrite, update);
@@ -56,7 +62,7 @@ int main(int argc, char** argv) {
 
     CLI11_PARSE(app, argc, argv);
 
-    if (*writeCmd) {
+    if (*demoCmd) {
         cout << "=== STEP 1: Writing new file with tabular data ===\n";
         cout << "Writing to file: " << outputFile << "\n";
         
@@ -503,8 +509,20 @@ int main(int argc, char** argv) {
         cout << "=== Full workflow demonstration complete! ===\n";
         cout << "File: " << outputFile << " now contains both tabular and image data.\n";
 
-        // Remove the file
-        //std::filesystem::remove(outputFile);
+        // Remove the file only if using default filename
+        if (outputFile == "demo.umdf") {
+            std::filesystem::remove(outputFile);
+            cout << "Demo file cleaned up." << endl;
+        } else {
+            cout << "File preserved: " << outputFile << endl;
+        }
+    }
+
+    else if (*writeCmd) {
+        cout << "Write command - implementation coming soon!" << endl;
+        cout << "Output file: " << outputFile << endl;
+        cout << "Overwrite: " << (overwrite ? "true" : "false") << endl;
+        cout << "Update: " << (update ? "true" : "false") << endl;
     }
 
     else if (*readCmd) {
@@ -610,6 +628,18 @@ void addWriteOptions(CLI::App* writeCmd, string& outputFile, bool& overwrite, bo
     writeCmd->callback([&]() {
         if (overwrite && update) {
             throw CLI::ValidationError("Cannot use both --overwrite and --update together.");
+        }
+    });
+}
+
+void addDemoOptions(CLI::App* demoCmd, string& outputFile) {
+
+    demoCmd->add_option("-o,--output", outputFile, "Output UMDF file (optional, defaults to demo.umdf)");
+
+    demoCmd->callback([&]() {
+        // Set default filename if not provided
+        if (outputFile.empty()) {
+            outputFile = "demo.umdf";
         }
     });
 }

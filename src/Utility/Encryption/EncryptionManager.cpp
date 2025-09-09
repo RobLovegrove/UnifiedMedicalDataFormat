@@ -74,7 +74,8 @@ std::vector<uint8_t> EncryptionManager::generateIV(size_t length) {
     ensureInitialized();  // Ensure libsodium is initialized
     
     std::vector<uint8_t> iv(length);
-    randombytes_buf(iv.data(), length);
+    
+    (iv.data(), length);
     return iv;
 }
 

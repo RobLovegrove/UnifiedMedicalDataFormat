@@ -45,7 +45,7 @@ protected:
 
     DateTime createdAt;
     std::string createdBy = "Unknown";
-    DateTime modifiedAt;
+    DateTime modifiedAt; 
     std::string modifiedBy = "Unkown";
 
     // virtual bool handleExtraField(HeaderFieldType, const std::vector<char>&) = 0;
