@@ -103,11 +103,6 @@ void TabularData::readData(istream& in) {
     readTableRows(in, header->getDataSize(), fields, rows);
 }
 
-void TabularData::printData(std::ostream& out) const {
-
-    printTableData(out, fields, rows);
-}
-
 std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
 TabularData::getModuleSpecificData() const {
     return getTableDataAsJson(dataRequired, rows, fields);

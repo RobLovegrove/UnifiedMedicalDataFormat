@@ -468,34 +468,6 @@ void DataModule::readTableRows(
     
 }
 
-// Helper method to read nested objects
-size_t DataModule::readNestedObject(
-    istream& in, 
-    ObjectField* objectField, 
-    vector<uint8_t>& row, 
-    size_t writePos) {
-    
-    const auto& nestedFields = objectField->getNestedFields();
-    size_t totalBytesRead = 0;
-    
-    // For now, assume nested objects have fixed sizes
-    // You might need to implement a more sophisticated approach for variable-sized nested objects
-    
-    for (const auto& nestedField : nestedFields) {
-        size_t fieldLen = nestedField->getLength();
-        in.read(reinterpret_cast<char*>(row.data() + writePos + totalBytesRead), fieldLen);
-        
-        if (in.gcount() != static_cast<std::streamsize>(fieldLen)) {
-            throw std::runtime_error("Failed to read nested field from stream");
-        }
-        
-        totalBytesRead += fieldLen;
-    }
-    
-    return totalBytesRead;
-}
-
-
 void DataModule::readMetadataRows(istream& in) {
     readTableRows(in, header->getMetadataSize(), metaDataFields, metaDataRows);
 }
@@ -985,62 +957,6 @@ void DataModule::addMetaData(const nlohmann::json& data) {
         // Handle single metadata row (backward compatibility)
         addTableData(data, metaDataFields, metaDataRows, metadataRequired);
     }
-}
-
-void DataModule::printTableData(
-    ostream& out, const vector<unique_ptr<DataField>>& fields, const vector<vector<uint8_t>>& rows) const{
-    
-    // Build flattened field list including nested fields (same logic as readTableRows)
-    std::vector<std::pair<std::string, DataField*>> flattenedFields;
-    
-    for (const auto& field : fields) {
-        if (auto* objectField = dynamic_cast<ObjectField*>(field.get())) {
-            // Add nested fields with dot notation
-            const auto& nestedFields = objectField->getNestedFields();
-            for (const auto& nestedField : nestedFields) {
-                std::string fieldPath = field->getName() + "." + nestedField->getName();
-                flattenedFields.push_back({fieldPath, nestedField.get()});
-            }
-        } else {
-            // Regular field
-            flattenedFields.push_back({field->getName(), field.get()});
-        }
-    }
-    
-    size_t numFlattenedFields = flattenedFields.size();
-    size_t bitmapSize = (numFlattenedFields + 7) / 8;
-
-    for (const auto& row : rows) {
-        // Read bitmap
-        std::vector<uint8_t> bitmap(bitmapSize);
-        std::memcpy(bitmap.data(), row.data(), bitmapSize);
-
-        // Start reading after bitmap
-        size_t offset = bitmapSize;
-        nlohmann::json rowJson = nlohmann::json::object();
-
-        // For each flattened field, check bitmap before decoding
-        for (size_t i = 0; i < numFlattenedFields; ++i) {
-            bool present = bitmap[i / 8] & (1 << (i % 8));
-
-            if (present) {
-                const auto& [fieldPath, fieldPtr] = flattenedFields[i];
-                rowJson[fieldPath] = fieldPtr->decodeFromBuffer(row, offset);
-                offset += fieldPtr->getLength();
-            } else {
-                const auto& [fieldPath, fieldPtr] = flattenedFields[i];
-                rowJson[fieldPath] = nullptr;
-            }
-        }
-
-        out << rowJson.dump(2) << "\n";
-    }
-
-
-}
-
-void DataModule::printMetadata(std::ostream& out) const {
-    printTableData(out, metaDataFields, metaDataRows);
 }
 
 // Template method that handles common functionality

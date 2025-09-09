@@ -85,17 +85,6 @@ protected:
             std::vector<std::vector<uint8_t>>& rows
         );
     
-    size_t readNestedObject(
-        std::istream& in, 
-        ObjectField* objectField, 
-        std::vector<uint8_t>& row, 
-        size_t writePos);
-
-    void printTableData(
-        std::ostream& out, 
-        const std::vector<std::unique_ptr<DataField>>& fields, 
-        const std::vector<std::vector<uint8_t>>& rows) const;
-    
     nlohmann::json getTableDataAsJson(
         const std::vector<std::string>& requiredFields,
         const std::vector<std::vector<uint8_t>>& rows, 
@@ -138,9 +127,6 @@ public:
     static std::unique_ptr<DataModule> fromStream(
         std::istream& in, uint64_t moduleStartOffset, ModuleType moduleType, EncryptionData encryptionData);
 
-    // static std::unique_ptr<DataModule> create(
-    //     const std::string& schemaPath, UUID uuid, ModuleType type);
-
     const nlohmann::json& getSchema() const;
 
 
@@ -149,9 +135,6 @@ public:
 
     void writeBinary(std::streampos absoluteModuleStart,
             std::ostream& out, XRefTable& xref, std::string author);
-
-    void printMetadata(std::ostream& out) const;
-    virtual void printData(std::ostream& out) const = 0;
 
     // Template method that handles common functionality
     ModuleData getModuleData() const;

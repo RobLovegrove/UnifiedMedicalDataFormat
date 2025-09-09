@@ -26,7 +26,6 @@ public:
         const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) override;
     virtual void writeData(std::ostream& out) const override;
     virtual void readData(std::istream& in) override;
-    virtual void printData(std::ostream& out) const override;
     
     // Override the virtual method for frame-specific data
     std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 

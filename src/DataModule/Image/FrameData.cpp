@@ -29,10 +29,6 @@ void FrameData::readData(std::istream& in) {
     // Note: needsDecompression flag will be set by ImageData based on encoding
 }
 
-void FrameData::printData(std::ostream&) const {
-
-}
-
 void FrameData::addData(
     const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>& data) {
 

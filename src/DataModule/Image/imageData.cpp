@@ -609,10 +609,6 @@ void ImageData::readData(std::istream& in) {
     }
 }
 
-void ImageData::printData(std::ostream& out) const {
-    out << "ImageData with " << frames.size() << " frames:" << std::endl;
-}
-
 // Override the virtual method for image-specific data
 std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 
 ImageData::getModuleSpecificData() const {

@@ -59,8 +59,6 @@ public:
     
     virtual void addData(
         const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) override;
-
-    void printData(std::ostream& out) const override;
     
     // Override addMetaData to populate dimensions array
     void addMetaData(const nlohmann::json& data) override;

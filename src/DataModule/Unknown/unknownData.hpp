@@ -44,11 +44,6 @@ public:
         const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) override {
             throw std::runtime_error("UnknownData does not support adding data");
         }
-    // void writeBinary(std::ostream& out, XRefTable& xref) override;
-
-    void printData(std::ostream& out) const override {
-        out << "Data type is unknown and therefore cannot be printed";
-    }
 
 };
 

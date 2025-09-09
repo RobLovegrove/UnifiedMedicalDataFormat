@@ -42,9 +42,7 @@ public:
     
     virtual void addData(
         const std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>>&) override;
-    // void writeBinary(std::ostream& out, XRefTable& xref) override;
 
-    void printData(std::ostream& out) const override;
 
 };
 
