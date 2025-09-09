@@ -62,8 +62,6 @@ public:
 
     ~Writer();
 
-    void printEncounterPath(const UUID& encounterId);
-
     Result createNewFile(std::string& filename, std::string author, std::string password = "");
     Result openFile(std::string& filename, std::string author, std::string password = "");
 

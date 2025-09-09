@@ -12,7 +12,7 @@ ImageEncoder::ImageEncoder() {
     // Constructor - initialize with default factory
     factory = std::make_shared<CompressionFactory>();
     // Set default strategy to RAW (no compression)
-    compressionStrategy = factory->createStrategy("RAW");
+    compressionStrategy = factory->createStrategy(CompressionType::RAW);
 }
 
 ImageEncoder::ImageEncoder(std::unique_ptr<CompressionStrategy> strategy) 
@@ -30,17 +30,14 @@ std::vector<uint8_t> ImageEncoder::compress(const std::vector<uint8_t>& rawData,
     // Note: Individual frame timing removed - use total timing from ImageData instead
     
     // Create a temporary strategy for this specific compression type
-    std::string typeString = compressionTypeToString(encoding);
-    std::cerr << "ImageEncoder: Using compression type: " << typeString << " (enum value: " << static_cast<int>(encoding) << ")" << std::endl;
-    
-    auto tempStrategy = factory->createStrategy(typeString);
+    auto tempStrategy = factory->createStrategy(encoding);
     
     if (!tempStrategy) {
-        std::cerr << "ERROR: Failed to create strategy for " << typeString << ", returning raw data!" << std::endl;
+        std::cerr << "ERROR: Failed to create strategy for " << compressionTypeToString(encoding) << ", returning raw data!" << std::endl;
         std::cerr << "Available strategies: ";
         auto availableTypes = factory->getSupportedTypes();
         for (const auto& type : availableTypes) {
-            std::cerr << type << " ";
+            std::cerr << compressionTypeToString(type) << " ";
         }
         std::cerr << std::endl;
         return rawData;
@@ -48,12 +45,11 @@ std::vector<uint8_t> ImageEncoder::compress(const std::vector<uint8_t>& rawData,
     
     // Check if the strategy supports the given parameters
     if (!tempStrategy->supports(channels, bitDepth)) {
-        std::cerr << "Warning: Compression type " << typeString 
+        std::cerr << "Warning: Compression type " << compressionTypeToString(encoding) 
                   << " may not support " << static_cast<int>(channels) << " channels and " 
                   << static_cast<int>(bitDepth) << " bit depth" << std::endl;
     }
     
-    std::cerr << "ImageEncoder: Calling " << typeString << " compression..." << std::endl;
     return tempStrategy->compress(rawData, width, height, channels, bitDepth);
 }
 
@@ -62,11 +58,10 @@ std::vector<uint8_t> ImageEncoder::decompress(const std::vector<uint8_t>& compre
     // Note: Individual frame timing removed - use total timing from ImageData instead
     
     // Create a temporary strategy for this specific compression type
-    std::string typeString = compressionTypeToString(encoding);
-    auto tempStrategy = factory->createStrategy(typeString);
+    auto tempStrategy = factory->createStrategy(encoding);
     
     if (!tempStrategy) {
-        std::cerr << "Warning: Unsupported compression type " << typeString << ", returning as-is" << std::endl;
+        std::cerr << "Warning: Unsupported compression type " << compressionTypeToString(encoding) << ", returning as-is" << std::endl;
         return compressedData;
     }
     
@@ -101,9 +96,13 @@ void ImageEncoder::setCompressionStrategy(std::unique_ptr<CompressionStrategy> s
 }
 
 void ImageEncoder::setCompressionStrategy(const std::string& type) {
-    auto newStrategy = factory->createStrategy(type);
-    if (!newStrategy) {
+    auto compressionType = stringToCompression(type);
+    if (!compressionType.has_value()) {
         throw std::invalid_argument("Unsupported compression type: " + type);
+    }
+    auto newStrategy = factory->createStrategy(compressionType.value());
+    if (!newStrategy) {
+        throw std::invalid_argument("Failed to create strategy for compression type: " + type);
     }
     compressionStrategy = std::move(newStrategy);
 }

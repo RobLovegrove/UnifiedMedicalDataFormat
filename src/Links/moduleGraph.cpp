@@ -86,7 +86,6 @@ void ModuleGraph::readEncounters(std::istream& in) {
 
     size_t bytesRead = 0;
     while (bytesRead < encounterSize) {
-        cout << "Reading encounter" << endl;
         Encounter encounter;
 
         std::array<uint8_t, 16> temp;
@@ -107,12 +106,6 @@ void ModuleGraph::readEncounters(std::istream& in) {
         bytesRead += temp.size() * 3;
 
         encounters[encounter.encounterId] = encounter;
-    }
-
-    cout << "Encounters read" << endl;
-
-    for (const auto& [encounterId, encounter] : encounters) {
-        cout << "Encounter " << encounterId.toString() << ": " << encounter.rootModule.value().toString() << " -> " << encounter.lastModule.value().toString() << endl;
     }
 }
 
@@ -270,7 +263,6 @@ void ModuleGraph::writeEncounters(std::ostream& outfile) {
 
 void ModuleGraph::writeLinks(std::ostream& outfile) {
 
-    cout << "Writing links" << endl;
     linkSize = 0;
     for (const std::shared_ptr<ModuleLink>& link : links) {
 
@@ -486,170 +478,8 @@ std::vector<UUID> ModuleGraph::getRootModules() const {
     return roots;
 }
 
-void ModuleGraph::displayEncounters() const {
-    for (const auto& [encounterId, encounter] : encounters) {
-        if (!encounter.rootModule.has_value()) {
-            std::cout << "Encounter " << encounterId.toString() << " (no root)\n";
-            continue;
-        }
-
-        std::cout << "Encounter " << encounterId.toString() << ": ";
-
-        // Start with root
-        UUID current = encounter.rootModule.value();
-        std::cout << current.toString();
-
-        // Follow BelongsTo chain until lastModule
-        while (current != encounter.lastModule) {
-        auto it = adjacency.find(current);
-            if (it == adjacency.end()) break; // no outgoing links
-
-            // Look for the BelongsTo chain link
-            UUID next{};
-            bool found = false;
-            for (const auto& link : it->second) {
-                if (link->linkType == ModuleLinkType::BELONGS_TO) {
-                    next = link->targetId;
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) break; // broken chain
-
-            std::cout << " -> " << next.toString();
-            current = next;
-        }
-
-        std::cout << "\n";
-    }
-}
-
-void ModuleGraph::displayLinks() const {
-    std::cout << "==== ModuleGraph Links ====" << std::endl;
-
-    if (links.empty()) {
-        std::cout << "No links present." << std::endl;
-        return;
-    }
-
-    for (const auto& linkPtr : links) {
-        std::cout 
-            << "Source: " << linkPtr->sourceId.toString()
-            << " -> Target: " << linkPtr->targetId.toString()
-            << " | Type: " << static_cast<int>(linkPtr->linkType) // or create a helper to convert to string
-            << " | Deleted: " << (linkPtr->deleted ? "Yes" : "No")
-            << std::endl;
-    }
-
-    std::cout << "============================" << std::endl;
-}
-
-
-void ModuleGraph::printEncounterPath(const UUID& encounterId) const {
-    auto encounterIt = encounters.find(encounterId);
-    if (encounterIt == encounters.end()) {
-        std::cout << "Encounter " << encounterId.toString() << " not found.\n";
-        return;
-    }
-
-    const Encounter& encounter = encounterIt->second;
-
-    if (!encounter.rootModule.has_value()) {
-        std::cout << "Encounter " << encounterId.toString() << " has no root module.\n";
-        return;
-    }
-
-    std::cout << "Printing Encounter:\n";
-    std::cout << "Encounter ID: " << encounterId.toString() << "\n\n";
-
-    // Recursive helper to print a module and its variant/annotated children
-    std::function<void(const UUID&, int)> printModule;
-    printModule = [&](const UUID& moduleId, int indent) {
-        // Print module ID with indentation
-        for (int i = 0; i < indent; ++i) std::cout << "    ";
-        std::cout << moduleId.toString() << "\n";
-
-        // Print variant modules (indented)
-        auto variantIt = adjacency.find(moduleId);
-        if (variantIt != adjacency.end()) {
-            for (const auto& link : variantIt->second) {
-                if (link->linkType == ModuleLinkType::VARIANT_OF) {
-                    printModule(link->targetId, indent + 1);
-                }
-            }
-        }
-
-        // Print annotations (with arrow)
-        if (variantIt != adjacency.end()) {
-            for (const auto& link : variantIt->second) {
-                if (link->linkType == ModuleLinkType::ANNOTATES) {
-                    for (int i = 0; i < indent; ++i) std::cout << "    ";
-                    std::cout << "-> " << link->targetId.toString() << "\n";
-                }
-            }
-        }
-    };
-
-    // Traverse BELONGS_TO chain along encounter
-    UUID current = encounter.rootModule.value();
-    while (true) {
-        printModule(current, 0);
-
-        if (current == encounter.lastModule) break;
-
-        // Move to next module in BELONGS_TO chain
-        auto it = adjacency.find(current);
-        if (it == adjacency.end()) break;
-
-        bool foundNext = false;
-        for (const auto& link : it->second) {
-            if (link->linkType == ModuleLinkType::BELONGS_TO) {
-                current = link->targetId;
-                foundNext = true;
-                break;
-            }
-        }
-        if (!foundNext) break;
-    }
-}
-
 // JSON export methods
-nlohmann::json ModuleGraph::toJson() const {
-    std::cout << "DEBUG: ModuleGraph::toJson() called!" << std::endl;
-    
-    // Debug: Print all module links
-    std::cout << "DEBUG: All Module Links:" << std::endl;
-    for (const auto& link : links) {
-        if (!link->deleted) {
-            std::cout << "  " << link->sourceId.toString() << " -> " << link->targetId.toString() 
-                      << " (" << static_cast<int>(link->linkType) << ")" << std::endl;
-        }
-    }
-    
-    // Debug: Print adjacency lists
-    std::cout << "DEBUG: Adjacency (outgoing links):" << std::endl;
-    for (const auto& [moduleId, links] : adjacency) {
-        std::cout << "  " << moduleId.toString() << " -> ";
-        for (const auto& link : links) {
-            if (!link->deleted) {
-                std::cout << link->targetId.toString() << "(" << static_cast<int>(link->linkType) << ") ";
-            }
-        }
-        std::cout << std::endl;
-    }
-    
-    // Debug: Print reverse adjacency lists
-    std::cout << "DEBUG: Reverse Adjacency (incoming links):" << std::endl;
-    for (const auto& [moduleId, links] : reverseAdjacency) {
-        std::cout << "  " << moduleId.toString() << " <- ";
-        for (const auto& link : links) {
-            if (!link->deleted) {
-                std::cout << link->sourceId.toString() << "(" << static_cast<int>(link->linkType) << ") ";
-            }
-        }
-        std::cout << std::endl;
-    }
+nlohmann::json ModuleGraph::toJson() const {    
     
     nlohmann::json result;
     
@@ -673,7 +503,6 @@ nlohmann::json ModuleGraph::toJson() const {
 
 // Recursive helper: build JSON for one module and its descendants
 nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
-    std::cout << "DEBUG: moduleToJson called for module: " << moduleId.toString() << std::endl;
     
     nlohmann::json j;
     j["id"] = moduleId.toString();
@@ -693,36 +522,13 @@ nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
         }
     }
 
-    // Find variant modules (incoming links)
-    std::cout << "DEBUG: Looking for VARIANT_OF links for module: " << moduleId.toString() << std::endl;
-    
-    // Debug: Check if there are any circular references
-    if (reverseAdjacency.find(moduleId) != reverseAdjacency.end()) {
-        std::cout << "DEBUG: reverseAdjacency contains module: " << moduleId.toString() << std::endl;
-        const auto& links = reverseAdjacency.at(moduleId);
-        std::cout << "DEBUG: Number of incoming links: " << links.size() << std::endl;
-        
-        for (size_t i = 0; i < links.size(); i++) {
-            const auto& link = links[i];
-            std::cout << "DEBUG: Link " << i << ": " << link->sourceId.toString() << " -> " << link->targetId.toString() 
-                      << " (type: " << static_cast<int>(link->linkType) << ", deleted: " << link->deleted << ")" << std::endl;
-            
-            // Check for circular reference
-            if (link->sourceId == moduleId) {
-                std::cout << "DEBUG: WARNING - Circular reference detected! Link points to itself!" << std::endl;
-            }
-        }
-    } else {
-        std::cout << "DEBUG: No incoming links found for module: " << moduleId.toString() << std::endl;
-    }
-    
+    // Find variant modules (incoming links) 
     auto reverseIt = reverseAdjacency.find(moduleId);
     if (reverseIt != reverseAdjacency.end()) {
         for (const auto& link : reverseIt->second) {
             if (link->deleted) continue;
 
             if (link->linkType == ModuleLinkType::VARIANT_OF) {
-                std::cout << "DEBUG: Found VARIANT_OF link! Adding to variantArray" << std::endl;
                 variantArray.push_back(moduleToJson(link->sourceId));
             }
         }
@@ -736,7 +542,6 @@ nlohmann::json ModuleGraph::moduleToJson(const UUID& moduleId) const {
     return j;
 }
 
-// Public entry: build full tree for an encounter
 nlohmann::json ModuleGraph::encounterToJson(const UUID& encounterId) const {
     auto it = encounters.find(encounterId);
     if (it == encounters.end() || !it->second.rootModule.has_value()) {

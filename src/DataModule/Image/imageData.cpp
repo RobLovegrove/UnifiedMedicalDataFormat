@@ -252,10 +252,8 @@ void ImageData::addMetaData(const nlohmann::json& data) {
         // Extract encoding from image_structure and store in C++ member
         if (imageStruct.contains("encoding")) {
             std::string enc_str = imageStruct["encoding"];
-            std::cerr << "DEBUG: Found encoding in image_structure: '" << enc_str << "'" << std::endl;
             auto encoding_opt = stringToCompression(enc_str);
             if (encoding_opt.has_value()) {
-                std::cerr << "DEBUG: Successfully converted to CompressionType: " << static_cast<int>(encoding_opt.value()) << std::endl;
                 header->setDataCompression(encoding_opt.value());
             } else {
                 // Invalid encoding - log warning and use default
@@ -264,7 +262,6 @@ void ImageData::addMetaData(const nlohmann::json& data) {
                 header->setDataCompression(CompressionType::RAW);
             }
         } else {
-            std::cerr << "DEBUG: No encoding found in image_structure, using default RAW" << std::endl;
             header->setDataCompression(CompressionType::RAW);
         }
         

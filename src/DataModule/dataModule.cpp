@@ -185,10 +185,6 @@ unique_ptr<DataModule> DataModule::fromStream(
         dm->readDecryptedMetadataAndData(in);
     }
 
-
-    if (dm->header->getModuleType() == ModuleType::Image) {
-        cout << *dm->header << endl;
-    }        
     return dm;
 }
 
@@ -674,11 +670,6 @@ void DataModule::writeBinary(std:: streampos absoluteModuleStart,
     else {
         header->setModifiedAt(now);
         header->setModifiedBy(author);
-    
-        cout << "Module is being updated" << endl;
-        if (header->getModuleType() != ModuleType::Frame) {
-            cout << *header << endl;
-        }
     }
 
 

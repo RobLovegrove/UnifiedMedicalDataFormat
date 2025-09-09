@@ -75,7 +75,6 @@ std::vector<uint8_t> EncryptionManager::generateIV(size_t length) {
     
     std::vector<uint8_t> iv(length);
     
-    (iv.data(), length);
     return iv;
 }
 

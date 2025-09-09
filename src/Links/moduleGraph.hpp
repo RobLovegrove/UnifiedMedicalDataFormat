@@ -71,10 +71,6 @@ public:
     std::vector<UUID> getRootModules() const;
 
     uint32_t writeModuleGraph(std::ostream& outfile);
-    
-    void displayLinks() const;
-    void displayEncounters() const;
-    void printEncounterPath(const UUID& encounterId) const;
 
     // JSON export method
     nlohmann::json toJson() const;

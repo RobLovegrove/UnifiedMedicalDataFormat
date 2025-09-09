@@ -151,8 +151,6 @@ Result Writer::openFile(std::string& filename, string author, string password) {
         // Read the module graph from the buffer
         moduleGraph = ModuleGraph::readModuleGraph(buffer);
 
-        cout << "Displaying encounters" << endl << endl;
-        moduleGraph.displayEncounters();
     }
     catch (const std::exception& e) {
         cancelThenClose();
@@ -312,10 +310,6 @@ Result Writer::closeFile() {
         removeTempFile();
         return Result{false, "Exception writing module graph: " + std::string(e.what())};
     }
-
-    cout << "Displaying encounters" << endl << endl;
-    moduleGraph.displayEncounters();
-
     // Make old XREF table obsolete and write new one
     try {
         if (!newFile) {
@@ -340,8 +334,6 @@ Result Writer::closeFile() {
         if (!result.success) {
             removeTempFile();
             return result;
-        } else {
-            cout << "Temp file validated successfully" << endl;
         }
     } catch (const std::exception& e) {
         removeTempFile();
@@ -349,10 +341,8 @@ Result Writer::closeFile() {
     }
 
     // Atomic replace (rename temp to original)
-    cout << "Renaming temp file: " << tempFilePath << " to: " << filePath << endl;
     try {
         std::filesystem::rename(tempFilePath, filePath);
-        cout << "File renamed successfully" << endl;
     } catch (const std::exception& e) {
         removeTempFile();
         return Result{false, "Exception renaming temp file: " + std::string(e.what())};
@@ -409,7 +399,6 @@ Result Writer::setUpFileStream(std::string& filename) {
     else {    
         fileStream.open(tempFilePath, std::ios::binary | std::ios::out | std::ios::trunc);
         if (!fileStream) {   
-            cout << "Failing here" << endl;
             return Result{false, "Failed to open temp file: " + std::string(std::strerror(errno))};
         }
     }
@@ -417,10 +406,6 @@ Result Writer::setUpFileStream(std::string& filename) {
     return Result{true, "File stream set up successfully"};
 }
 
-
-void Writer::printEncounterPath(const UUID& encounterId) {
-    moduleGraph.printEncounterPath(encounterId);
-}
 
 /* ======================================================= */
 /* =============== MODULE GRAPH OPERATIONS =============== */
@@ -447,12 +432,6 @@ std::expected<UUID, std::string> Writer::addModuleToEncounter(
 
     // Check if encounter exists
     if (!moduleGraph.encounterExists(encounterId)) {
-
-        const auto& encounters = moduleGraph.getEncounters();
-        for (const auto& [encounterId, encounter] : encounters) {
-            cout << "Encounter " << encounterId.toString() << ": " << encounter.rootModule.value().toString() << " -> " << encounter.lastModule.value().toString() << endl;
-        }
-
         return std::unexpected("Encounter ID " + encounterId.toString() + " not found");
     }
     

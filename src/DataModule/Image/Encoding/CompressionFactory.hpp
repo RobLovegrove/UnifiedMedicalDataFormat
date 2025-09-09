@@ -3,6 +3,7 @@
 #include "CompressionStrategy.hpp"
 #include "JPEG2000Compression.hpp"
 #include "PNGCompression.hpp"
+#include "Utility/Compression/CompressionType.hpp"
 #include <map>
 #include <memory>
 #include <functional>
@@ -15,27 +16,27 @@
  */
 class CompressionFactory : public CompressionStrategyFactory {
 private:
-    std::map<std::string, std::function<std::unique_ptr<CompressionStrategy>()>> strategyCreators;
+    std::map<CompressionType, std::function<std::unique_ptr<CompressionStrategy>()>> strategyCreators;
 
 public:
     CompressionFactory();
     
-    std::unique_ptr<CompressionStrategy> createStrategy(const std::string& type) const override;
+    std::unique_ptr<CompressionStrategy> createStrategy(CompressionType type) const override;
     
-    std::vector<std::string> getSupportedTypes() const override;
+    std::vector<CompressionType> getSupportedTypes() const override;
     
     /**
      * @brief Register a new compression strategy type
-     * @param type Type identifier
+     * @param type Compression type enum
      * @param creator Function to create the strategy
      */
-    void registerStrategy(const std::string& type, 
+    void registerStrategy(CompressionType type, 
                          std::function<std::unique_ptr<CompressionStrategy>()> creator);
     
     /**
      * @brief Check if a compression type is supported
-     * @param type Type identifier
+     * @param type Compression type enum
      * @return True if supported, false otherwise
      */
-    bool isSupported(const std::string& type) const;
+    bool isSupported(CompressionType type) const;
 };

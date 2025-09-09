@@ -105,6 +105,7 @@ nlohmann::json Reader::getFileInfo() {
         xrefTable = XRefTable::loadXrefTable(fileStream);
     }
 
+    cout << "\nXREF table:" << endl;
     cout << xrefTable << endl;
 
     result["success"] = true;
@@ -249,9 +250,4 @@ std::expected<ModuleData, std::string> Reader::getAuditData(const ModuleTrail& m
     catch (const std::exception& e) {
         return std::unexpected("Error getting audit data: " + string(e.what()));
     }
-}
-
-
-void Reader::printEncounterPath(const UUID& encounterId) {
-    moduleGraph.printEncounterPath(encounterId);
 }

@@ -15,15 +15,11 @@
 
 using namespace std;
  
-
-/* -------------------------- CONSTANTS -------------------------- */
-
 /* -------------------------- DECLARATIONS -------------------------- */
 void addWriteOptions(CLI::App* writeCmd, string& inputFile, string& outputFile);
 void addDemoOptions(CLI::App* demoCmd, string& outputFile);
-
-/* -------------------------- MOCK DATA -------------------------- */
-
+void displayModuleTree(Reader& reader, const nlohmann::json& moduleTree, int indentLevel);
+void displayModuleData(ModuleData& moduleData, const string& moduleType = "unknown", const string& moduleUuid = "unknown");
 
 /* -------------------------- MAIN FUNCTION -------------------------- */
 
@@ -70,8 +66,8 @@ int main(int argc, char** argv) {
 
     if (*demoCmd) {
         cout << "\n" << string(80, '=') << "\n";
-        cout << "           UMDF SYSTEM DEMONSTRATION\n";
-        cout << "    Unified Medical Data Format - Complete Workflow\n";
+        cout << "                        UMDF SYSTEM DEMONSTRATION\n";
+        cout << "             Unified Medical Data Format - Complete Workflow\n";
         cout << string(80, '=') << "\n\n";
         
         cout << "This demonstration will show the complete UMDF workflow:\n";
@@ -79,7 +75,7 @@ int main(int argc, char** argv) {
         cout << "2. Reading and verifying the data\n";
         cout << "3. Adding medical imaging data\n";
         cout << "4. Creating module variants\n";
-        cout << "5. Updating existing data with audit trail\n";
+        cout << "5. Updating existing data and displaying audit trail\n";
         cout << "6. Final verification and cleanup\n\n";
         
         cout << "Output file: " << outputFile << "\n\n";
@@ -137,14 +133,14 @@ int main(int argc, char** argv) {
             moduleId = addResult.value();
             firstTabularUUID = moduleId.toString();
             
-            cout << "Adding clinical annotation to patient data...\n";
+            cout << "\n\nAdding clinical annotation to patient data...\n";
             addResult = writer.addAnnotation(moduleId, patientPair.first, patientPair.second);
             if (!addResult) {
                 cerr << "Failed to add annotation: " << addResult.error() << endl;
                 return 1;
             }
             
-            cout << "Patient data module added successfully\n";
+            cout << "\nPatient data module added successfully\n";
             cout << "  Module UUID: " << moduleId.toString() << "\n";
             cout << "  Schema: " << patientPair.first << "\n\n";
 
@@ -188,8 +184,11 @@ int main(int argc, char** argv) {
                 }
             }
 
+            cout << "\nModule graph:" << endl;
+            cout << fileInfo["module_graph"].dump(2) << endl;
+
             reader.closeFile();
-            cout << "Data verification complete\n\n";
+            cout << "\nData verification complete\n\n";
 
             cout << "STEP 4: ADDING MEDICAL IMAGING DATA\n";
             cout << string(40, '-') << "\n";
@@ -197,7 +196,7 @@ int main(int argc, char** argv) {
             // Load image mock data
             cout << "Loading CT scan imaging data from mock_data/ct_image_data.json...\n";
             auto imagePair = MockDataLoader::loadMockData("mock_data/ct_image_data.json");
-            cout << "CT imaging data loaded successfully\n\n";
+            cout << "\nCT imaging data loaded successfully\n\n";
 
             cout << "Reopening file for additional data...\n";
             auto reopenResult = writer.openFile(outputFile, author, password);
@@ -209,11 +208,9 @@ int main(int argc, char** argv) {
 
             cout << "Adding CT scan data to the same medical encounter...\n";
             cout << "  - Modality: CT (Computed Tomography)\n";
-            cout << "  - Body part: CHEST\n";
             cout << "  - Dimensions: 256x256x12x5 (x,y,z,time)\n";
             cout << "  - Encoding: PNG compression\n";
-            cout << "  - Frames: 60 total (12 slices × 5 time points)\n";
-            cout << "  - Compression: ~99.6% space savings\n\n";
+            cout << "  - Frames: 60 total (12 slices × 5 time points)\n\n";
             
             addResult = writer.addModuleToEncounter(encounterId, imagePair.first, imagePair.second);
             if (!addResult) {
@@ -222,7 +219,7 @@ int main(int argc, char** argv) {
             }
             UUID imageModuleId = addResult.value();
 
-            cout << "CT imaging data added successfully\n";
+            cout << "Imaging data added successfully\n";
             cout << "  Module UUID: " << imageModuleId.toString() << "\n";
             cout << "  Schema: " << imagePair.first << "\n\n";
 
@@ -231,10 +228,9 @@ int main(int argc, char** argv) {
             cout << string(40, '-') << "\n";
             cout << "Creating a variant of the CT scan with modified parameters...\n";
             cout << "  - Original modality: CT\n";
-            cout << "  - Variant modality: CT2 (modified processing)\n";
-            cout << "  - This demonstrates UMDF's versioning capabilities\n\n";
+            cout << "  - Variant modality: MRI (modified processing)\n";
 
-            imagePair.second.metadata["modality"] = "CT2";
+            imagePair.second.metadata["modality"] = "MRI";
 
             // Add variant module
             auto variantModuleResult = writer.addVariantModule(imageModuleId, imagePair.first, imagePair.second);
@@ -244,7 +240,7 @@ int main(int argc, char** argv) {
             }
             UUID variantModuleId = variantModuleResult.value();
 
-            cout << "Variant module created successfully\n";
+            cout << "\nVariant module created successfully\n";
             cout << "  Variant UUID: " << variantModuleId.toString() << "\n";
             cout << "  Parent UUID: " << imageModuleId.toString() << "\n\n";
 
@@ -257,7 +253,7 @@ int main(int argc, char** argv) {
             }
             cout << "File closed and imaging data saved\n\n";
 
-            cout << "STEP 6: COMPREHENSIVE DATA VERIFICATION\n";
+            cout << "STEP 6: DATA VERIFICATION\n";
             cout << string(40, '-') << "\n";
             cout << "Reading the complete file to verify all data types...\n";
             
@@ -278,20 +274,18 @@ int main(int argc, char** argv) {
             cout << "  Total modules: " << finalFileInfo["module_count"] << "\n";
             cout << "  Data types: Patient demographics + CT imaging + Variants\n\n";
 
-            cout << "STEP 7: AUDIT TRAIL DEMONSTRATION\n";
+            cout << "Module graph:" << endl;
+            cout << finalFileInfo["module_graph"].dump(2) << endl;
+
+            cout << "\n\nSTEP 7: UPDATING DATA\n";
             cout << string(40, '-') << "\n";
-            cout << "Demonstrating UMDF's audit trail capabilities...\n";
-            cout << "We will update the patient data and show the audit trail.\n\n";
-            
             cout << "INTRODUCING ARTIFICIAL TIME DELAY\n";
             cout << "This 2-second delay is added to demonstrate the audit trail\n";
             cout << "showing different timestamps for module creation vs. modification.\n";
-            cout << "In a real medical system, this would represent actual time\n";
-            cout << "between data entry and subsequent updates by different users.\n\n";
             
-            cout << "Waiting 2 seconds... ";
+            cout << "Waiting 3 seconds.";
             cout.flush();
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < 3; i++) {
                 std::this_thread::sleep_for(std::chrono::seconds(1));
                 cout << ".";
                 cout.flush();
@@ -305,13 +299,10 @@ int main(int argc, char** argv) {
                 cerr << "Failed to get patient module data: " << patientModuleData.error() << endl;
                 return 1;
             }
-            cout << "Patient data retrieved successfully\n\n";
+            cout << "\nPatient data retrieved successfully\n\n";
 
             // Update the patient module data
             cout << "Adding new clinical annotation to patient data...\n";
-            cout << "  - New clinician: Dr. John Doe\n";
-            cout << "  - New encounter date: 2025-07-29\n";
-            cout << "  - This simulates a follow-up visit\n\n";
             
             patientModuleData.value().metadata.push_back({
                 {"clinician", "Dr. John Doe"},
@@ -321,13 +312,14 @@ int main(int argc, char** argv) {
             // Update the patient module data in the file
             reader.closeFile();
 
-             cout << "Opening file for update (different user: " << author << ")...\n";
-             auto result = writer.openFile(outputFile, author, password);
-             if (!result.success) {
-                 cerr << "Failed to reopen file: " << result.message << endl;
-                 return 1;
-             }
-             cout << "File opened for update by user '" << author << "'\n\n";
+            string newAuthor = "Rob";
+            cout << "\nOpening file for update with a new author: " << newAuthor << ")...\n";
+            auto result = writer.openFile(outputFile, newAuthor, password);
+            if (!result.success) {
+                cerr << "Failed to reopen file: " << result.message << endl;
+                return 1;
+            }
+            cout << "File opened for update by user '" << newAuthor << "'\n\n";
 
             cout << "Updating patient module with new clinical data...\n";
             auto updateResult = writer.updateModule(firstTabularUUID, patientModuleData.value());
@@ -347,7 +339,17 @@ int main(int argc, char** argv) {
             cout << "STEP 8: FINAL VERIFICATION AND AUDIT TRAIL\n";
             cout << string(40, '-') << "\n";
             cout << "Reading final file state and displaying audit trail...\n\n";
-            
+
+            cout << "Reopening file for final verification...\n";
+            result = reader.openFile(outputFile, password);
+            if (!result.success) {
+                cerr << "Failed to reopen file: " << result.message << endl;
+                return 1;
+            }
+
+            cout << "File reopened successfully\n\n";
+            finalFileInfo = reader.getFileInfo();
+
             cout << "Final file statistics:\n";
             cout << "  Total modules: " << finalFileInfo["module_count"] << "\n";
             
@@ -358,20 +360,42 @@ int main(int argc, char** argv) {
                     cout << "    - " << module["type"] << " data (UUID: " << module["uuid"] << ")\n";
                 }
             }
-            cout << "\n";
-            reader.closeFile();
 
-            result = reader.openFile(outputFile, password);
-            if (!result.success) {
-                cerr << "Failed to reopen file: " << result.message << endl;
-                return 1;
+            cout << "Module graph:" << endl;
+            cout << finalFileInfo["module_graph"].dump(2) << endl;
+
+            cout << "\nDISPLAYING DATA BY ENCOUNTER AND MODULE RELATIONSHIPS\n";
+            cout << string(60, '-') << "\n";
+
+            // Display data organized by encounters
+            if (finalFileInfo.contains("module_graph") && finalFileInfo["module_graph"].contains("encounters")) {
+                const auto& encounters = finalFileInfo["module_graph"]["encounters"];
+                
+                for (size_t encounterIdx = 0; encounterIdx < encounters.size(); encounterIdx++) {
+                    const auto& encounter = encounters[encounterIdx];
+                    cout << "\nENCOUNTER " << (encounterIdx + 1) << ": " << encounter["encounter_id"] << "\n";
+                    cout << string(50, '-') << "\n";
+                    
+                    if (encounter.contains("module_tree")) {
+                        displayModuleTree(reader, encounter["module_tree"], 0);
+                    }
+                }
+            } else {
+                // Fallback to original display if no encounter structure
+                cout << "No encounter structure found, displaying modules individually:\n\n";
+                if (finalFileInfo.contains("modules")) {
+                    for (const auto& module : finalFileInfo["modules"]) {
+                        auto moduleData = reader.getModuleData(module["uuid"]);
+                        if (moduleData) {
+                            displayModuleData(moduleData.value(), module["type"], module["uuid"]);
+                        }
+                    }
+                }
             }
 
-            finalFileInfo = reader.getFileInfo();
-
-            cout << "AUDIT TRAIL DEMONSTRATION\n";
+            cout << "\nAUDIT TRAIL DEMONSTRATION\n";
             cout << "========================\n";
-            cout << "The audit trail shows the complete history of the patient module:\n\n";
+            cout << "The audit trail shows the complete history of the patient tabular module:\n\n";
 
             auto auditTrailResult = reader.getAuditTrail(UUID::fromString(firstTabularUUID));
             if (!auditTrailResult.has_value()) {
@@ -391,6 +415,10 @@ int main(int argc, char** argv) {
                 cout << "  Modified: " << trail.modifiedAt.toString() << " by " << trail.modifiedBy << "\n";
                 cout << "  Size: " << trail.moduleSize << " bytes\n";
                 cout << "  Offset: " << trail.moduleOffset << "\n\n";
+                auto auditData = reader.getAuditData(trail);
+                if (auditData) {
+                    displayModuleData(auditData.value(), module_type_to_string(trail.moduleType), trail.moduleID.toString());
+                }
             }
 
             cout << "DEMONSTRATION COMPLETE\n";
@@ -398,11 +426,10 @@ int main(int argc, char** argv) {
             cout << "The UMDF system has successfully demonstrated:\n";
             cout << "Secure file creation with encryption\n";
             cout << "Patient demographic data storage\n";
-            cout << "Medical imaging data (CT scans) with compression\n";
-            cout << "Module versioning and variants\n";
+            cout << "Medical imaging data with compression (with simple mock data)\n";
+            cout << "Module Graph capabilities\n";
             cout << "Complete audit trail with timestamps\n";
-             cout << "Multi-user access (" << author << " → " << author << ")\n";
-            cout << "Data integrity and verification\n\n";
+            cout << "Multi-user access (" << author << " → " << newAuthor << ")\n";
             cout << "FILE CLEANUP\n";
             cout << "============\n";
 
@@ -410,15 +437,14 @@ int main(int argc, char** argv) {
             if (outputFile == "demo.umdf") {
                 std::filesystem::remove(outputFile);
                 cout << "Demo file cleaned up (temporary file removed)\n";
-                cout << "  This was a demonstration file - in production, files would be preserved.\n\n";
             } else {
                 cout << "File preserved: " << outputFile << "\n";
                 cout << "  Your custom file has been saved and can be used for further testing.\n\n";
             }
             
+            cout << "\n";
             cout << string(80, '=') << "\n";
-            cout << "           UMDF DEMONSTRATION COMPLETE\n";
-            cout << "    Thank you for exploring the UMDF system!\n";
+            cout << "\n                          UMDF DEMONSTRATION COMPLETE\n\n";
             cout << string(80, '=') << "\n\n";
             
         } catch (const std::exception& e) {
@@ -629,4 +655,96 @@ void addDemoOptions(CLI::App* demoCmd, string& outputFile) {
             outputFile = "demo.umdf";
         }
     });
+}
+
+
+// Helper function to display module data
+void displayModuleData(ModuleData& moduleData, const string& moduleType, const string& moduleUuid) {
+    cout << "Module: " << moduleType << " (UUID: " << moduleUuid << ")" << endl;
+    cout << "Metadata: " << moduleData.metadata.dump(2) << endl;
+    
+    // Handle the data variant based on type
+    const auto& data = moduleData.data;
+    if (std::holds_alternative<nlohmann::json>(data)) {
+        // Tabular data
+        cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
+    } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
+        // Binary data (like image pixels)
+        const auto& binaryData = std::get<std::vector<uint8_t>>(data);
+        cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
+    } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
+        // Nested modules (like image frames)
+        const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
+        cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
+        
+        // Show details of nested modules
+        for (size_t i = 0; i < nestedModules.size() && i < 3; i++) { // Limit to first 2 for readability
+            cout << "  Sub-module " << i << " metadata: " 
+                    << nestedModules[i].metadata.dump(2) << endl;
+        }
+        if (nestedModules.size() > 3) {
+            cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;
+        }
+    }
+    cout << endl;
+}
+
+// Helper function to display module tree with relationships
+void displayModuleTree(Reader& reader, const nlohmann::json& moduleTree, int indentLevel) {
+    for (const auto& module : moduleTree) {
+        // Indent based on level
+        string indent(indentLevel * 2, ' ');
+        
+        cout << indent << "\n└─ Module: " << module["id"] << "\n";
+        
+        // Display relationships FIRST to make them prominent
+        if (module.contains("annotated_by")) {
+            cout << indent << "    ANNOTATIONS:\n";
+            for (const auto& annotation : module["annotated_by"]) {
+                cout << indent << "      └─ " << annotation["id"] << "\n";
+            }
+            cout << "\n";
+        }
+        
+        if (module.contains("variant")) {
+            cout << indent << "    VARIANTS:\n";
+            for (const auto& variant : module["variant"]) {
+                cout << indent << "      └─ " << variant["id"] << "\n";
+            }
+            cout << "\n";
+        }
+        
+        // Get and display module data
+        auto moduleData = reader.getModuleData(module["id"]);
+        if (moduleData) {
+            // Display full metadata
+            cout << indent << "   Metadata: " << moduleData.value().metadata.dump(2) << "\n";
+            
+            // Display full data based on type
+            const auto& data = moduleData.value().data;
+            if (std::holds_alternative<nlohmann::json>(data)) {
+                // Tabular data
+                cout << indent << "   Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << "\n";
+            } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
+                // Binary data (like image pixels)
+                const auto& binaryData = std::get<std::vector<uint8_t>>(data);
+                cout << indent << "   Data (Binary): " << binaryData.size() << " bytes\n";
+            } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
+                // Nested modules (like image frames)
+                const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
+                cout << indent << "   Data (Nested): " << nestedModules.size() << " sub-modules\n";
+                
+                // Show details of first few nested modules
+                for (size_t i = 0; i < nestedModules.size() && i < 2; i++) {
+                    cout << indent << "     Sub-module " << i << " metadata: " 
+                         << nestedModules[i].metadata.dump(2) << "\n";
+                }
+                if (nestedModules.size() > 2) {
+                    cout << indent << "     ... and " << (nestedModules.size() - 2) << " more sub-modules\n";
+                }
+            }
+        }
+        
+        cout << "\n";
+    }
 }

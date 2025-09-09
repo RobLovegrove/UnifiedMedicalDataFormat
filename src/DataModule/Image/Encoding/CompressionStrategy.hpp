@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include "Utility/Compression/CompressionType.hpp"
 
 /**
  * @brief Abstract interface for image compression strategies
@@ -58,14 +59,14 @@ public:
     
     /**
      * @brief Create a compression strategy for the given type
-     * @param type Compression type identifier
+     * @param type Compression type enum
      * @return Unique pointer to compression strategy, or nullptr if unsupported
      */
-    virtual std::unique_ptr<CompressionStrategy> createStrategy(const std::string& type) const = 0;
+    virtual std::unique_ptr<CompressionStrategy> createStrategy(CompressionType type) const = 0;
     
     /**
      * @brief Get list of supported compression types
-     * @return Vector of supported compression type strings
+     * @return Vector of supported compression type enums
      */
-    virtual std::vector<std::string> getSupportedTypes() const = 0;
+    virtual std::vector<CompressionType> getSupportedTypes() const = 0;
 };

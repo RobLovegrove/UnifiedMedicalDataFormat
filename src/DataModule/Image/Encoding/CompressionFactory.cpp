@@ -6,17 +6,12 @@
 class RawCompression : public CompressionStrategy {
 public:
     std::vector<uint8_t> compress(const std::vector<uint8_t>& rawData,
-                                 int width, int height,
-                                 uint8_t channels, uint8_t bitDepth) const override {
-        std::cerr << "RAW: No compression applied. Size: " << rawData.size() 
-                  << " bytes, Dimensions: " << width << "x" << height 
-                  << ", Channels: " << static_cast<int>(channels) 
-                  << ", BitDepth: " << static_cast<int>(bitDepth) << std::endl;
+                                 int, int,
+                                 uint8_t, uint8_t) const override {
         return rawData; // Return data as-is
     }
     
     std::vector<uint8_t> decompress(const std::vector<uint8_t>& compressedData) const override {
-        std::cerr << "RAW: No decompression needed. Size: " << compressedData.size() << " bytes" << std::endl;
         return compressedData; // Return data as-is
     }
     
@@ -31,21 +26,21 @@ public:
 
 CompressionFactory::CompressionFactory() {
     // Register built-in compression strategies
-    registerStrategy("JPEG2000_LOSSLESS", []() -> std::unique_ptr<CompressionStrategy> {
+    registerStrategy(CompressionType::JPEG2000_LOSSLESS, []() -> std::unique_ptr<CompressionStrategy> {
         return std::make_unique<JPEG2000Compression>();
     });
     
-    registerStrategy("PNG", []() -> std::unique_ptr<CompressionStrategy> {
+    registerStrategy(CompressionType::PNG, []() -> std::unique_ptr<CompressionStrategy> {
         return std::make_unique<PNGCompression>();
     });
     
     // Add RAW strategy (no compression)
-    registerStrategy("RAW", []() -> std::unique_ptr<CompressionStrategy> {
+    registerStrategy(CompressionType::RAW, []() -> std::unique_ptr<CompressionStrategy> {
         return std::make_unique<RawCompression>();
     });
 }
 
-std::unique_ptr<CompressionStrategy> CompressionFactory::createStrategy(const std::string& type) const {
+std::unique_ptr<CompressionStrategy> CompressionFactory::createStrategy(CompressionType type) const {
     auto it = strategyCreators.find(type);
     if (it != strategyCreators.end()) {
         return it->second();
@@ -53,19 +48,19 @@ std::unique_ptr<CompressionStrategy> CompressionFactory::createStrategy(const st
     return nullptr;
 }
 
-std::vector<std::string> CompressionFactory::getSupportedTypes() const {
-    std::vector<std::string> types;
+std::vector<CompressionType> CompressionFactory::getSupportedTypes() const {
+    std::vector<CompressionType> types;
     for (const auto& pair : strategyCreators) {
         types.push_back(pair.first);
     }
     return types;
 }
 
-void CompressionFactory::registerStrategy(const std::string& type, 
+void CompressionFactory::registerStrategy(CompressionType type, 
                                         std::function<std::unique_ptr<CompressionStrategy>()> creator) {
     strategyCreators[type] = creator;
 }
 
-bool CompressionFactory::isSupported(const std::string& type) const {
+bool CompressionFactory::isSupported(CompressionType type) const {
     return strategyCreators.find(type) != strategyCreators.end();
 }

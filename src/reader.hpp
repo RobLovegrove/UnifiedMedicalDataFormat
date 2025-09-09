@@ -36,8 +36,6 @@ private:
 
 public:
 
-    void printEncounterPath(const UUID& encounterId);
-
     std::expected<ModuleData, std::string> getModuleData(const std::string& moduleId);
     
     std::expected<std::vector<ModuleTrail>, std::string> getAuditTrail(const UUID& moduleId);
