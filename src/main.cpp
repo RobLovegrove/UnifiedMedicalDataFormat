@@ -32,6 +32,11 @@ void addDemoOptions(CLI::App* demoCmd, string& outputFile);
 void displayModuleTree(Reader& reader, const nlohmann::json& moduleTree, int indentLevel);
 void displayModuleData(ModuleData& moduleData, const string& moduleType = "unknown", const string& moduleUuid = "unknown");
 void displayFileData(Reader& reader, const nlohmann::json& fileInfo, bool showSummary = true);
+void displayOperationHeader(const string& operation, const string& inputFile, const string& outputFile, const string& encounterId, const string& author, const string& password);
+void displayEncryptionStatus(const string& password);
+bool loadMockData(const string& inputFile, string& schemaPath, ModuleData& moduleData);
+bool openOrCreateFile(Writer& writer, const string& operation, string& outputFile, const string& author, const string& password);
+bool closeFile(Writer& writer);
 
 /* -------------------------- MAIN FUNCTION -------------------------- */
 
@@ -409,35 +414,18 @@ int main(int argc, char** argv) {
     else if (*subcommands.writeCmd) {
         // Check for write subcommands
         if (*subcommands.createCmd) {
-            cout << "=== Creating new UMDF file ===" << endl;
-            cout << "Input mock data: " << inputFile << endl;
-            cout << "Output file: " << outputFile << endl;
-            if (!encounterId.empty()) {
-                cout << "Encounter ID: " << encounterId << endl;
-            } else {
-                cout << "Encounter ID: (will create new encounter)" << endl;
-            }
-            cout << "Author: " << author << endl;
-            if (password != "") {
-                cout << "Encryption: AES-256-GCM enabled" << endl;
-            } else {
-                cout << "Encryption: NONE" << endl;
-            }
-            cout << endl;
+            displayOperationHeader("Creating new UMDF file", inputFile, outputFile, "", author, password);
             
             try {
                 // Load mock data from file
-                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
-                string schemaPath = mockDataPair.first;
-                ModuleData moduleData = mockDataPair.second;
-                
-                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                string schemaPath;
+                ModuleData moduleData;
+                if (!loadMockData(inputFile, schemaPath, moduleData)) {
+                    return 1;
+                }
                 
                 // Create new file
-                cout << "Creating new UMDF file: " << outputFile << endl;
-                Result result = writer.createNewFile(outputFile, author, password);
-                if (!result.success) {
-                    cerr << "Failed to create file: " << result.message << endl;
+                if (!openOrCreateFile(writer, "create", outputFile, author, password)) {
                     return 1;
                 }
                 
@@ -462,9 +450,7 @@ int main(int argc, char** argv) {
                 cout << "Module added successfully. UUID: " << moduleId.toString() << endl;
                 
                 // Close the file
-                auto closeResult = writer.closeFile();
-                if (!closeResult.success) {
-                    cerr << "Failed to close file: " << closeResult.message << endl;
+                if (!closeFile(writer)) {
                     return 1;
                 }
                 
@@ -476,35 +462,18 @@ int main(int argc, char** argv) {
             }
         }
         else if (*subcommands.addCmd) {
-            cout << "=== Adding module to existing UMDF file ===" << endl;
-            cout << "Input mock data: " << inputFile << endl;
-            cout << "Output file: " << outputFile << endl;
-            if (!encounterId.empty()) {
-                cout << "Encounter ID: " << encounterId << endl;
-            } else {
-                cout << "Encounter ID: (will create new encounter)" << endl;
-            }
-            cout << "Author: " << author << endl;
-            if (password != "") {
-                cout << "Encryption: AES-256-GCM enabled" << endl;
-            } else {
-                cout << "Encryption: NONE" << endl;
-        }
-        cout << endl;
-
+            displayOperationHeader("Adding module to existing UMDF file", inputFile, outputFile, encounterId, author, password);
+            
             try {
                 // Load mock data from file
-                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
-                string schemaPath = mockDataPair.first;
-                ModuleData moduleData = mockDataPair.second;
-                
-                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                string schemaPath;
+                ModuleData moduleData;
+                if (!loadMockData(inputFile, schemaPath, moduleData)) {
+                    return 1;
+                }
                 
                 // Add to existing file
-                cout << "Opening existing UMDF file: " << outputFile << endl;
-                Result result = writer.openFile(outputFile, author, password);
-                if (!result.success) {
-                    cerr << "Failed to open file: " << result.message << endl;
+                if (!openOrCreateFile(writer, "add", outputFile, author, password)) {
                     return 1;
                 }
                 
@@ -534,9 +503,7 @@ int main(int argc, char** argv) {
                 cout << "Module added successfully. UUID: " << moduleId.toString() << endl;
                 
                 // Close the file
-                auto closeResult = writer.closeFile();
-                if (!closeResult.success) {
-                    cerr << "Failed to close file: " << closeResult.message << endl;
+                if (!closeFile(writer)) {
                     return 1;
                 }
                 
@@ -548,25 +515,18 @@ int main(int argc, char** argv) {
             }
         }
         else if (*subcommands.updateCmd) {
-            cout << "=== Updating module in UMDF file ===" << endl;
-            cout << "Input mock data: " << inputFile << endl;
-            cout << "UMDF file: " << outputFile << endl;
-            cout << "Module ID: " << encounterId << endl;
-            cout << "Author: " << author << endl;
+            displayOperationHeader("Updating module in UMDF file", inputFile, outputFile, encounterId, author, password);
             
             try {
                 // Load mock data from file
-                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
-                string schemaPath = mockDataPair.first;
-                ModuleData moduleData = mockDataPair.second;
-                
-                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                string schemaPath;
+                ModuleData moduleData;
+                if (!loadMockData(inputFile, schemaPath, moduleData)) {
+                    return 1;
+                }
                 
                 // Open existing file for update
-                cout << "Opening file for module update: " << outputFile << endl;
-                Result result = writer.openFile(outputFile, author, password);
-                if (!result.success) {
-                    cerr << "Failed to open file: " << result.message << endl;
+                if (!openOrCreateFile(writer, "update", outputFile, author, password)) {
                     return 1;
                 }
                 
@@ -584,9 +544,7 @@ int main(int argc, char** argv) {
                 cout << "Module updated successfully" << endl;
                 
                 // Close the file
-                auto closeResult = writer.closeFile();
-                if (!closeResult.success) {
-                    cerr << "Failed to close file: " << closeResult.message << endl;
+                if (!closeFile(writer)) {
                     return 1;
                 }
                 
@@ -598,25 +556,18 @@ int main(int argc, char** argv) {
             }
         }
         else if (*subcommands.addVariantCmd) {
-            cout << "=== Adding variant module to parent ===" << endl;
-            cout << "Input mock data: " << inputFile << endl;
-            cout << "UMDF file: " << outputFile << endl;
-            cout << "Parent module ID: " << encounterId << endl;
-            cout << "Author: " << author << endl;
+            displayOperationHeader("Adding variant module to parent", inputFile, outputFile, encounterId, author, password);
             
             try {
                 // Load mock data from file
-                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
-                string schemaPath = mockDataPair.first;
-                ModuleData moduleData = mockDataPair.second;
-                
-                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                string schemaPath;
+                ModuleData moduleData;
+                if (!loadMockData(inputFile, schemaPath, moduleData)) {
+                    return 1;
+                }
                 
                 // Open existing file for adding variant
-                cout << "Opening file for variant addition: " << outputFile << endl;
-                Result result = writer.openFile(outputFile, author, password);
-                if (!result.success) {
-                    cerr << "Failed to open file: " << result.message << endl;
+                if (!openOrCreateFile(writer, "addVariant", outputFile, author, password)) {
                     return 1;
                 }
                 
@@ -635,9 +586,7 @@ int main(int argc, char** argv) {
                 cout << "Variant module added successfully. UUID: " << variantModuleId.toString() << endl;
                 
                 // Close the file
-                auto closeResult = writer.closeFile();
-                if (!closeResult.success) {
-                    cerr << "Failed to close file: " << closeResult.message << endl;
+                if (!closeFile(writer)) {
                     return 1;
                 }
                 
@@ -649,25 +598,18 @@ int main(int argc, char** argv) {
             }
         }
         else if (*subcommands.addAnnotationCmd) {
-            cout << "=== Adding annotation module to parent ===" << endl;
-            cout << "Input mock data: " << inputFile << endl;
-            cout << "UMDF file: " << outputFile << endl;
-            cout << "Parent module ID: " << encounterId << endl;
-            cout << "Author: " << author << endl;
+            displayOperationHeader("Adding annotation module to parent", inputFile, outputFile, encounterId, author, password);
             
             try {
                 // Load mock data from file
-                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
-                string schemaPath = mockDataPair.first;
-                ModuleData moduleData = mockDataPair.second;
-                
-                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                string schemaPath;
+                ModuleData moduleData;
+                if (!loadMockData(inputFile, schemaPath, moduleData)) {
+                    return 1;
+                }
                 
                 // Open existing file for adding annotation
-                cout << "Opening file for annotation addition: " << outputFile << endl;
-                Result result = writer.openFile(outputFile, author, password);
-                if (!result.success) {
-                    cerr << "Failed to open file: " << result.message << endl;
+                if (!openOrCreateFile(writer, "addAnnotation", outputFile, author, password)) {
                     return 1;
                 }
                 
@@ -686,9 +628,7 @@ int main(int argc, char** argv) {
                 cout << "Annotation module added successfully. UUID: " << annotationModuleId.toString() << endl;
                 
                 // Close the file
-                auto closeResult = writer.closeFile();
-                if (!closeResult.success) {
-                    cerr << "Failed to close file: " << closeResult.message << endl;
+                if (!closeFile(writer)) {
                     return 1;
                 }
                 
@@ -948,4 +888,67 @@ void displayFileData(Reader& reader, const nlohmann::json& fileInfo, bool showSu
             }
         }
     }
+}
+
+void displayOperationHeader(const string& operation, const string& inputFile, const string& outputFile, const string& encounterId, const string& author, const string& password) {
+    cout << "=== " << operation << " ===" << endl;
+    cout << "Input mock data: " << inputFile << endl;
+    cout << "Output file: " << outputFile << endl;
+    if (!encounterId.empty()) {
+        cout << "Encounter ID: " << encounterId << endl;
+    } else {
+        cout << "Encounter ID: (will create new encounter)" << endl;
+    }
+    cout << "Author: " << author << endl;
+    displayEncryptionStatus(password);
+    cout << endl;
+}
+
+void displayEncryptionStatus(const string& password) {
+    if (password != "") {
+        cout << "Encryption: AES-256-GCM enabled" << endl;
+    } else {
+        cout << "Encryption: NONE" << endl;
+    }
+}
+
+bool loadMockData(const string& inputFile, string& schemaPath, ModuleData& moduleData) {
+    try {
+        auto mockDataPair = MockDataLoader::loadMockData(inputFile);
+        schemaPath = mockDataPair.first;
+        moduleData = mockDataPair.second;
+        cout << "Loaded mock data with schema: " << schemaPath << endl;
+        return true;
+    } catch (const std::exception& e) {
+        cerr << "Failed to load mock data: " << e.what() << endl;
+        return false;
+    }
+}
+
+bool openOrCreateFile(Writer& writer, const string& operation, string& outputFile, const string& author, const string& password) {
+    if (operation == "create") {
+        cout << "Creating new UMDF file: " << outputFile << endl;
+        Result result = writer.createNewFile(outputFile, author, password);
+        if (!result.success) {
+            cerr << "Failed to create file: " << result.message << endl;
+            return false;
+        }
+    } else {
+        cout << "Opening existing UMDF file: " << outputFile << endl;
+        Result result = writer.openFile(outputFile, author, password);
+        if (!result.success) {
+            cerr << "Failed to open file: " << result.message << endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool closeFile(Writer& writer) {
+    auto closeResult = writer.closeFile();
+    if (!closeResult.success) {
+        cerr << "Failed to close file: " << closeResult.message << endl;
+        return false;
+    }
+    return true;
 }
