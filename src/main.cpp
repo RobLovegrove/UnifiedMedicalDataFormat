@@ -20,6 +20,7 @@ void addWriteOptions(CLI::App* writeCmd, string& inputFile, string& outputFile);
 void addDemoOptions(CLI::App* demoCmd, string& outputFile);
 void displayModuleTree(Reader& reader, const nlohmann::json& moduleTree, int indentLevel);
 void displayModuleData(ModuleData& moduleData, const string& moduleType = "unknown", const string& moduleUuid = "unknown");
+void displayFileData(Reader& reader, const nlohmann::json& fileInfo, bool showSummary = true);
 
 /* -------------------------- MAIN FUNCTION -------------------------- */
 
@@ -350,48 +351,8 @@ int main(int argc, char** argv) {
             cout << "File reopened successfully\n\n";
             finalFileInfo = reader.getFileInfo();
 
-            cout << "Final file statistics:\n";
-            cout << "  Total modules: " << finalFileInfo["module_count"] << "\n";
-            
-            // List all modules
-            if (finalFileInfo.contains("modules")) {
-                cout << "  Module breakdown:\n";
-                for (const auto& module : finalFileInfo["modules"]) {
-                    cout << "    - " << module["type"] << " data (UUID: " << module["uuid"] << ")\n";
-                }
-            }
-
-            cout << "Module graph:" << endl;
-            cout << finalFileInfo["module_graph"].dump(2) << endl;
-
-            cout << "\nDISPLAYING DATA BY ENCOUNTER AND MODULE RELATIONSHIPS\n";
-            cout << string(60, '-') << "\n";
-
-            // Display data organized by encounters
-            if (finalFileInfo.contains("module_graph") && finalFileInfo["module_graph"].contains("encounters")) {
-                const auto& encounters = finalFileInfo["module_graph"]["encounters"];
-                
-                for (size_t encounterIdx = 0; encounterIdx < encounters.size(); encounterIdx++) {
-                    const auto& encounter = encounters[encounterIdx];
-                    cout << "\nENCOUNTER " << (encounterIdx + 1) << ": " << encounter["encounter_id"] << "\n";
-                    cout << string(50, '-') << "\n";
-                    
-                    if (encounter.contains("module_tree")) {
-                        displayModuleTree(reader, encounter["module_tree"], 0);
-                    }
-                }
-            } else {
-                // Fallback to original display if no encounter structure
-                cout << "No encounter structure found, displaying modules individually:\n\n";
-                if (finalFileInfo.contains("modules")) {
-                    for (const auto& module : finalFileInfo["modules"]) {
-                        auto moduleData = reader.getModuleData(module["uuid"]);
-                        if (moduleData) {
-                            displayModuleData(moduleData.value(), module["type"], module["uuid"]);
-                        }
-                    }
-                }
-            }
+            // Display file data 
+            displayFileData(reader, finalFileInfo, true);
 
             cout << "\nAUDIT TRAIL DEMONSTRATION\n";
             cout << "========================\n";
@@ -565,68 +526,8 @@ int main(int argc, char** argv) {
         
         cout << "File opened successfully. Module count: " << fileInfo["module_count"] << "\n";
         
-
-        // List all modules
-        if (fileInfo.contains("modules")) {
-            cout << "Modules in file:\n";
-            for (const auto& module : fileInfo["modules"]) {
-                cout << "  - " << module["type"] << " (UUID: " << module["uuid"] << ")\n";
-            }
-        }
-
-        cout << endl;
-
-        // Load all modules
-        for (const auto& module : fileInfo["modules"]) {
-
-            auto moduleData = reader.getModuleData(module["uuid"]);
-            if (moduleData.has_value()) {
-                cout << "Module: " << module["type"] << " (UUID: " << module["uuid"] << ")" << endl;
-                cout << "Metadata: " << moduleData.value().metadata.dump(2) << endl;
-                
-                // Handle the data variant based on type
-                const auto& data = moduleData.value().data;
-                if (std::holds_alternative<nlohmann::json>(data)) {
-                    // Tabular data
-                    cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
-                } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
-                    // Binary data 
-                    const auto& binaryData = std::get<std::vector<uint8_t>>(data);
-                    cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
-                } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
-                    // Nested modules (like image frames)
-                    const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
-                    cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
-                    
-                    // Show details of nested modules
-                    for (size_t i = 0; i < nestedModules.size() && i < 3; i++) { // Limit to first 3 for readability
-                        cout << "  Sub-module " << i << " metadata: " 
-                             << nestedModules[i].metadata.dump(2) << endl;
-                        
-                        // Print pixel data for each frame
-                        const auto& frameData = nestedModules[i].data;
-                        if (std::holds_alternative<std::vector<uint8_t>>(frameData)) {
-                            const auto& pixelData = std::get<std::vector<uint8_t>>(frameData);
-                            cout << "  Frame " << i << " pixel data: " << pixelData.size() << " pixels" << endl;
-                            
-                            // Print pixel statistics
-                            if (!pixelData.empty()) {
-                                uint8_t minVal = *min_element(pixelData.begin(), pixelData.end());
-                                uint8_t maxVal = *max_element(pixelData.begin(), pixelData.end());
-                                cout << "  Pixel range: [" << (int)minVal << "-" << (int)maxVal << "]" << endl;
-                            }
-                        }
-                    }
-                    if (nestedModules.size() > 3) {
-                        cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;
-                    }
-                }
-                cout << endl;
-            }
-            else {
-                cout << "Error loading module: " << module["uuid"] << " " << moduleData.error() << endl;
-            }
-        }
+        // Display file data using the reusable function
+        displayFileData(reader, fileInfo, false);
         
         cout << "File read complete" << endl;
     }
@@ -746,5 +647,53 @@ void displayModuleTree(Reader& reader, const nlohmann::json& moduleTree, int ind
         }
         
         cout << "\n";
+    }
+}
+
+// Helper function to display file data (reusable for demo and read commands)
+void displayFileData(Reader& reader, const nlohmann::json& fileInfo, bool showSummary) {
+    if (showSummary) {
+        cout << "Final file statistics:\n";
+        cout << "  Total modules: " << fileInfo["module_count"] << "\n";
+        
+        // List all modules
+        if (fileInfo.contains("modules")) {
+            cout << "  Module breakdown:\n";
+            for (const auto& module : fileInfo["modules"]) {
+                cout << "    - " << module["type"] << " data (UUID: " << module["uuid"] << ")\n";
+            }
+        }
+
+        cout << "Module graph:" << endl;
+        cout << fileInfo["module_graph"].dump(2) << endl;
+    }
+
+    cout << "\nDISPLAYING DATA BY ENCOUNTER AND MODULE RELATIONSHIPS\n";
+    cout << string(60, '-') << "\n";
+
+    // Display data organized by encounters
+    if (fileInfo.contains("module_graph") && fileInfo["module_graph"].contains("encounters")) {
+        const auto& encounters = fileInfo["module_graph"]["encounters"];
+        
+        for (size_t encounterIdx = 0; encounterIdx < encounters.size(); encounterIdx++) {
+            const auto& encounter = encounters[encounterIdx];
+            cout << "\nENCOUNTER " << (encounterIdx + 1) << ": " << encounter["encounter_id"] << "\n";
+            cout << string(50, '-') << "\n";
+            
+            if (encounter.contains("module_tree")) {
+                displayModuleTree(reader, encounter["module_tree"], 0);
+            }
+        }
+    } else {
+        // Fallback to original display if no encounter structure
+        cout << "No encounter structure found, displaying modules individually:\n\n";
+        if (fileInfo.contains("modules")) {
+            for (const auto& module : fileInfo["modules"]) {
+                auto moduleData = reader.getModuleData(module["uuid"]);
+                if (moduleData) {
+                    displayModuleData(moduleData.value(), module["type"], module["uuid"]);
+                }
+            }
+        }
     }
 }
