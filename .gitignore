@@ -21,12 +21,11 @@ update_ui.sh
 
 # Test and output files
 ./tests
-test_*.umdf
-*_workflow.umdf
-*.umdf
-test_output.umdf
 dummy_input.txt
 umdf_test
+
+*.umdf
+!example_file1.umdf
 
 # IDE and editor files
 .vscode/

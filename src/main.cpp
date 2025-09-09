@@ -14,9 +14,20 @@
 #include "mockDataLoader.hpp"
 
 using namespace std;
- 
+
 /* -------------------------- DECLARATIONS -------------------------- */
-void addWriteOptions(CLI::App* writeCmd, string& inputFile, string& outputFile);
+struct CLISubcommands {
+    CLI::App* demoCmd;
+    CLI::App* writeCmd;
+    CLI::App* readCmd;
+    CLI::App* createCmd;
+    CLI::App* addCmd;
+    CLI::App* updateCmd;
+    CLI::App* addVariantCmd;
+    CLI::App* addAnnotationCmd;
+};
+
+CLISubcommands setUpCLI(CLI::App* app, string& inputFile, string& outputFile, string& password, string& author, string& encounterId);
 void addDemoOptions(CLI::App* demoCmd, string& outputFile);
 void displayModuleTree(Reader& reader, const nlohmann::json& moduleTree, int indentLevel);
 void displayModuleData(ModuleData& moduleData, const string& moduleType = "unknown", const string& moduleUuid = "unknown");
@@ -25,47 +36,28 @@ void displayFileData(Reader& reader, const nlohmann::json& fileInfo, bool showSu
 /* -------------------------- MAIN FUNCTION -------------------------- */
 
 int main(int argc, char** argv) {
-
+    // Initialize variables
     string firstTabularUUID;
-
     string tabularUUID;
-
     UUID uuid;
 
-    CLI::App app{"UMDF - Unified Medical Data Format Tool\nA comprehensive tool for creating, reading, and managing medical data files with encryption, compression, and audit trails."};
+    CLI::App app{"UMDF - Unified Medical Data Format Tool"};
 
     Writer writer;
     Reader reader;
 
     string inputFile;
     string outputFile;
-
     string author = "User (Default)";
     string password = "";
+    string encounterId = "";
 
-    // DEMO subcommand
-    CLI::App* demoCmd = app.add_subcommand("demo", "Run a comprehensive demonstration of UMDF capabilities with sample data");
-    addDemoOptions(demoCmd, outputFile);
-    demoCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (optional)");
-    demoCmd->add_option("-a,--author", author, "Author of the UMDF file (default: 'User (Default)')");
-
-    // WRITE subcommand
-    CLI::App* writeCmd = app.add_subcommand("write", "Write data to a UMDF file from mock data");
-    addWriteOptions(writeCmd, inputFile, outputFile);
-    writeCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (optional)");
-    writeCmd->add_option("-a,--author", author, "Author of the UMDF file (default: 'User (Default)')");
-    // READ subcommand
-    CLI::App* readCmd = app.add_subcommand("read", "Read and display data from a UMDF file");
-    readCmd->add_option("-i,--input", inputFile, "Input UMDF file")->required();
-    readCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (required if file is encrypted)");
-    readCmd->add_option("-a,--author", author, "Author name for audit trail (optional)");
-
-    // Require that one subcommand is given
-    app.require_subcommand();
+    // Set up all CLI commands
+    CLISubcommands subcommands = setUpCLI(&app, inputFile, outputFile, password, author, encounterId);
 
     CLI11_PARSE(app, argc, argv);
 
-    if (*demoCmd) {
+    if (*subcommands.demoCmd) {
         cout << "\n" << string(80, '=') << "\n";
         cout << "                        UMDF SYSTEM DEMONSTRATION\n";
         cout << "             Unified Medical Data Format - Complete Workflow\n";
@@ -104,82 +96,82 @@ int main(int argc, char** argv) {
             
             try {
             Result result = writer.createNewFile(outputFile, author, password);
-            if (!result.success) {
-                    cerr << "Failed to create new file: " << result.message << endl;
-                    return 1;
-                }
-            } catch (const std::exception& e) {
-                cerr << "Failed to create new file: " << e.what() << endl;
+        if (!result.success) {
+                cerr << "Failed to create new file: " << result.message << endl;
                 return 1;
             }
+        } catch (const std::exception& e) {
+            cerr << "Failed to create new file: " << e.what() << endl;
+            return 1;
+        }
             cout << "UMDF file created successfully\n\n";
 
-            UUID moduleId;
+        UUID moduleId;
 
             cout << "Creating new medical encounter...\n";
-            auto encounterResult = writer.createNewEncounter();
-            if (!encounterResult) {
-                cerr << "Failed to create new encounter: " << encounterResult.error() << endl;
-                return 1;
-            }
-            UUID encounterId = encounterResult.value();
+        auto encounterResult = writer.createNewEncounter();
+        if (!encounterResult) {
+            cerr << "Failed to create new encounter: " << encounterResult.error() << endl;
+            return 1;
+        }
+        UUID encounterId = encounterResult.value();
             cout << "Medical encounter created (ID: " << encounterId.toString() << ")\n\n";
 
             cout << "Adding patient demographic data to encounter...\n";
-            auto addResult = writer.addModuleToEncounter(encounterId, patientPair.first, patientPair.second);
-            if (!addResult) {
+        auto addResult = writer.addModuleToEncounter(encounterId, patientPair.first, patientPair.second);
+        if (!addResult) {
                 cerr << "Failed to add patient module: " << addResult.error() << endl;
-                return 1;
-            }
-            moduleId = addResult.value();
-            firstTabularUUID = moduleId.toString();
+            return 1;
+        }
+        moduleId = addResult.value();
+        firstTabularUUID = moduleId.toString();
             
             cout << "\n\nAdding clinical annotation to patient data...\n";
-            addResult = writer.addAnnotation(moduleId, patientPair.first, patientPair.second);
-            if (!addResult) {
-                cerr << "Failed to add annotation: " << addResult.error() << endl;
-                return 1;
-            }
-            
+        addResult = writer.addAnnotation(moduleId, patientPair.first, patientPair.second);
+        if (!addResult) {
+            cerr << "Failed to add annotation: " << addResult.error() << endl;
+            return 1;
+        }
+        
             cout << "\nPatient data module added successfully\n";
             cout << "  Module UUID: " << moduleId.toString() << "\n";
             cout << "  Schema: " << patientPair.first << "\n\n";
 
-            // Close the file
+        // Close the file
             cout << "Closing file and finalizing...\n";
-            auto closeResult = writer.closeFile();
-            if (!closeResult.success) {
-                cerr << "Failed to close file: " << closeResult.message << endl;
-                return 1;
-            }
+        auto closeResult = writer.closeFile();
+        if (!closeResult.success) {
+            cerr << "Failed to close file: " << closeResult.message << endl;
+            return 1;
+        }
             cout << "File closed and saved successfully\n\n";
 
             cout << "STEP 3: DATA VERIFICATION\n";
             cout << string(40, '-') << "\n";
             cout << "Reading the file to verify patient data was stored correctly...\n";
-            
-            // Read the file to verify tabular data
+        
+        // Read the file to verify tabular data
             auto readResult = reader.openFile(outputFile, password);
-            if (!readResult.success) {
-                cerr << "Failed to open file for reading: " << outputFile << " " << readResult.message << endl;
-                return 1;
-            }
-            
-            auto fileInfo = reader.getFileInfo();
-            if (fileInfo.contains("success") && !fileInfo["success"]) {
-                cerr << "Error reading file: " << fileInfo["error"] << "\n";
-                return 1;
-            }
-            
+        if (!readResult.success) {
+            cerr << "Failed to open file for reading: " << outputFile << " " << readResult.message << endl;
+            return 1;
+        }
+        
+        auto fileInfo = reader.getFileInfo();
+        if (fileInfo.contains("success") && !fileInfo["success"]) {
+            cerr << "Error reading file: " << fileInfo["error"] << "\n";
+            return 1;
+        }
+        
             cout << "File opened successfully\n";
             cout << "  Total modules: " << fileInfo["module_count"] << "\n";
-            
-            // List all modules
-            if (fileInfo.contains("modules")) {
+        
+        // List all modules
+        if (fileInfo.contains("modules")) {
                 cout << "  Modules found:\n";
-                for (const auto& module : fileInfo["modules"]) {
-                    if (module["type"] == "tabular") {
-                        tabularUUID = module["uuid"];
+            for (const auto& module : fileInfo["modules"]) {
+                if (module["type"] == "tabular") {
+                    tabularUUID = module["uuid"];
                     }
                     cout << "    - " << module["type"] << " data (UUID: " << module["uuid"] << ")\n";
                 }
@@ -201,10 +193,10 @@ int main(int argc, char** argv) {
 
             cout << "Reopening file for additional data...\n";
             auto reopenResult = writer.openFile(outputFile, author, password);
-            if (!reopenResult.success) {
-                cerr << "Failed to reopen file: " << reopenResult.message << endl;
-                return 1;
-            }
+        if (!reopenResult.success) {
+            cerr << "Failed to reopen file: " << reopenResult.message << endl;
+            return 1;
+        }
             cout << "File reopened successfully\n\n";
 
             cout << "Adding CT scan data to the same medical encounter...\n";
@@ -213,12 +205,12 @@ int main(int argc, char** argv) {
             cout << "  - Encoding: PNG compression\n";
             cout << "  - Frames: 60 total (12 slices × 5 time points)\n\n";
             
-            addResult = writer.addModuleToEncounter(encounterId, imagePair.first, imagePair.second);
-            if (!addResult) {
+        addResult = writer.addModuleToEncounter(encounterId, imagePair.first, imagePair.second);
+        if (!addResult) {
                 cerr << "Failed to add image module: " << addResult.error() << endl;
-                return 1;
-            }
-            UUID imageModuleId = addResult.value();
+            return 1;
+        }
+        UUID imageModuleId = addResult.value();
 
             cout << "Imaging data added successfully\n";
             cout << "  Module UUID: " << imageModuleId.toString() << "\n";
@@ -233,43 +225,43 @@ int main(int argc, char** argv) {
 
             imagePair.second.metadata["modality"] = "MRI";
 
-            // Add variant module
-            auto variantModuleResult = writer.addVariantModule(imageModuleId, imagePair.first, imagePair.second);
-            if (!variantModuleResult) {
-                cerr << "Failed to add variant module: " << variantModuleResult.error() << endl;
-                return 1;
-            }
-            UUID variantModuleId = variantModuleResult.value();
+        // Add variant module
+        auto variantModuleResult = writer.addVariantModule(imageModuleId, imagePair.first, imagePair.second);
+        if (!variantModuleResult) {
+            cerr << "Failed to add variant module: " << variantModuleResult.error() << endl;
+            return 1;
+        }
+        UUID variantModuleId = variantModuleResult.value();
 
             cout << "\nVariant module created successfully\n";
             cout << "  Variant UUID: " << variantModuleId.toString() << "\n";
             cout << "  Parent UUID: " << imageModuleId.toString() << "\n\n";
 
-            // Close the file
+        // Close the file
             cout << "Closing file and finalizing imaging data...\n";
-            closeResult = writer.closeFile();
-            if (!closeResult.success) {
-                cerr << "Failed to close file: " << closeResult.message << endl;
-                return 1;
-            }
+        closeResult = writer.closeFile();
+        if (!closeResult.success) {
+            cerr << "Failed to close file: " << closeResult.message << endl;
+            return 1;
+        }
             cout << "File closed and imaging data saved\n\n";
 
             cout << "STEP 6: DATA VERIFICATION\n";
             cout << string(40, '-') << "\n";
             cout << "Reading the complete file to verify all data types...\n";
-            
-            // Close and reopen to get fresh file info
+        
+        // Close and reopen to get fresh file info
             reopenResult = reader.openFile(outputFile, password);
-            if (!reopenResult.success) {
-                cerr << "Failed to reopen file for final reading: " << outputFile << " " << reopenResult.message << endl;
-                return 1;
-            }
-            
-            auto finalFileInfo = reader.getFileInfo();
-            if (finalFileInfo.contains("success") && !finalFileInfo["success"]) {
-                cerr << "Error reading final file: " << finalFileInfo["error"] << "\n";
-                return 1;
-            }
+        if (!reopenResult.success) {
+            cerr << "Failed to reopen file for final reading: " << outputFile << " " << reopenResult.message << endl;
+            return 1;
+        }
+        
+        auto finalFileInfo = reader.getFileInfo();
+        if (finalFileInfo.contains("success") && !finalFileInfo["success"]) {
+            cerr << "Error reading final file: " << finalFileInfo["error"] << "\n";
+            return 1;
+        }
 
             cout << "File reopened successfully\n";
             cout << "  Total modules: " << finalFileInfo["module_count"] << "\n";
@@ -293,48 +285,48 @@ int main(int argc, char** argv) {
             }
             cout << " Done!\n\n";
 
-            // Get the patient module data
+        // Get the patient module data
             cout << "Retrieving current patient data for update...\n";
-            auto patientModuleData = reader.getModuleData(tabularUUID);
-            if (!patientModuleData.has_value()) {
+        auto patientModuleData = reader.getModuleData(tabularUUID);
+        if (!patientModuleData.has_value()) {
                 cerr << "Failed to get patient module data: " << patientModuleData.error() << endl;
-                return 1;
-            }
+            return 1;
+        }
             cout << "\nPatient data retrieved successfully\n\n";
 
-            // Update the patient module data
+        // Update the patient module data
             cout << "Adding new clinical annotation to patient data...\n";
             
-            patientModuleData.value().metadata.push_back({
-                {"clinician", "Dr. John Doe"},
-                {"encounter_date", "2025-07-29"}
-            });
+        patientModuleData.value().metadata.push_back({
+            {"clinician", "Dr. John Doe"},
+            {"encounter_date", "2025-07-29"}
+        });
 
-            // Update the patient module data in the file
-            reader.closeFile();
+        // Update the patient module data in the file
+        reader.closeFile();
 
             string newAuthor = "Rob";
             cout << "\nOpening file for update with a new author: " << newAuthor << ")...\n";
             auto result = writer.openFile(outputFile, newAuthor, password);
-            if (!result.success) {
-                cerr << "Failed to reopen file: " << result.message << endl;
-                return 1;
-            }
+        if (!result.success) {
+            cerr << "Failed to reopen file: " << result.message << endl;
+            return 1;
+        }
             cout << "File opened for update by user '" << newAuthor << "'\n\n";
 
             cout << "Updating patient module with new clinical data...\n";
-            auto updateResult = writer.updateModule(firstTabularUUID, patientModuleData.value());
-            if (!updateResult.success) {
-                cerr << "Failed to update module: " << updateResult.message << endl;
-                return 1;
-            }
+        auto updateResult = writer.updateModule(firstTabularUUID, patientModuleData.value());
+        if (!updateResult.success) {
+            cerr << "Failed to update module: " << updateResult.message << endl;
+            return 1;
+        }
             cout << "Patient data updated successfully\n\n";
 
-            result = writer.closeFile();
-            if (!result.success) {
-                cerr << "Failed to close file: " << result.message << endl;
-                return 1;
-            }
+        result = writer.closeFile();
+        if (!result.success) {
+            cerr << "Failed to close file: " << result.message << endl;
+            return 1;
+        }
             cout << "File closed after update\n\n";
 
             cout << "STEP 8: FINAL VERIFICATION AND AUDIT TRAIL\n";
@@ -343,13 +335,13 @@ int main(int argc, char** argv) {
 
             cout << "Reopening file for final verification...\n";
             result = reader.openFile(outputFile, password);
-            if (!result.success) {
-                cerr << "Failed to reopen file: " << result.message << endl;
-                return 1;
-            }
+        if (!result.success) {
+            cerr << "Failed to reopen file: " << result.message << endl;
+            return 1;
+        }
 
             cout << "File reopened successfully\n\n";
-            finalFileInfo = reader.getFileInfo();
+        finalFileInfo = reader.getFileInfo();
 
             // Display file data 
             displayFileData(reader, finalFileInfo, true);
@@ -358,12 +350,12 @@ int main(int argc, char** argv) {
             cout << "========================\n";
             cout << "The audit trail shows the complete history of the patient tabular module:\n\n";
 
-            auto auditTrailResult = reader.getAuditTrail(UUID::fromString(firstTabularUUID));
-            if (!auditTrailResult.has_value()) {
-                cerr << "Failed to get audit trail: " << auditTrailResult.error() << endl;
-                return 1;
-            }
-            std::vector<ModuleTrail> auditTrail = auditTrailResult.value(); 
+        auto auditTrailResult = reader.getAuditTrail(UUID::fromString(firstTabularUUID));
+        if (!auditTrailResult.has_value()) {
+            cerr << "Failed to get audit trail: " << auditTrailResult.error() << endl;
+            return 1;
+        }
+        std::vector<ModuleTrail> auditTrail = auditTrailResult.value(); 
             
             cout << "Audit trail entries: " << auditTrail.size() << "\n";
             cout << "This shows the complete modification history:\n\n";
@@ -414,99 +406,306 @@ int main(int argc, char** argv) {
         }
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    else if (*writeCmd) {
-        cout << "=== Writing UMDF file from mock data ===" << endl;
-        cout << "Input mock data: " << inputFile << endl;
-        cout << "Output file: " << outputFile << endl;
-        
-        try {
-            // Load mock data from file
-            auto mockDataPair = MockDataLoader::loadMockData(inputFile);
-            string schemaPath = mockDataPair.first;
-            ModuleData moduleData = mockDataPair.second;
+    else if (*subcommands.writeCmd) {
+        // Check for write subcommands
+        if (*subcommands.createCmd) {
+            cout << "=== Creating new UMDF file ===" << endl;
+            cout << "Input mock data: " << inputFile << endl;
+            cout << "Output file: " << outputFile << endl;
+            if (!encounterId.empty()) {
+                cout << "Encounter ID: " << encounterId << endl;
+            } else {
+                cout << "Encounter ID: (will create new encounter)" << endl;
+            }
+            cout << "Author: " << author << endl;
+            if (password != "") {
+                cout << "Encryption: AES-256-GCM enabled" << endl;
+            } else {
+                cout << "Encryption: NONE" << endl;
+            }
+            cout << endl;
             
-            cout << "Loaded mock data with schema: " << schemaPath << endl;
-            
-            // Create new UMDF file
-            cout << "Creating new UMDF file: " << outputFile << endl;
-            Result result = writer.createNewFile(outputFile, author, password);
-            if (!result.success) {
-                cerr << "Failed to create new file: " << result.message << endl;
+            try {
+                // Load mock data from file
+                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
+                string schemaPath = mockDataPair.first;
+                ModuleData moduleData = mockDataPair.second;
+                
+                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                
+                // Create new file
+                cout << "Creating new UMDF file: " << outputFile << endl;
+                Result result = writer.createNewFile(outputFile, author, password);
+                if (!result.success) {
+                    cerr << "Failed to create file: " << result.message << endl;
+                    return 1;
+                }
+                
+                // Create new encounter
+                auto encounterResult = writer.createNewEncounter();
+                if (!encounterResult) {
+                    cerr << "Failed to create new encounter: " << encounterResult.error() << endl;
+                    return 1;
+                }
+                UUID encounterUUID = encounterResult.value();
+                cout << "Created new encounter: " << encounterUUID.toString() << endl;
+                
+                // Add module to encounter
+                cout << "Adding module to file" << endl;
+                auto addResult = writer.addModuleToEncounter(encounterUUID, schemaPath, moduleData);
+                if (!addResult) {
+                    cerr << "Failed to add module: " << addResult.error() << endl;
+                    return 1;
+                }
+                
+                UUID moduleId = addResult.value();
+                cout << "Module added successfully. UUID: " << moduleId.toString() << endl;
+                
+                // Close the file
+                auto closeResult = writer.closeFile();
+                if (!closeResult.success) {
+                    cerr << "Failed to close file: " << closeResult.message << endl;
+                    return 1;
+                }
+                
+                cout << "UMDF file created successfully: " << outputFile << endl;
+                
+            } catch (const std::exception& e) {
+                cerr << "Error: " << e.what() << endl;
                 return 1;
             }
-            
-            // Create encounter
-            auto encounterResult = writer.createNewEncounter();
-            if (!encounterResult) {
-                cerr << "Failed to create new encounter: " << encounterResult.error() << endl;
+        }
+        else if (*subcommands.addCmd) {
+            cout << "=== Adding module to existing UMDF file ===" << endl;
+            cout << "Input mock data: " << inputFile << endl;
+            cout << "Output file: " << outputFile << endl;
+            if (!encounterId.empty()) {
+                cout << "Encounter ID: " << encounterId << endl;
+            } else {
+                cout << "Encounter ID: (will create new encounter)" << endl;
+            }
+            cout << "Author: " << author << endl;
+            if (password != "") {
+                cout << "Encryption: AES-256-GCM enabled" << endl;
+            } else {
+                cout << "Encryption: NONE" << endl;
+        }
+        cout << endl;
+
+            try {
+                // Load mock data from file
+                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
+                string schemaPath = mockDataPair.first;
+                ModuleData moduleData = mockDataPair.second;
+                
+                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                
+                // Add to existing file
+                cout << "Opening existing UMDF file: " << outputFile << endl;
+                Result result = writer.openFile(outputFile, author, password);
+                if (!result.success) {
+                    cerr << "Failed to open file: " << result.message << endl;
+                    return 1;
+                }
+                
+                UUID encounterUUID;
+                if (!encounterId.empty()) {
+                    encounterUUID = UUID::fromString(encounterId);
+                    cout << "Using existing encounter: " << encounterUUID.toString() << endl;
+                } else {
+                    auto encounterResult = writer.createNewEncounter();
+                    if (!encounterResult) {
+                        cerr << "Failed to create new encounter: " << encounterResult.error() << endl;
+                        return 1;
+                    }
+                    encounterUUID = encounterResult.value();
+                    cout << "Created new encounter: " << encounterUUID.toString() << endl;
+                }
+                
+                // Add module to encounter
+                cout << "Adding module to encounter" << endl;
+                auto addResult = writer.addModuleToEncounter(encounterUUID, schemaPath, moduleData);
+                if (!addResult) {
+                    cerr << "Failed to add module: " << addResult.error() << endl;
+                    return 1;
+                }
+                
+                UUID moduleId = addResult.value();
+                cout << "Module added successfully. UUID: " << moduleId.toString() << endl;
+                
+                // Close the file
+                auto closeResult = writer.closeFile();
+                if (!closeResult.success) {
+                    cerr << "Failed to close file: " << closeResult.message << endl;
+                    return 1;
+                }
+                
+                cout << "Module added successfully to: " << outputFile << endl;
+                
+            } catch (const std::exception& e) {
+                cerr << "Error: " << e.what() << endl;
                 return 1;
             }
-            UUID encounterId = encounterResult.value();
+        }
+        else if (*subcommands.updateCmd) {
+            cout << "=== Updating module in UMDF file ===" << endl;
+            cout << "Input mock data: " << inputFile << endl;
+            cout << "UMDF file: " << outputFile << endl;
+            cout << "Module ID: " << encounterId << endl;
+            cout << "Author: " << author << endl;
             
-            // Add module to encounter
-            cout << "Adding module to file" << endl;
-            auto addResult = writer.addModuleToEncounter(encounterId, schemaPath, moduleData);
-            if (!addResult) {
-                cerr << "Failed to add module: " << addResult.error() << endl;
+            try {
+                // Load mock data from file
+                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
+                string schemaPath = mockDataPair.first;
+                ModuleData moduleData = mockDataPair.second;
+                
+                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                
+                // Open existing file for update
+                cout << "Opening file for module update: " << outputFile << endl;
+                Result result = writer.openFile(outputFile, author, password);
+                if (!result.success) {
+                    cerr << "Failed to open file: " << result.message << endl;
+                    return 1;
+                }
+                
+                // Convert module ID string to UUID
+                UUID moduleUUID = UUID::fromString(encounterId);
+                cout << "Updating module: " << moduleUUID.toString() << endl;
+                
+                // Update the module
+                auto updateResult = writer.updateModule(encounterId, moduleData);
+                if (!updateResult.success) {
+                    cerr << "Failed to update module: " << updateResult.message << endl;
+                    return 1;
+                }
+                
+                cout << "Module updated successfully" << endl;
+                
+                // Close the file
+                auto closeResult = writer.closeFile();
+                if (!closeResult.success) {
+                    cerr << "Failed to close file: " << closeResult.message << endl;
+                    return 1;
+                }
+                
+                cout << "UMDF file updated successfully: " << outputFile << endl;
+                
+            } catch (const std::exception& e) {
+                cerr << "Error: " << e.what() << endl;
                 return 1;
             }
-            UUID moduleId = addResult.value();
+        }
+        else if (*subcommands.addVariantCmd) {
+            cout << "=== Adding variant module to parent ===" << endl;
+            cout << "Input mock data: " << inputFile << endl;
+            cout << "UMDF file: " << outputFile << endl;
+            cout << "Parent module ID: " << encounterId << endl;
+            cout << "Author: " << author << endl;
             
-            // Add annotation
-            addResult = writer.addAnnotation(moduleId, schemaPath, moduleData);
-            if (!addResult) {
-                cerr << "Failed to add annotation: " << addResult.error() << endl;
+            try {
+                // Load mock data from file
+                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
+                string schemaPath = mockDataPair.first;
+                ModuleData moduleData = mockDataPair.second;
+                
+                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                
+                // Open existing file for adding variant
+                cout << "Opening file for variant addition: " << outputFile << endl;
+                Result result = writer.openFile(outputFile, author, password);
+                if (!result.success) {
+                    cerr << "Failed to open file: " << result.message << endl;
+                    return 1;
+                }
+                
+                // Convert parent module ID string to UUID
+                UUID parentModuleUUID = UUID::fromString(encounterId);
+                cout << "Adding variant to parent module: " << parentModuleUUID.toString() << endl;
+                
+                // Add variant module
+                auto variantResult = writer.addVariantModule(parentModuleUUID, schemaPath, moduleData);
+                if (!variantResult) {
+                    cerr << "Failed to add variant module: " << variantResult.error() << endl;
+                    return 1;
+                }
+                
+                UUID variantModuleId = variantResult.value();
+                cout << "Variant module added successfully. UUID: " << variantModuleId.toString() << endl;
+                
+                // Close the file
+                auto closeResult = writer.closeFile();
+                if (!closeResult.success) {
+                    cerr << "Failed to close file: " << closeResult.message << endl;
+                    return 1;
+                }
+                
+                cout << "Variant module added successfully to: " << outputFile << endl;
+                
+            } catch (const std::exception& e) {
+                cerr << "Error: " << e.what() << endl;
                 return 1;
             }
+        }
+        else if (*subcommands.addAnnotationCmd) {
+            cout << "=== Adding annotation module to parent ===" << endl;
+            cout << "Input mock data: " << inputFile << endl;
+            cout << "UMDF file: " << outputFile << endl;
+            cout << "Parent module ID: " << encounterId << endl;
+            cout << "Author: " << author << endl;
             
-            cout << "Module added successfully. UUID: " << moduleId.toString() << endl;
-            
-            // Close the file
-            auto closeResult = writer.closeFile();
-            if (!closeResult.success) {
-                cerr << "Failed to close file: " << closeResult.message << endl;
+            try {
+                // Load mock data from file
+                auto mockDataPair = MockDataLoader::loadMockData(inputFile);
+                string schemaPath = mockDataPair.first;
+                ModuleData moduleData = mockDataPair.second;
+                
+                cout << "Loaded mock data with schema: " << schemaPath << endl;
+                
+                // Open existing file for adding annotation
+                cout << "Opening file for annotation addition: " << outputFile << endl;
+                Result result = writer.openFile(outputFile, author, password);
+                if (!result.success) {
+                    cerr << "Failed to open file: " << result.message << endl;
+                    return 1;
+                }
+                
+                // Convert parent module ID string to UUID
+                UUID parentModuleUUID = UUID::fromString(encounterId);
+                cout << "Adding annotation to parent module: " << parentModuleUUID.toString() << endl;
+                
+                // Add annotation module
+                auto annotationResult = writer.addAnnotation(parentModuleUUID, schemaPath, moduleData);
+                if (!annotationResult) {
+                    cerr << "Failed to add annotation module: " << annotationResult.error() << endl;
+                    return 1;
+                }
+                
+                UUID annotationModuleId = annotationResult.value();
+                cout << "Annotation module added successfully. UUID: " << annotationModuleId.toString() << endl;
+                
+                // Close the file
+                auto closeResult = writer.closeFile();
+                if (!closeResult.success) {
+                    cerr << "Failed to close file: " << closeResult.message << endl;
+                    return 1;
+                }
+                
+                cout << "Annotation module added successfully to: " << outputFile << endl;
+                
+            } catch (const std::exception& e) {
+                cerr << "Error: " << e.what() << endl;
                 return 1;
             }
-            
-            cout << "UMDF file created successfully: " << outputFile << endl;
-            
-        } catch (const std::exception& e) {
-            cerr << "Error: " << e.what() << endl;
+        }
+        else {
+            cerr << "Error: No write subcommand specified. Use 'create', 'add', 'update', 'addVariant', or 'addAnnotation'" << endl;
             return 1;
         }
     }
 
-    else if (*readCmd) {
+    else if (*subcommands.readCmd) {
         
         // Read file using new API
         cout << "Reading from file: " << inputFile << "\n";
@@ -532,6 +731,7 @@ int main(int argc, char** argv) {
         cout << "File read complete" << endl;
     }
 
+
     return 0;
 }
 
@@ -539,12 +739,64 @@ int main(int argc, char** argv) {
 
 /* -------------------------- HELPER FUNCTIONS -------------------------- */
 
-void addWriteOptions(CLI::App* writeCmd, string& inputFile, string& outputFile) {
+CLISubcommands setUpCLI(CLI::App* app, string& inputFile, string& outputFile, string& password, string& author, string& encounterId) {
+    // DEMO subcommand
+    CLI::App* demoCmd = app->add_subcommand("demo", "Run a comprehensive demonstration of UMDF capabilities with sample data");
+    addDemoOptions(demoCmd, outputFile);
+    demoCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (optional)");
+    demoCmd->add_option("-a,--author", author, "Author of the UMDF file (default: 'User (Default)')");
 
-    writeCmd->add_option("-i,--input", inputFile, "Input mock data file")->required();
-    writeCmd->add_option("-o,--output", outputFile, "Output UMDF file")->required();
+    // WRITE subcommand with sub-subcommands
+    CLI::App* writeCmd = app->add_subcommand("write", "Write data to a UMDF file from mock data");
 
+    // Write subcommands - all write operations as subcommands of write
+    CLI::App* createCmd = writeCmd->add_subcommand("create", "Create a new UMDF file");
+    createCmd->add_option("-i,--input", inputFile, "Input mock data file")->required();
+    createCmd->add_option("-o,--output", outputFile, "Output UMDF file")->required();
+    createCmd->add_option("-e,--encounter-id", encounterId, "Encounter ID to add module to (optional, creates new encounter if not provided)");
+    createCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (optional)");
+    createCmd->add_option("-a,--author", author, "Author of the UMDF file (default: 'User (Default)')");
+
+    CLI::App* addCmd = writeCmd->add_subcommand("add", "Add module to existing UMDF file");
+    addCmd->add_option("-i,--input", inputFile, "Input mock data file")->required();
+    addCmd->add_option("-o,--output", outputFile, "UMDF file to add to")->required();
+    addCmd->add_option("-e,--encounter-id", encounterId, "Encounter ID to add module to (optional, creates new encounter if not provided)");
+    addCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (optional)");
+    addCmd->add_option("-a,--author", author, "Author of the UMDF file (default: 'User (Default)')");
+
+    CLI::App* updateCmd = writeCmd->add_subcommand("update", "Update an existing module in a UMDF file");
+    updateCmd->add_option("-i,--input", inputFile, "Input mock data file")->required();
+    updateCmd->add_option("-o,--output", outputFile, "UMDF file to update")->required();
+    updateCmd->add_option("--module-id", encounterId, "Module ID to update")->required();
+    updateCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (required if file is encrypted)");
+    updateCmd->add_option("-a,--author", author, "Author name for audit trail (required)");
+
+    CLI::App* addVariantCmd = writeCmd->add_subcommand("addVariant", "Add a variant module to an existing parent module");
+    addVariantCmd->add_option("-i,--input", inputFile, "Input mock data file")->required();
+    addVariantCmd->add_option("-o,--output", outputFile, "UMDF file to update")->required();
+    addVariantCmd->add_option("--module-id", encounterId, "Parent module ID to add variant to")->required();
+    addVariantCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (required if file is encrypted)");
+    addVariantCmd->add_option("-a,--author", author, "Author name for audit trail (required)");
+
+    CLI::App* addAnnotationCmd = writeCmd->add_subcommand("addAnnotation", "Add an annotation module to an existing parent module");
+    addAnnotationCmd->add_option("-i,--input", inputFile, "Input mock data file")->required();
+    addAnnotationCmd->add_option("-o,--output", outputFile, "UMDF file to update")->required();
+    addAnnotationCmd->add_option("--module-id", encounterId, "Parent module ID to add annotation to")->required();
+    addAnnotationCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (required if file is encrypted)");
+    addAnnotationCmd->add_option("-a,--author", author, "Author name for audit trail (required)");
+
+    // READ subcommand
+    CLI::App* readCmd = app->add_subcommand("read", "Read and display data from a UMDF file");
+    readCmd->add_option("-i,--input", inputFile, "Input UMDF file")->required();
+    readCmd->add_option("-p,--password", password, "Password for encrypted UMDF file (required if file is encrypted)");
+    readCmd->add_option("-a,--author", author, "Author name for audit trail (optional)");
+
+    // Require that one subcommand is given
+    app->require_subcommand();
+    
+    return {demoCmd, writeCmd, readCmd, createCmd, addCmd, updateCmd, addVariantCmd, addAnnotationCmd};
 }
+
 
 void addDemoOptions(CLI::App* demoCmd, string& outputFile) {
 
@@ -563,32 +815,32 @@ void addDemoOptions(CLI::App* demoCmd, string& outputFile) {
 void displayModuleData(ModuleData& moduleData, const string& moduleType, const string& moduleUuid) {
     cout << "Module: " << moduleType << " (UUID: " << moduleUuid << ")" << endl;
     cout << "Metadata: " << moduleData.metadata.dump(2) << endl;
-    
-    // Handle the data variant based on type
+                
+                // Handle the data variant based on type
     const auto& data = moduleData.data;
-    if (std::holds_alternative<nlohmann::json>(data)) {
-        // Tabular data
-        cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
-    } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
+                if (std::holds_alternative<nlohmann::json>(data)) {
+                    // Tabular data
+                    cout << "Data (Tabular): " << std::get<nlohmann::json>(data).dump(2) << endl;
+                } else if (std::holds_alternative<std::vector<uint8_t>>(data)) {
         // Binary data (like image pixels)
-        const auto& binaryData = std::get<std::vector<uint8_t>>(data);
-        cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
-    } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
-        // Nested modules (like image frames)
-        const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
-        cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
-        
-        // Show details of nested modules
+                    const auto& binaryData = std::get<std::vector<uint8_t>>(data);
+                    cout << "Data (Binary): " << binaryData.size() << " bytes" << endl;
+                } else if (std::holds_alternative<std::vector<ModuleData>>(data)) {
+                    // Nested modules (like image frames)
+                    const auto& nestedModules = std::get<std::vector<ModuleData>>(data);
+                    cout << "Data (Nested): " << nestedModules.size() << " sub-modules" << endl;
+                    
+                    // Show details of nested modules
         for (size_t i = 0; i < nestedModules.size() && i < 3; i++) { // Limit to first 2 for readability
-            cout << "  Sub-module " << i << " metadata: " 
-                    << nestedModules[i].metadata.dump(2) << endl;
-        }
-        if (nestedModules.size() > 3) {
-            cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;
-        }
-    }
-    cout << endl;
-}
+                        cout << "  Sub-module " << i << " metadata: " 
+                             << nestedModules[i].metadata.dump(2) << endl;
+                    }
+                    if (nestedModules.size() > 3) {
+                        cout << "  ... and " << (nestedModules.size() - 3) << " more sub-modules" << endl;
+                    }
+                }
+                cout << endl;
+            }
 
 // Helper function to display module tree with relationships
 void displayModuleTree(Reader& reader, const nlohmann::json& moduleTree, int indentLevel) {
