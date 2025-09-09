@@ -1,0 +1,33 @@
+{
+  "schema_path": "./schemas/patient/v1.0.json",
+  "metadata": [
+    {
+      "clinician": "Dr. Jane Doe",
+      "encounter_date": "2025-07-28"
+    }
+  ],
+  "data": [
+    {
+      "patient_id": "123e4567-e89b-12d3-a456-426614174000",
+      "gender": "male",
+      "birth_sex": "female",
+      "birth_date": "1990-01-01",
+      "name": {
+        "family": "Smith",
+        "given": "Alice"
+      },
+      "age": 29
+    },
+    {
+      "patient_id": "f49900f3-8dc7-47b9-b6f5-34939e4b42dc",
+      "gender": "male",
+      "birth_sex": "male",
+      "birth_date": "1994-12-29",
+      "name": {
+        "family": "Lovegrove",
+        "given": "This is a long sentence that will be too long to store in a fixed length string"
+      },
+      "age": 30
+    }
+  ]
+}

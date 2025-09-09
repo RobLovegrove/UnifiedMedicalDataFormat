@@ -1,0 +1,29 @@
+{
+  "schema_path": "./schemas/image/v1.0.json",
+  "metadata": {
+    "acquisitionDate": "2024-02-15",
+    "bodyPart": "BRAIN",
+    "image_structure": {
+      "bit_depth": 16,
+      "channels": 1,
+      "dimension_names": ["x", "y", "z"],
+      "dimensions": [512, 512, 24],
+      "encoding": "png",
+      "layout": "planar",
+      "memory_order": "row_major",
+      "origin": "top_left"
+    },
+    "institution": "Medical Center",
+    "modality": "MRI",
+    "patientID": "67890",
+    "patientName": "Jane Smith",
+    "technician": "Dr. Johnson"
+  },
+  "frame_config": {
+    "width": 512,
+    "height": 512,
+    "depth": 24,
+    "timePoints": 1,
+    "pattern_type": "grayscale_gradient"
+  }
+}

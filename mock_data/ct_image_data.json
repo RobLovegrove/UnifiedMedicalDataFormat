@@ -1,0 +1,29 @@
+{
+  "schema_path": "./schemas/image/v1.0.json",
+  "metadata": {
+    "acquisitionDate": "2024-01-01",
+    "bodyPart": "CHEST",
+    "image_structure": {
+      "bit_depth": 8,
+      "channels": 3,
+      "dimension_names": ["x", "y", "z", "time"],
+      "dimensions": [256, 256, 12, 5],
+      "encoding": "png",
+      "layout": "interleaved",
+      "memory_order": "row_major",
+      "origin": "top_left"
+    },
+    "institution": "Test Hospital",
+    "modality": "CT",
+    "patientID": "12345",
+    "patientName": "John Doe",
+    "technician": "Dr. Smith"
+  },
+  "frame_config": {
+    "width": 256,
+    "height": 256,
+    "depth": 12,
+    "timePoints": 5,
+    "pattern_type": "rgb_gradient"
+  }
+}
