@@ -15,29 +15,24 @@
 #   build/   - object and dependency files
 #   tests/   - test files
 #
-# Author: Rob Lovegrove
 # ============================================
 
 CXX := g++
 CXXFLAGS := -std=c++23 -Iinclude -Isrc -Wall -Wextra -MMD -MP
-OPENJPEG_CFLAGS := -I/opt/homebrew/include/openjpeg-2.5
-OPENJPEG_LIBS := -L/opt/homebrew/lib -lopenjp2
-PNG_CFLAGS := -I/opt/homebrew/include
-PNG_LIBS := -L/opt/homebrew/lib -lpng
-ZSTD_CFLAGS := -I/opt/homebrew/opt/zstd/include
-ZSTD_LIBS := -L/opt/homebrew/opt/zstd/lib -lzstd
 
-# libsodium paths
-LIBSODIUM_CFLAGS := -I/opt/homebrew/opt/libsodium/include
-LIBSODIUM_LIBS := -L/opt/homebrew/opt/libsodium/lib -lsodium
-
-# Catch2 paths
-CATCH2_INCLUDE := -I/opt/homebrew/opt/catch2/include
-CATCH2_LIBS := -L/opt/homebrew/opt/catch2/lib -lCatch2 -lCatch2Main
-
-# pybind11 and Python paths
-PYBIND11_CFLAGS := -I/opt/homebrew/include -I/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/include/python3.11
-PYBIND11_LIBS := -L/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib -lpython3.11
+# Use pkg-config for portable library detection, fallback to common paths
+OPENJPEG_CFLAGS := $(shell pkg-config --cflags libopenjp2 2>/dev/null || echo "-I/opt/homebrew/include/openjpeg-2.5 -I/usr/include/openjpeg-2.5 -I/usr/local/include/openjpeg-2.5")
+OPENJPEG_LIBS := $(shell pkg-config --libs libopenjp2 2>/dev/null || echo "-L/opt/homebrew/lib -L/usr/lib -L/usr/local/lib -lopenjp2")
+PNG_CFLAGS := $(shell pkg-config --cflags libpng 2>/dev/null || echo "-I/opt/homebrew/include -I/usr/include -I/usr/local/include")
+PNG_LIBS := $(shell pkg-config --libs libpng 2>/dev/null || echo "-L/opt/homebrew/lib -L/usr/lib -L/usr/local/lib -lpng")
+ZSTD_CFLAGS := $(shell pkg-config --cflags libzstd 2>/dev/null || echo "-I/opt/homebrew/opt/zstd/include -I/usr/include -I/usr/local/include")
+ZSTD_LIBS := $(shell pkg-config --libs libzstd 2>/dev/null || echo "-L/opt/homebrew/opt/zstd/lib -L/usr/lib -L/usr/local/lib -lzstd")
+LIBSODIUM_CFLAGS := $(shell pkg-config --cflags libsodium 2>/dev/null || echo "-I/opt/homebrew/opt/libsodium/include -I/usr/include -I/usr/local/include")
+LIBSODIUM_LIBS := $(shell pkg-config --libs libsodium 2>/dev/null || echo "-L/opt/homebrew/opt/libsodium/lib -L/usr/lib -L/usr/local/lib -lsodium")
+CATCH2_INCLUDE := -I/opt/homebrew/opt/catch2/include -I/usr/include -I/usr/local/include
+CATCH2_LIBS := -L/opt/homebrew/opt/catch2/lib -L/usr/lib -L/usr/local/lib -lCatch2 -lCatch2Main
+PYBIND11_CFLAGS := -I/opt/homebrew/include -I/usr/include -I/usr/local/include -I/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/include/python3.11 -I/usr/include/python3.11 -I/usr/local/include/python3.11
+PYBIND11_LIBS := -L/opt/homebrew/Cellar/python@3.11/3.11.13/Frameworks/Python.framework/Versions/3.11/lib -L/usr/lib -L/usr/local/lib -lpython3.11
 
 # pybind module target
 PYBIND_MODULE := umdf_reader
