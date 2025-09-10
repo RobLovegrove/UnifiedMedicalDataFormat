@@ -662,6 +662,8 @@ int main(int argc, char** argv) {
             cerr << "Error reading file: " << fileInfo["error"] << endl;
             return 1;
         }
+
+        cout << "File info: " << fileInfo.dump(2) << endl;
         
         cout << "File opened successfully. Module count: " << fileInfo["module_count"] << "\n";
         

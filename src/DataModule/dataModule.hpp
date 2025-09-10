@@ -75,10 +75,7 @@ protected:
     nlohmann::json getNestedValue(const nlohmann::json& data, const std::string& fieldPath);
 
 
-    size_t writeTableRows(std::ostream& out, const std::vector<std::vector<uint8_t>>& dataRows) const;
-
-    void readTableRows
-        (
+    void readTableRows(
             std::istream& in, 
             size_t dataSize, 
             std::vector<std::unique_ptr<DataField>>& fields, 
@@ -95,9 +92,8 @@ protected:
     void writeMetaData(std::ostream& out);
     virtual void writeData(std::ostream& out) const = 0;
     void writeStringBuffer(std::ostream& out);
-
     void writeCompressedMetadata(std::ostream& metadataStream);
-    
+    size_t writeTableRows(std::ostream& out, const std::vector<std::vector<uint8_t>>& dataRows) const;
 
     void encryptModule(std::stringstream& metadataStream, std::stringstream& dataStream, std::ostream& out);
 
@@ -112,9 +108,6 @@ protected:
 
     // Helper method to reconstruct metadata from encoded fields
     nlohmann::json getMetadataAsJson() const;
-
-    // Getter for header (protected for derived classes)
-    const DataHeader& getHeader() const { return *header; }
 
     // Virtual method for module-specific data
     virtual std::variant<nlohmann::json, std::vector<uint8_t>, std::vector<ModuleData>> 

@@ -6,16 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "umdf"
 version = "1.0.0"
 description = "Unified Medical Data Format Python bindings"
-readme = "../README.md"
+readme = "README.md"
 authors = [
     {name = "Rob Lovegrove", email = "rob@example.com"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Healthcare Industry",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",

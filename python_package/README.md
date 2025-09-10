@@ -1,115 +1,62 @@
-# UMDF Python Package
+# UMDF - Unified Medical Data Format
 
-Python bindings for the Unified Medical Data Format (UMDF) library.
+A C++ implementation of a unified medical data format for storing and managing medical data with encryption, compression, and audit trail capabilities.
 
-## Installation
+## Building
 
-### Prerequisites
-
-#### System Dependencies (Ubuntu/Debian)
 ```bash
-sudo apt-get update
-sudo apt-get install libopenjp2-7-dev libpng-dev libzstd-dev libsodium-dev build-essential cmake
+make
 ```
 
-#### System Dependencies (macOS)
+Dependencies: OpenJPEG, libpng, zstd, libsodium, Catch2 (for tests), Python 3.11+ (for pybind11)
+
+## Usage
+
+### Demo
 ```bash
-brew install openjpeg png zstd libsodium
+./umdf_tool demo
 ```
+Runs a comprehensive demonstration with sample data. Output defaults to `demo.umdf` (deleted after completion) or specify with `-o`.
 
-#### Python Dependencies
+### Reading Files
 ```bash
-pip install pybind11 setuptools wheel
+./umdf_tool read -i <file.umdf> [-p password]
 ```
 
-### Install UMDF
-
-#### From Source (Development)
+### Writing Files
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd umdf/python_package
+# Create new file
+./umdf_tool write create -i <mock_data.json> -o <output.umdf> [-p password] [-a author]
 
-# Install in development mode
-pip install -e .
+# Add to existing file
+./umdf_tool write add -i <mock_data.json> -o <existing.umdf> [-e encounter-id] [-p password] [-a author]
+# -e encounter-id: Optional. If provided, adds module to existing encounter. If omitted, creates new encounter.
+
+# Update existing module
+./umdf_tool write update -i <mock_data.json> -o <file.umdf> --module-id <UUID> [-p password] [-a author]
+
+# Add variant to existing module
+./umdf_tool write addVariant -i <mock_data.json> -o <file.umdf> --module-id <parent_UUID> [-p password] [-a author]
+
+# Add annotation to existing module
+./umdf_tool write addAnnotation -i <mock_data.json> -o <file.umdf> --module-id <parent_UUID> [-p password] [-a author]
 ```
 
-#### From Built Package
+## Mock Data
+
+Available in `mock_data/`:
+- `ct_image_data.json` - CT scan with 60 axial slices
+- `mri_image_data.json` - MRI scan with 24 slices
+- `patient_data.json` - Patient demographics and metadata
+- `tabular_data.json` - Tabular clinical data
+
+## Example Files
+
+`example_file1.umdf` contains actual CT imaging data:
+- Topogram (scout image)
+- Axial series with 60 slices
+- Encrypted with password: `password`
+
 ```bash
-# If you have a pre-built wheel
-pip install umdf-1.0.0-py3-none-any.whl
+./umdf_tool read -i example_file1.umdf -p password
 ```
-
-## Quick Start
-
-```python
-import umdf
-
-# Create a new UMDF file
-writer = umdf.Writer()
-result = writer.createNewFile("medical_data.umdf", "doctor", "password")
-
-if result.success:
-    print("File created successfully!")
-    
-    # Create an encounter
-    encounter_result = writer.createNewEncounter()
-    if encounter_result.has_value():
-        encounter_id = encounter_result.value()
-        
-        # Add medical data
-        module_data = umdf.ModuleData()
-        module_data.set_metadata({"patient_id": "12345", "diagnosis": "Healthy"})
-        
-        # Add to encounter
-        add_result = writer.addModuleToEncounter(encounter_id, "schema.json", module_data)
-        if add_result.has_value():
-            print(f"Module added with ID: {add_result.value()}")
-    
-    # Close the file
-    close_result = writer.closeFile()
-    print(f"File closed: {close_result.success}")
-
-# Read the file back
-reader = umdf.Reader()
-open_result = reader.openFile("medical_data.umdf", "password")
-
-if open_result.success:
-    # Get file information
-    file_info = reader.getFileInfo()
-    print(f"File info: {file_info}")
-    
-    # Close the file
-    reader.closeFile()
-```
-
-## API Reference
-
-### Core Classes
-
-- **`Writer`** - Create and write UMDF files
-- **`Reader`** - Read existing UMDF files
-- **`ModuleData`** - Store medical data and metadata
-- **`UUID`** - Unique identifiers for modules and encounters
-
-### Key Methods
-
-#### Writer
-- `createNewFile(filename, author, password)` - Create a new UMDF file
-- `createNewEncounter()` - Create a new medical encounter
-- `addModuleToEncounter(encounter_id, schema_path, module_data)` - Add data to encounter
-- `closeFile()` - Finalize and close the file
-
-#### Reader
-- `openFile(filename, password)` - Open an existing UMDF file
-- `getFileInfo()` - Get information about the open file
-- `getModuleData(module_id)` - Retrieve specific module data
-- `closeFile()` - Close the open file
-
-## Examples
-
-See the `examples/` directory for more detailed usage examples.
-
-## License
-
-[Your License Here]

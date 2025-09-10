@@ -435,12 +435,16 @@ void ObjectField::encodeToBuffer(
         if (value.contains(subName)) {
             field->encodeToBuffer(value[subName], buffer, subOffset);
         } else {
-
-
-            // TODO: Handle optional fields or throw if required
-            // Example:
-            // if (field->isRequired()) throw runtime_error("Missing required field " + subName);
-            // else zero-fill or skip
+            // Check if this field is required
+            bool isRequired = std::find(requiredFields.begin(), requiredFields.end(), subName) != requiredFields.end();
+            
+            if (isRequired) {
+                throw std::runtime_error("Missing required field '" + subName + "' in ObjectField '" + name + "'");
+            } else {
+                // Optional field missing - zero-fill the buffer space
+                size_t fieldLength = field->getLength();
+                std::fill(buffer.begin() + subOffset, buffer.begin() + subOffset + fieldLength, 0);
+            }
         }
         subOffset += field->getLength();
     }

@@ -659,16 +659,6 @@ CompressionType ImageData::getEncoding() const {
     return header->getDataCompression();
 }
 
-// bool ImageData::setEncodingFromString(const std::string& enc_str) {
-//     auto encoding_opt = stringToCompression(enc_str);
-//     if (encoding_opt.has_value()) {
-//         encoding = encoding_opt.value();
-//         return true;  // Success
-//     } else {
-//         return false;  // Invalid encoding
-//     }
-// }
-
 bool ImageData::validateEncodingInSchema() const {
     // Check if the schema defines an encoding field with valid enum values
     if (schemaJson.contains("properties") && 

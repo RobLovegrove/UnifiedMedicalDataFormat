@@ -27,19 +27,21 @@ struct Result {
 
 class Writer {
 private:
+
+    // Attributes
     Header header;
     XRefTable xrefTable;
     ModuleGraph moduleGraph;
 
-    std::unique_ptr<boost::interprocess::file_lock> fileLock;
-
-    std::string filePath;
-    std::string tempFilePath;
-
-    std::fstream fileStream;   
-
     std::string author;
     bool newFile = false;
+    std::unique_ptr<boost::interprocess::file_lock> fileLock;
+
+    // File paths
+    std::string filePath;
+    std::string tempFilePath;
+    std::fstream fileStream;
+
 
     void releaseFileLock();
 
