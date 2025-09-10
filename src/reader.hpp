@@ -147,8 +147,5 @@ public:
      * @note The returned JSON can be used for file browsing and navigation
      */
     nlohmann::json getFileInfo();
-
 };
-
-
 #endif

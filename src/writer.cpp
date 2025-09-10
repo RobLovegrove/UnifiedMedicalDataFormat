@@ -30,7 +30,7 @@ Result Writer::createNewFile(std::string& filename, string author, string passwo
 
     newFile = true;
 
-    //Check file stream is not already open
+    // Check file stream is not already open
     if (fileStream.is_open()) {
         return Result{false, "A file is already open"};
     }
